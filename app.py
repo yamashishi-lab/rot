@@ -606,13 +606,13 @@ if st.button("🔴 Starship Flight 5 スタイル 公式4K生中継を開始 (1:
         scene.add(rocketGroup);
 
         function createRocketMaterial(matId) {{
-            if (matId === 'ss') {
-                return new THREE.MeshStandardMaterial({ color: 0xdde4ec, roughness: 0.12, metalness: 0.98 });
-            } else if (matId === 'cf') {
-                return new THREE.MeshStandardMaterial({ color: 0x141619, roughness: 0.62, metalness: 0.3 });
-            } else {
-                return new THREE.MeshStandardMaterial({ color: 0xf5f7fb, roughness: 0.35, metalness: 0.2 });
-            }
+            if (matId === 'ss') {{
+                return new THREE.MeshStandardMaterial({{ color: 0xdde4ec, roughness: 0.12, metalness: 0.98 }});
+            }} else if (matId === 'cf') {{
+                return new THREE.MeshStandardMaterial({{ color: 0x141619, roughness: 0.62, metalness: 0.3 }});
+            }} else {{
+                return new THREE.MeshStandardMaterial({{ color: 0xf5f7fb, roughness: 0.35, metalness: 0.2 }});
+            }}
         }}
 
         const s1Mat = createRocketMaterial(cfg.s1_mat);
@@ -705,7 +705,7 @@ if st.button("🔴 Starship Flight 5 スタイル 公式4K生中継を開始 (1:
         outerPlume.position.y = -4.25;
         plumeGroup.add(outerPlume);
 
-        // マッハディスク (実機同様の多重ショックパターン)
+        // マッハディスク
         const shockDiamonds = [];
         for (let i = 0; i < 6; i++) {{
             const sd = new THREE.Mesh(
@@ -787,29 +787,24 @@ if st.button("🔴 Starship Flight 5 スタイル 公式4K生中継を開始 (1:
                 camera.position.lerp(new THREE.Vector3(rx + 9, ry + 3, 18), 0.1);
                 camTarget.lerp(new THREE.Vector3(rx, ry + 2, 0), 0.12);
             }} else if (simT < 0.0) {{
-                // 発射台ローアングル (迫力の見上げ視点)
                 document.getElementById('cam-tag').innerText = "PAD CLOSE-UP: STARBASE OLIT-1";
                 camera.position.set(3.5, R_EARTH + 1.8, 12.0);
                 camTarget.set(0, R_EARTH + 5.5, 0);
             }} else if (simT < 3.5) {{
-                // 離床の瞬間: ウォーターデリュージとチョップスティック通過
                 document.getElementById('cam-tag').innerText = "TOWER TRACKER: LIFTOFF & MECHAZILLA CLEARANCE";
                 camera.position.set(3.0, R_EARTH + 1.2, 9.8);
                 camTarget.set(rx, ry + 4.0, 0);
             }} else if (simT < 26.0) {{
-                // 長距離光学望遠トラッカー (大気の揺らぎ・上昇追従)
                 document.getElementById('cam-tag').innerText = "LONG RANGE OPTICAL: BOCA CHICA TRACK";
                 camera.position.set(-18, R_EARTH + 2.5, 42);
                 camTarget.lerp(new THREE.Vector3(rx, ry + 3.5, 0), 0.08);
             }} else if (alt < 65.0) {{
-                // オンボードカメラ (ブースター胴体横から海と排気炎を捉える)
                 document.getElementById('cam-tag').innerText = "SUPER HEAVY ONBOARD: DOWNWARD FIN CHASE";
                 const ox = -upX * 5.2 + upY * 2.8;
                 const oy = -upY * 5.2 - upX * 2.8;
                 camera.position.lerp(new THREE.Vector3(rx + ox, ry + oy, 8.8), 0.12);
                 camTarget.lerp(new THREE.Vector3(rx + upX * 5.0, ry + upY * 5.0, 0), 0.12);
             }} else {{
-                // 宇宙空間 (ホットステージング・宇宙空間軌道投入)
                 document.getElementById('cam-tag').innerText = "ORBITAL TELEMETRY CAM: STARSHIP SPACE TRACK";
                 const ox = -upX * 10.0;
                 const oy = -upY * 10.0;
@@ -863,7 +858,6 @@ if st.button("🔴 Starship Flight 5 スタイル 公式4K生中継を開始 (1:
 
             updateDirectorCam(simT, rx, ry, alt, pitch, pt0.exploded);
 
-            // カウントダウン & 発射台ウォーターデリュージ
             if (simT < 0.0) {{
                 const sec = Math.ceil(Math.abs(simT));
                 if (sec !== lastCountSec && sec <= 10) {{
@@ -881,12 +875,10 @@ if st.button("🔴 Starship Flight 5 スタイル 公式4K生中継を開始 (1:
                 document.getElementById('tv-timer').innerText = `T- 00:0${{sec}}.0`;
                 document.getElementById('tv-status').innerText = (simT >= -3.0) ? "RAPTOR IGNITION / WATER DELUGE ACTIVE" : "TERMINAL COUNTDOWN AUTO SEQUENCE";
 
-                // 極低温LOXベント白煙
                 if (Math.random() < 0.65) {{
                     emitP(rx + 0.72, ry + 6.0 + Math.random()*2, 0, 0.05, -0.02, 0, 0.4, 1.6, 28, 0xedf4fc, 0.55);
                 }}
 
-                // T-3s 大規模ウォーターデリュージ蒸気爆散
                 if (simT >= -3.0) {{
                     cameraShake = 0.12;
                     if (rumbleGain) rumbleGain.gain.setTargetAtTime(0.55, actx.currentTime, 0.1);
@@ -908,7 +900,6 @@ if st.button("🔴 Starship Flight 5 スタイル 公式4K生中継を開始 (1:
                 }}
             }}
 
-            // ヴェイパーコーン (マッハ1.0 前後の超音速凝縮)
             if (vel > 310.0 && vel < 380.0) {{
                 const vapInt = Math.sin(((vel - 310.0) / 70.0) * Math.PI);
                 vaporConeMat.opacity = vapInt * 0.75;
@@ -917,7 +908,6 @@ if st.button("🔴 Starship Flight 5 スタイル 公式4K生中継を開始 (1:
                 vaporConeMat.opacity = 0.0;
             }}
 
-            // イベント実況アナウンス
             if (pt0.event === "SUPERSONIC" && !voicedEvents.has('supersonic') && !pt0.exploded) {{
                 voicedEvents.add('supersonic');
                 speakWebcastHost("Vehicle is supersonic. Transonic buffet nominal.");
@@ -932,7 +922,6 @@ if st.button("🔴 Starship Flight 5 スタイル 公式4K生中継を開始 (1:
                 voicedEvents.add('hotstaging');
                 speakWebcastHost("Hot-staging confirmed! Ship engines are lit, Super Heavy booster initiating boostback maneuver.");
 
-                // ホットステージング時のリング開口部からの爆発的火炎
                 for (let k = 0; k < 40; k++) {{
                     const a = (k / 40) * Math.PI * 2;
                     emitP(rx, ry + 9.5, 0, Math.cos(a)*0.4, Math.sin(a)*0.4, 0, 0.8, 4.0, 30, 0x44bbff, 0.9);
@@ -943,7 +932,6 @@ if st.button("🔴 Starship Flight 5 スタイル 公式4K生中継を開始 (1:
                 speakWebcastHost("Ship engine cutoff confirmed! Starship has reached orbital velocity and entered stable Earth orbit!");
             }}
 
-            // 排気プルーム（高度上昇による超膨張・ジェリーフィッシュ効果）
             if (pt0.thrust && !pt0.exploded) {{
                 plumeGroup.visible = true;
                 plumeGroup.position.y = (pt0.stage === 1) ? 1.0 : s2BaseY;
@@ -966,7 +954,6 @@ if st.button("🔴 Starship Flight 5 スタイル 公式4K生中継を開始 (1:
                 engineLight.intensity = 0.0;
             }}
 
-            // パーティクル更新
             for (let i = 0; i < MAX_P; i++) {{
                 const p = pPool[i];
                 if (!p.active) continue;
@@ -980,7 +967,6 @@ if st.button("🔴 Starship Flight 5 スタイル 公式4K生中継を開始 (1:
                 p.sp.material.opacity = p.o0 * (1.0 - pr * pr);
             }}
 
-            // テレメトリー更新
             document.getElementById('tv-spd').innerText = Math.round(vel * 3.6).toLocaleString();
             document.getElementById('tv-alt').innerText = Math.max(0, alt).toFixed(1);
             document.getElementById('tv-q').innerText   = q.toFixed(1);
