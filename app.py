@@ -56,8 +56,8 @@ with col3:
     total_mass_s1 = s1_fuel + m1_dry + total_mass_s2
     
     twr_s1 = (e1["thrust_sl"] * s1_eng_count) / (total_mass_s1 * 9.80665)
-    dv_s1 = e1["isp_sl"] * 9.80665 * np.log(total_mass_s1 / (total_mass_s1 - s1_fuel))
-    dv_s2 = e2["isp_vac"] * 9.80665 * np.log(total_mass_s2 / (total_mass_s2 - s2_fuel))
+    dv_s1 = float(e1["isp_sl"] * 9.80665 * np.log(total_mass_s1 / (total_mass_s1 - s1_fuel)))
+    dv_s2 = float(e2["isp_vac"] * 9.80665 * np.log(total_mass_s2 / (total_mass_s2 - s2_fuel)))
     total_dv = dv_s1 + dv_s2
 
     st.markdown("---")
@@ -73,23 +73,22 @@ def run_simulation():
     x, y = 0.0, R_earth  # 地球中心からの座標
     vx, vy = 0.0, 0.0
     stage = 1
-    fuel_rem = s1_fuel * 1000.0
+    fuel_rem = float(s1_fuel * 1000.0)
     
     history = []
     status = "飛行中"
     fail_reason = None
 
-    # 第1段で真空用ノズルを使った場合のペナルティ判定
     if e1["type"] == "LH2_VAC":
         return [], "大気圏内で真空専用ノズルを使用したため、発射直後にノズルが過膨張で爆散しました！"
     if twr_s1 <= 1.02:
         return [], f"推力重量比(TWR: {twr_s1:.2f})が不足しており、発射台から浮上できません！"
 
     for step in range(1600): # 最大800秒
-        t = step * dt
-        r = np.sqrt(x**2 + y**2)
-        alt = r - R_earth
-        v = np.sqrt(vx**2 + vy**2)
+        t = float(step * dt)
+        r = float(np.sqrt(x**2 + y**2))
+        alt = float(r - R_earth)
+        v = float(np.sqrt(vx**2 + vy**2))
         
         if alt < 0:
             status = "墜落"
@@ -97,20 +96,19 @@ def run_simulation():
             break
 
         # 大気密度モデル (指数減衰)
-        rho = 1.225 * np.exp(-alt / 7500.0) if alt < 120000 else 0.0
-        q = 0.5 * rho * (v**2) / 1000.0  # 動圧 (kPa)
+        rho = float(1.225 * np.exp(-alt / 7500.0)) if alt < 120000 else 0.0
+        q = float(0.5 * rho * (v**2) / 1000.0)  # 動圧 (kPa)
 
         # ステージ管理と質量・推力計算
         if stage == 1:
             if fuel_rem <= 0:
                 stage = 2
-                fuel_rem = s2_fuel * 1000.0
+                fuel_rem = float(s2_fuel * 1000.0)
             else:
-                cur_mass = (m1_dry + total_mass_s2) * 1000.0 + fuel_rem
-                # 高度によるIspと推力の補間
-                atm_factor = np.exp(-alt / 7500.0)
-                isp = e1["isp_vac"] - (e1["isp_vac"] - e1["isp_sl"]) * atm_factor
-                thrust = (e1["thrust_vac"] - (e1["thrust_vac"] - e1["thrust_sl"]) * atm_factor) * s1_eng_count * 1000.0
+                cur_mass = float((m1_dry + total_mass_s2) * 1000.0 + fuel_rem)
+                atm_factor = float(np.exp(-alt / 7500.0))
+                isp = float(e1["isp_vac"] - (e1["isp_vac"] - e1["isp_sl"]) * atm_factor)
+                thrust = float((e1["thrust_vac"] - (e1["thrust_vac"] - e1["thrust_sl"]) * atm_factor) * s1_eng_count * 1000.0)
                 
                 # Max-Q付近のスロットル制御
                 if 8000 < alt < 16000:
@@ -121,17 +119,17 @@ def run_simulation():
         if stage == 2:
             if fuel_rem <= 0:
                 thrust = 0.0
-                cur_mass = (m2_dry + payload_mass) * 1000.0
+                cur_mass = float((m2_dry + payload_mass) * 1000.0)
             else:
-                cur_mass = (m2_dry + payload_mass) * 1000.0 + fuel_rem
-                atm_factor = np.exp(-alt / 7500.0)
-                isp = e2["isp_vac"] - (e2["isp_vac"] - e2["isp_sl"]) * atm_factor
-                thrust = (e2["thrust_vac"] - (e2["thrust_vac"] - e2["thrust_sl"]) * atm_factor) * s2_eng_count * 1000.0
+                cur_mass = float((m2_dry + payload_mass) * 1000.0 + fuel_rem)
+                atm_factor = float(np.exp(-alt / 7500.0))
+                isp = float(e2["isp_vac"] - (e2["isp_vac"] - e2["isp_sl"]) * atm_factor)
+                thrust = float((e2["thrust_vac"] - (e2["thrust_vac"] - e2["thrust_sl"]) * atm_factor) * s2_eng_count * 1000.0)
                 mdot = thrust / (isp * g0)
                 fuel_rem -= mdot * dt
 
-        # ピッチ角（重力ターン）の計算: 局所水平線に対する角度
-        alt_km = alt / 1000.0
+        # ピッチ角（重力ターン）の計算
+        alt_km = float(alt / 1000.0)
         if alt_km < turn_start_alt:
             pitch_deg = 90.0
         elif alt_km < turn_end_alt:
@@ -140,16 +138,14 @@ def run_simulation():
         else:
             pitch_deg = 0.0
 
-        # 地球中心からの角度
-        theta = np.arctan2(x, y)
-        # ロケットの推力方向ベクトル
-        pitch_rad = np.radians(pitch_deg)
-        dir_x = np.sin(theta) * np.sin(pitch_rad) + np.cos(theta) * np.cos(pitch_rad)
-        dir_y = np.cos(theta) * np.sin(pitch_rad) - np.sin(theta) * np.cos(pitch_rad)
+        theta = float(np.arctan2(x, y))
+        pitch_rad = float(np.radians(pitch_deg))
+        dir_x = float(np.sin(theta) * np.sin(pitch_rad) + np.cos(theta) * np.cos(pitch_rad))
+        dir_y = float(np.cos(theta) * np.sin(pitch_rad) - np.sin(theta) * np.cos(pitch_rad))
 
         # 空気抵抗
         drag_area = 12.0 if stage == 1 else 5.0
-        drag_force = 0.5 * rho * (v**2) * 0.35 * drag_area
+        drag_force = float(0.5 * rho * (v**2) * 0.35 * drag_area)
         if v > 0:
             drag_x = -drag_force * (vx / v)
             drag_y = -drag_force * (vy / v)
@@ -157,46 +153,49 @@ def run_simulation():
             drag_x, drag_y = 0.0, 0.0
 
         # 重力
-        g_cur = g0 * ((R_earth / r) ** 2)
-        grav_x = -cur_mass * g_cur * np.sin(theta)
-        grav_y = -cur_mass * g_cur * np.cos(theta)
+        g_cur = float(g0 * ((R_earth / r) ** 2))
+        grav_x = -cur_mass * g_cur * float(np.sin(theta))
+        grav_y = -cur_mass * g_cur * float(np.cos(theta))
 
         # 合力と加速度
         fx = thrust * dir_x + drag_x + grav_x
         fy = thrust * dir_y + drag_y + grav_y
         ax = fx / cur_mass
         ay = fy / cur_mass
-        acc_g = np.sqrt((thrust * dir_x + drag_x)**2 + (thrust * dir_y + drag_y)**2) / (cur_mass * g0)
+        acc_g = float(np.sqrt((thrust * dir_x + drag_x)**2 + (thrust * dir_y + drag_y)**2) / (cur_mass * g0))
 
         # 破壊判定（シビア要素）
-        mat_limit_q = MATERIALS[s1_mat if stage == 1 else s2_mat]["max_q_limit"]
-        mat_limit_g = MATERIALS[s1_mat if stage == 1 else s2_mat]["max_g"]
+        mat_limit_q = float(MATERIALS[s1_mat if stage == 1 else s2_mat]["max_q_limit"])
+        mat_limit_g = float(MATERIALS[s1_mat if stage == 1 else s2_mat]["max_g"])
 
         if q > mat_limit_q:
             fail_reason = f"T+{t:.0f}秒 (高度{alt_km:.1f}km): 動圧({q:.1f} kPa)が機体構造限界({mat_limit_q} kPa)を超え、空中分解しました！"
-            history.append({"t": t, "x": x, "y": y, "alt": alt_km, "v": v, "q": q, "g": acc_g, "stage": stage, "exploded": True})
+            history.append({"t": t, "x": float(x), "y": float(y), "alt": alt_km, "v": v, "q": q, "g": acc_g, "stage": int(stage), "exploded": True, "thrust": False})
             break
         if acc_g > mat_limit_g:
             fail_reason = f"T+{t:.0f}秒: 過剰なG({acc_g:.1f} G)によりタンク隔壁が圧壊しました！(限界: {mat_limit_g} G)"
-            history.append({"t": t, "x": x, "y": y, "alt": alt_km, "v": v, "q": q, "g": acc_g, "stage": stage, "exploded": True})
+            history.append({"t": t, "x": float(x), "y": float(y), "alt": alt_km, "v": v, "q": q, "g": acc_g, "stage": int(stage), "exploded": True, "thrust": False})
             break
         if alt_km < 60 and v > 2600:
             fail_reason = f"T+{t:.0f}秒 (高度{alt_km:.1f}km): 低高度で加速しすぎたため、空力加熱によりフェアリングが融解しました！"
-            history.append({"t": t, "x": x, "y": y, "alt": alt_km, "v": v, "q": q, "g": acc_g, "stage": stage, "exploded": True})
+            history.append({"t": t, "x": float(x), "y": float(y), "alt": alt_km, "v": v, "q": q, "g": acc_g, "stage": int(stage), "exploded": True, "thrust": False})
             break
 
         # 位置と速度の更新
-        vx += ax * dt
-        vy += ay * dt
-        x += vx * dt
-        y += vy * dt
+        vx = float(vx + ax * dt)
+        vy = float(vy + ay * dt)
+        x = float(x + vx * dt)
+        y = float(y + vy * dt)
 
         if step % 4 == 0: # 2秒おきに記録
-            history.append({"t": t, "x": x, "y": y, "alt": alt_km, "v": v, "q": q, "g": acc_g, "stage": stage, "exploded": False, "thrust": thrust > 0})
+            history.append({
+                "t": t, "x": x, "y": y, "alt": alt_km, "v": v, "q": q, "g": acc_g,
+                "stage": int(stage), "exploded": False, "thrust": bool(thrust > 0)
+            })
 
         # 軌道投入成功判定 (高度180km以上、水平速度7750m/s以上、垂直速度が安定)
-        v_radial = (vx * np.sin(theta) + vy * np.cos(theta))
-        v_tangent = (vx * np.cos(theta) - vy * np.sin(theta))
+        v_radial = float(vx * np.sin(theta) + vy * np.cos(theta))
+        v_tangent = float(vx * np.cos(theta) - vy * np.sin(theta))
         if alt_km >= 180.0 and v_tangent >= 7750.0 and abs(v_radial) < 400.0:
             status = "軌道投入成功"
             break
@@ -218,8 +217,12 @@ if st.button("🔥 イグニッション・発射シークエンス開始", use_
         else:
             st.success("🎉 ミッション成功！ペイロードは安定した地球低軌道（LEO）へ投入されました！")
 
-        # Three.jsによる3D宇宙＆軌道ビジュアライザーの埋め込み
-        traj_json = json.dumps(traj_data)
+        # NumPy型が残っていても安全にJSON化するエンコーダー指定
+        traj_json = json.dumps(
+            traj_data,
+            default=lambda o: float(o) if isinstance(o, np.floating) else (int(o) if isinstance(o, np.integer) else (bool(o) if isinstance(o, np.bool_) else str(o)))
+        )
+        
         html_code = f"""
         <div style="position: relative; width: 100%; height: 520px; background: #000; border-radius: 12px; overflow: hidden; font-family: monospace;">
             <div id="canvas-container" style="width: 100%; height: 100%;"></div>
@@ -243,7 +246,6 @@ if st.button("🔥 イグニッション・発射シークエンス開始", use_
             renderer.setSize(container.clientWidth, container.clientHeight);
             container.appendChild(renderer.domElement);
 
-            // スケール変換 (1 unit = 10km)
             const SCALE = 0.0001;
             const R_EARTH = 6371000 * SCALE;
 
@@ -254,11 +256,11 @@ if st.button("🔥 イグニッション・発射シークエンス開始", use_
             scene.add(earth);
 
             const atmosGeo = new THREE.SphereGeometry(R_EARTH + (100000 * SCALE), 64, 64);
-            const atmosMat = new THREE.MeshBasicMaterial({{ color: 0x4da6ff, transparent: true, opacity: 0.18, wireframe: false }});
+            const atmosMat = new THREE.MeshBasicMaterial({{ color: 0x4da6ff, transparent: true, opacity: 0.18 }});
             const atmos = new THREE.Mesh(atmosGeo, atmosMat);
             scene.add(atmos);
 
-            // 光源と星空
+            // 光源
             const light = new THREE.DirectionalLight(0xffffff, 1.3);
             light.position.set(1000, 1000, 2000);
             scene.add(light);
@@ -298,7 +300,6 @@ if st.button("🔥 イグニッション・発射シークエンス開始", use_
                     points.push(new THREE.Vector3(rx, ry, 0));
                     lineGeo.setFromPoints(points);
 
-                    // 進行方向へロケットを向ける
                     if (idx > 0) {{
                         const prev = data[idx - 1];
                         const angle = Math.atan2(pt.y - prev.y, pt.x - prev.x);
@@ -311,11 +312,9 @@ if st.button("🔥 イグニッション・発射シークエンス開始", use_
                         rocketGroup.scale.set(3, 3, 3);
                     }}
 
-                    // カメラ追従
                     camera.position.set(rx * 0.7, ry * 0.7 + 50, 450);
                     camera.lookAt(rx, ry, 0);
 
-                    // HUD更新
                     document.getElementById('hud-time').innerText = `T+ ${{pt.t.toFixed(1)}} s`;
                     document.getElementById('hud-alt').innerText = `ALTITUDE : ${{pt.alt.toFixed(1)}} km`;
                     document.getElementById('hud-vel').innerText = `VELOCITY : ${{pt.v.toFixed(0)}} m/s`;
