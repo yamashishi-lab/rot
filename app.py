@@ -338,12 +338,12 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         <div id="canvas-container" style="width: 100%; height: 100%;"></div>
 
         <!-- 実写光学レンズフィルムグレイン & アナモフィックフレア & ビネット -->
-        <div style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; background: radial-gradient(circle at center, transparent 50%, rgba(0,3,8,0.85) 100%); z-index: 2;"></div>
+        <div style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; background: radial-gradient(circle at center, transparent 48%, rgba(0,3,8,0.85) 100%); z-index: 2;"></div>
         <div id="film-grain" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; opacity:0.045; z-index:3;"></div>
-        <div id="streak-flare" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; opacity:0; z-index:4; mix-blend-mode: screen; background: linear-gradient(0deg, transparent 48%, rgba(100,200,255,0.25) 50%, transparent 52%); transition: opacity 0.08s;"></div>
+        <div id="streak-flare" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; opacity:0; z-index:4; mix-blend-mode: screen; background: linear-gradient(0deg, transparent 48%, rgba(100,200,255,0.3) 50%, transparent 52%); transition: opacity 0.08s;"></div>
 
         <!-- 放送中継トップバナー -->
-        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 42px; background: rgba(6,10,18,0.85); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 10;">
+        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 42px; background: rgba(6,10,18,0.88); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 10;">
             <div style="display: flex; align-items: center; gap: 12px;">
                 <span style="display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 10px #ef4444; animation: liveBlink 1.4s infinite alternate;"></span>
                 <span style="color: #ffffff; font-weight: 800; font-size: 12px; letter-spacing: 2px;">LIVE WEBCAST</span>
@@ -360,7 +360,7 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
             @keyframes liveBlink {{ from {{ opacity: 0.2; }} to {{ opacity: 1.0; }} }}
         </style>
 
-        <!-- 🛰️ フライトトラッカー (右上HUD: 映像と重ならないコンパクト設計) -->
+        <!-- 🛰️ フライトトラッカー (右上HUD: 画面外周・余白配置) -->
         <div style="position: absolute; top: 52px; right: 20px; width: 250px; background: rgba(8,12,22,0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 10px; z-index: 10;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                 <span style="font-size: 9px; font-weight: 800; color: #38bdf8; letter-spacing: 1px;">TRAJECTORY TRACKER</span>
@@ -507,7 +507,8 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         // =========================================================================
         const scene = new THREE.Scene();
 
-        const camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 4000000);
+        // 望遠レンズ特有の画角圧縮 (FOV: 30度)
+        const camera = new THREE.PerspectiveCamera(30, container.clientWidth / container.clientHeight, 0.1, 4000000);
         const renderer = new THREE.WebGLRenderer({{ antialias: true, powerPreference: "high-performance" }});
         renderer.setSize(container.clientWidth, container.clientHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -525,7 +526,6 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
             ctx.fillStyle = '#0a1726';
             ctx.fillRect(0, 0, 2048, 2048);
 
-            // 沿岸部陸地
             ctx.fillStyle = '#1e2920';
             ctx.beginPath();
             ctx.moveTo(0, 0);
@@ -534,12 +534,10 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
             ctx.lineTo(0, 2048);
             ctx.fill();
 
-            // 砂浜
             ctx.strokeStyle = '#a39068';
             ctx.lineWidth = 18;
             ctx.stroke();
 
-            // 射場コンクリートパッド
             ctx.fillStyle = '#475569';
             ctx.fillRect(560, 940, 260, 200);
 
@@ -555,7 +553,7 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         groundMesh.receiveShadow = true;
         scene.add(groundMesh);
 
-        // 高度に応じたスカイドーム (低空: 青空/朝焼け、高空: 宇宙の星空と地球リム)
+        // 高度に応じたスカイドーム
         const skyGeo = new THREE.SphereGeometry(1500000, 32, 32);
         const skyMat = new THREE.ShaderMaterial({{
             side: THREE.BackSide,
@@ -585,7 +583,6 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
                     vec3 lowAtm = mix(horizon, daySky, smoothstep(0.0, 0.28, h));
                     vec3 sky = mix(lowAtm, spaceSky, altRatio);
                     
-                    // 地球リム大気グロー
                     float rim = smoothstep(0.01, 0.08, h) * (1.0 - smoothstep(0.08, 0.24, h)) * altRatio;
                     sky += vec3(0.25, 0.65, 1.0) * rim * 2.5;
 
@@ -633,7 +630,7 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
             swingArms.push(arm);
         }});
 
-        // --- ロケット本体 (Starship / Falcon風 高精細モデリング) ---
+        // --- ロケット本体 ---
         const rocketGroup = new THREE.Group();
         scene.add(rocketGroup);
 
@@ -659,7 +656,6 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         s1Hull.position.y = s1Len / 2 + 1.4;
         s1Group.add(s1Hull);
 
-        // グリッドフィン
         for (let i = 0; i < 4; i++) {{
             const a = (i * Math.PI) / 2 + Math.PI / 4;
             const fin = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.08, 0.42), nozzleMat);
@@ -672,7 +668,6 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         interstageMesh.position.y = s1Len + 1.4 + 0.55;
         s1Group.add(interstageMesh);
 
-        // 第1段 エンジンノズル群
         const s1EngCount = Math.min(cfg.s1_eng, 33);
         for (let i = 0; i < s1EngCount; i++) {{
             const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.12, 0.45, 16, 1, true), nozzleMat);
@@ -683,7 +678,7 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
             s1Group.add(bell);
         }}
 
-        // 第2段 オービター
+        // 第2段
         const s2Group = new THREE.Group();
         rocketGroup.add(s2Group);
 
@@ -699,14 +694,13 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         s2Group.add(noseMesh);
 
         // =========================================================================
-        // 🔥 実写YouTube級 火炎・ショックダイヤモンド・動的排気プルーム
+        // 🔥 実写排気プルーム・ショックダイヤモンド
         // =========================================================================
         const plumeGroup = new THREE.Group();
         rocketGroup.add(plumeGroup);
 
         const flameColorHex = parseInt(cfg.s1_flame);
 
-        // 超高温中心コア炎 (純白の高輝度発光)
         const coreFlame = new THREE.Mesh(
             new THREE.ConeGeometry(0.55, 6.5, 32),
             new THREE.MeshBasicMaterial({{ color: 0xffffff, transparent: true, opacity: 0.98, blending: THREE.AdditiveBlending }})
@@ -715,7 +709,6 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         coreFlame.position.y = -3.25;
         plumeGroup.add(coreFlame);
 
-        // 外周排気プルーム（高度＝真空度に応じて実写のように巨大化・半透明化）
         const outerPlumeMat = new THREE.MeshBasicMaterial({{
             color: flameColorHex, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending
         }});
@@ -724,7 +717,6 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         outerPlume.position.y = -6.0;
         plumeGroup.add(outerPlume);
 
-        // マッハショックダイヤモンド（低空大気圧縮時の衝撃波結節）
         const shockDiamonds = [];
         for (let i = 0; i < 7; i++) {{
             const sd = new THREE.Mesh(
@@ -737,7 +729,6 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
             shockDiamonds.push(sd);
         }}
 
-        // ベイパーコーン (遷音速水蒸気ショック凝縮)
         const vaporCone = new THREE.Mesh(
             new THREE.ConeGeometry(1.9, 2.6, 32, 1, true),
             new THREE.MeshBasicMaterial({{ color: 0xffffff, transparent: true, opacity: 0.0, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }})
@@ -746,7 +737,7 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         vaporCone.position.y = s2BaseY;
         rocketGroup.add(vaporCone);
 
-        // デリュージ白煙 & 排気スモークパーティクル
+        // デリュージ白煙パーティクル
         function createSmokeTexture() {{
             const c = document.createElement('canvas');
             c.width = 128; c.height = 128;
@@ -788,12 +779,11 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         }}
 
         // =========================================================================
-        // 🗺️ フライトトラッカー (右上にすっきり分離配置)
+        // 🗺️ フライトトラッカー
         // =========================================================================
         function drawFlightTracker(downrangeKm, altKm, velocity) {{
             mapCtx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
 
-            // 背景グリッド
             mapCtx.strokeStyle = 'rgba(255,255,255,0.06)';
             mapCtx.lineWidth = 1;
             for (let x = 20; x < mapCanvas.width; x += 40) {{
@@ -803,7 +793,6 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
                 mapCtx.beginPath(); mapCtx.moveTo(0, y); mapCtx.lineTo(mapCanvas.width, y); mapCtx.stroke();
             }}
 
-            // 海岸線輪郭
             mapCtx.fillStyle = '#1e293b';
             mapCtx.beginPath();
             mapCtx.moveTo(0, 0);
@@ -812,7 +801,6 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
             mapCtx.lineTo(0, 75);
             mapCtx.fill();
 
-            // 予定軌道破線
             mapCtx.strokeStyle = 'rgba(56,189,248,0.25)';
             mapCtx.setLineDash([2, 3]);
             mapCtx.beginPath();
@@ -821,7 +809,6 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
             mapCtx.stroke();
             mapCtx.setLineDash([]);
 
-            // 実飛行プロファイル
             const mapX = 20 + Math.min(200, (downrangeKm / 2400.0) * 200);
             const mapY = 50 - Math.min(32, (downrangeKm / 2400.0) * 32);
 
@@ -832,7 +819,6 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
             mapCtx.lineTo(mapX, mapY);
             mapCtx.stroke();
 
-            // 現在位置ドット
             mapCtx.fillStyle = '#ef4444';
             mapCtx.beginPath();
             mapCtx.arc(mapX, mapY, 3, 0, Math.PI * 2);
@@ -860,47 +846,48 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         }}
 
         // =========================================================================
-        // 🎥 ロストゼロ・常時機体全体捕捉 シネマティックカメラ
+        // 🎥 【根本修正】常時機体全体フレームロック・シネマティック追尾
         // =========================================================================
         let cameraShake = 0.0;
         let stageSeparated = false;
-        const totalRocketH = 16.5; // 全長 (単位)
+        const totalRocketH = 16.5; // 機体全長 (単位)
 
         function updateFullRocketCamera(simT, rx, ry, alt, pitch, exploded) {{
-            // ロケットの重心（中心点）: ノズルから約8m上
-            const rCenterY = ry + (totalRocketH * 0.48);
-            const lookTarget = new THREE.Vector3(rx, rCenterY, 0);
+            // 機体の幾何学的中心（ローカル原点から約8.2m上）
+            const localCenterY = totalRocketH * 0.5;
+            
+            // ピッチ回転（-pitch）を反映した真の3D空間重心座標
+            const rCenterX = rx + Math.sin(pitch) * localCenterY;
+            const rCenterY = ry + Math.cos(pitch) * localCenterY;
+            const lookTarget = new THREE.Vector3(rCenterX, rCenterY, 0);
+
+            // 機体進行方向ベクトル
+            const upX = Math.sin(pitch);
+            const upY = Math.cos(pitch);
+
+            // 進行方向の法線（垂直横方向）
+            const normX = upY;
+            const normY = -upX;
 
             if (exploded) {{
                 document.getElementById('cam-tag').innerText = "OPTICAL: BREAKUP TRACKING";
-                camera.position.lerp(new THREE.Vector3(rx + 25, rCenterY + 10, 45), 0.08);
+                camera.position.lerp(new THREE.Vector3(rx + 25, rCenterY + 10, 50), 0.08);
             }} else if (simT < 0.0) {{
-                // 【発射前 T-10s】発射台とタワー、ロケット全体が見上げる位置にすっぽり収まる画角
+                // 【発射前 T-10s】発射台とタワー、ロケット全体が見上げる位置に綺麗に収まる広角
                 document.getElementById('cam-tag').innerText = "LC-1 PAD TRACKER: FULL VEHICLE 4K";
-                camera.position.set(6.0, 8.5, 28.0);
-            }} else if (alt < 10.0) {{
-                // 【初期上昇 0-10km】地上光学超望遠追従（機体全体＋排気炎＋タワーが画角に収まり続ける）
-                document.getElementById('cam-tag').innerText = "OPTICAL TRACKER: SURFACE CHASE";
-                // 距離を取りながらロケットの垂直上昇に追従
-                const desiredDist = 32.0 + alt * 1.5;
-                camera.position.lerp(new THREE.Vector3(rx - 8.0, rCenterY * 0.7 + 4.0, desiredDist), 0.12);
-            }} else if (alt < 70.0) {{
-                // 【重力ターン〜Max-Q 10-70km】機体全体の傾きと進行方向を見渡す望遠チェイス
-                document.getElementById('cam-tag').innerText = "TRACKER 2: GRAVITY TURN & MAX-Q";
-                const upX = Math.sin(pitch);
-                const upY = Math.cos(pitch);
-                // 機体の斜め後方・十分な距離から機体全体と排気炎を常に捉える
-                const camX = rx - upX * 18.0 + upY * 8.0;
-                const camY = rCenterY - upY * 18.0 - upX * 8.0;
-                camera.position.lerp(new THREE.Vector3(camX, camY, 32.0), 0.14);
+                camera.position.set(6.0, 8.5, 30.0);
             }} else {{
-                // 【成層圏・宇宙空間 70km〜】地球の青い円弧を背景に機体全体を捉えるオービタルビュー
-                document.getElementById('cam-tag').innerText = "ORBITAL TELEMETRY: SPACE INSERTION";
-                const upX = Math.sin(pitch);
-                const upY = Math.cos(pitch);
-                const camX = rx + upX * 14.0 + upY * 10.0;
-                const camY = rCenterY + upY * 14.0 - upX * 10.0;
-                camera.position.lerp(new THREE.Vector3(camX, camY, 36.0), 0.12);
+                // 【常時全体フレームロック】
+                // 距離: 機体長(16.5) + 排気炎(12) = 約28.5単位が常に画角内に収まるカメラ距離(Z=40〜48)
+                document.getElementById('cam-tag').innerText = (alt < 70.0) ? "GROUND TRACKER: ULTRA-TELEPHOTO CHASE" : "ORBITAL TELEMETRY: SPACE INSERTION";
+
+                // カメラは機体の進行方向に対して横・やや後方に位置し、機体全体を見下ろすアングルを保つ
+                const camDistZ = (alt < 10.0) ? 36.0 : 44.0;
+                const camOffX = -upX * 6.0 + normX * 12.0;
+                const camOffY = -upY * 6.0 + normY * 12.0;
+
+                const targetCamPos = new THREE.Vector3(rCenterX + camOffX, rCenterY + camOffY, camDistZ);
+                camera.position.lerp(targetCamPos, 0.14);
             }}
 
             if (cameraShake > 0.005) {{
@@ -909,7 +896,7 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
                 cameraShake *= 0.92;
             }}
 
-            // 常にロケットの中心点（全体）をフレームの真ん中にロック
+            // 常に機体幾何中心を直接凝視（これで絶対に機体を見失わず中央に固定される）
             camera.lookAt(lookTarget);
             skyMat.uniforms.uCameraY.value = camera.position.y;
         }}
