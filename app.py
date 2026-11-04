@@ -6,7 +6,7 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="Orbital Architect Pro: 4K実写打ち上げ生中継", layout="wide")
 
 st.title("🚀 Orbital Architect Pro - 次世代超重量級ロケット打ち上げシミュレーター")
-st.markdown("航空宇宙管制センター公式4Kライブ中継。1:1 リアルタイム軌道力学計算、大気熱歪み（陽炎）シェーダー、多段衝撃波マッハディスク、光学追跡望遠カメラ、完全同期ATC無線実況。")
+st.markdown("航空宇宙管制センター公式4Kライブ中継。実写ブレンド光学パイプライン、完全自動ロストゼロ・ディレクターカメラ、1:1 リアルタイム軌道力学計算。")
 
 # --- 推進剤・材料データベース ---
 PROPELLANTS = {
@@ -153,13 +153,12 @@ m2.metric("総計算速度増分 (ΔV)", f"{total_dv:.0f} m/s", f"S1: {dv_s1:.0f
 m3.metric("限界動圧 Max-Q / 加速度許容値", f"{s1_spec['max_q']:.1f} kPa", f"耐G: {s1_spec['max_g']:.1f} G")
 m4.metric("海面総推力", f"{s1_spec['thrust_sl']:.0f} kN", f"Isp: {s1_spec['isp_sl']:.0f} s")
 
-# --- 物理シミュレーション（相対直交座標系：発射台 y=0 から確実に力強く上昇） ---
+# --- 物理シミュレーション ---
 def run_simulation():
     dt = 0.5
     g0 = 9.80665
     R_earth = 6371000.0
 
-    # x: ダウンレンジ距離 (m), y: 海抜高度 (m)
     x, y = 0.0, 0.0
     vx, vy = 0.0, 0.0
     stage = 1
@@ -169,7 +168,6 @@ def run_simulation():
     history = []
     fail_reason = None
 
-    # T-10s カウントダウン
     for cd_step in range(20):
         t_cd = -10.0 + cd_step * 0.5
         pre_ignition = bool(t_cd >= -3.0)
@@ -191,7 +189,6 @@ def run_simulation():
         rho = float(1.225 * np.exp(-alt / 7400.0)) if alt < 130000 else 0.0
         q = float(0.5 * rho * (v**2) / 1000.0)
 
-        # 重力ターン ピッチ角の算出 (90度=垂直上昇, 0度=水平)
         if alt_km < turn_start_alt:
             pitch_deg = 90.0
         elif alt_km < turn_end_alt:
@@ -201,7 +198,6 @@ def run_simulation():
             pitch_deg = 0.0
 
         pitch_rad = float(np.radians(pitch_deg))
-        # 画面描画用のロケット傾斜角 (ラジアン)
         visual_pitch = float(np.radians(90.0 - pitch_deg))
 
         cur_event = "FLIGHT"
@@ -254,17 +250,14 @@ def run_simulation():
                 mdot = thrust / (isp * g0)
                 fuel_rem -= mdot * dt
 
-        # 推力ベクトル
         dir_x = float(np.cos(pitch_rad))
         dir_y = float(np.sin(pitch_rad))
 
-        # 抗力
         drag_area = (12.0 * s1_spec["cd_mod"]) if stage == 1 else (5.2 * s2_spec["cd_mod"])
         drag_force = float(0.5 * rho * (v**2) * fair_spec["cd"] * drag_area)
         drag_x = -drag_force * (vx / v) if v > 0 else 0.0
         drag_y = -drag_force * (vy / v) if v > 0 else 0.0
 
-        # 重力（地球曲率と遠心力補正）
         g_cur = float(g0 * ((R_earth / (R_earth + alt)) ** 2))
         centrifugal_acc = (vx ** 2) / (R_earth + alt)
         grav_y = -cur_mass * (g_cur - centrifugal_acc)
@@ -272,9 +265,14 @@ def run_simulation():
         fx = thrust * dir_x + drag_x
         fy = thrust * dir_y + drag_y + grav_y
 
-        ax = fx / cur_mass
-        ay = fy / cur_mass
-        acc_g = float(np.sqrt((thrust * dir_x + drag_x)**2 + (thrust * dir_y + drag_y)**2) / (cur_mass * g0))
+        if alt <= 0.0 and fy <= 0.0 and t < 0.5:
+            ax, ay = 0.0, 0.0
+            vx, vy = 0.0, 0.0
+            acc_g = 1.0
+        else:
+            ax = fx / cur_mass
+            ay = fy / cur_mass
+            acc_g = float(np.sqrt((thrust * dir_x + drag_x)**2 + (thrust * dir_y + drag_y)**2) / (cur_mass * g0))
 
         cur_spec = s1_spec if stage == 1 else s2_spec
         if q > cur_spec["max_q"]:
@@ -333,7 +331,7 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         <!-- 3D レンダリングキャンバス -->
         <div id="canvas-container" style="width: 100%; height: 100%; pointer-events: none;"></div>
 
-        <!-- 4K光学望遠レンズの周辺光量落ち (Vignette) & フィルム粒子感 -->
+        <!-- 実写4K光学レンズ周辺減光 (Vignette) & フィルムグレイン -->
         <div style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; background: radial-gradient(circle at center, transparent 40%, rgba(2,5,10,0.85) 100%); z-index: 2;"></div>
 
         <!-- 放送中継トップバナー (公式Webcast英語表記) -->
@@ -392,7 +390,7 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         const flashOverlay = document.getElementById('flash-overlay');
 
         // =========================================================================
-        // 🎙️ 司令管制室 ATC / Webcast 公式英語アナウンス ＆ アナログ音響
+        // 🎙️ 司令管制室 ATC / Webcast 公式英語アナウンス ＆ 音響シンセサイザー
         // =========================================================================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let actx = null;
@@ -482,7 +480,7 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         const scene = new THREE.Scene();
         scene.fog = new THREE.FogExp2(0x182434, 0.0001);
 
-        const camera = new THREE.PerspectiveCamera(34, container.clientWidth / container.clientHeight, 0.05, 1500000);
+        const camera = new THREE.PerspectiveCamera(34, container.clientWidth / container.clientHeight, 0.05, 2000000);
         const renderer = new THREE.WebGLRenderer({{ antialias: true, powerPreference: "high-performance" }});
         renderer.setSize(container.clientWidth, container.clientHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -491,9 +489,6 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
-
-        // 1単位 = 10メートル
-        const SCALE = 0.1;
 
         // --- プロシージャル テクスチャ (金属鏡面・溶接線・霜) ---
         function generateProceduralMetalTexture(type) {{
@@ -523,8 +518,8 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
             return new THREE.CanvasTexture(c);
         }}
 
-        // 大西洋のリアルな波浪海面 (y = -0.5)
-        const seaGeo = new THREE.PlaneGeometry(20000, 20000, 64, 64);
+        // 大西洋の波浪海面 (y = -0.5)
+        const seaGeo = new THREE.PlaneGeometry(30000, 30000, 64, 64);
         const seaMat = new THREE.MeshStandardMaterial({{
             color: 0x061320,
             roughness: 0.16,
@@ -536,7 +531,7 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         scene.add(seaMesh);
 
         // 朝焼けの地平線大気スカイドーム
-        const skyGeo = new THREE.SphereGeometry(350000, 32, 32);
+        const skyGeo = new THREE.SphereGeometry(450000, 32, 32);
         const skyMat = new THREE.ShaderMaterial({{
             side: THREE.BackSide,
             vertexShader: `
@@ -552,11 +547,11 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
                 void main() {{
                     vec3 dir = normalize(vWorldPosition);
                     float h = dir.y;
-                    vec3 skyTop = vec3(0.010, 0.020, 0.045);
+                    vec3 skyTop = vec3(0.008, 0.016, 0.04);
                     vec3 skyMid = vec3(0.12, 0.24, 0.40);
                     vec3 horizon = vec3(0.95, 0.54, 0.24);
-                    vec3 col = mix(horizon, skyMid, smoothstep(0.0, 0.20, h));
-                    col = mix(col, skyTop, smoothstep(0.20, 0.72, h));
+                    vec3 col = mix(horizon, skyMid, smoothstep(0.0, 0.18, h));
+                    col = mix(col, skyTop, smoothstep(0.18, 0.70, h));
                     gl_FragColor = vec4(col, 1.0);
                 }}
             `
@@ -569,7 +564,7 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         scene.add(sun);
         scene.add(new THREE.AmbientLight(0x2a3648, 0.85));
 
-        const engineLight = new THREE.PointLight(0x38bdf8, 0.0, 160);
+        const engineLight = new THREE.PointLight(0x38bdf8, 0.0, 180);
         scene.add(engineLight);
 
         // --- 1. 海岸打ち上げ複合施設 LC-1 ---
@@ -800,7 +795,7 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
         let cameraShake = 0.0;
         let stageSeparated = false;
 
-        // --- 6. 実写テレビ中継ディレクターカメラワーク ---
+        // --- 6. 完全ロストゼロ・実写Webcastディレクターカメラ (7ステージ自動スイッチ) ---
         const camTarget = new THREE.Vector3(0, 6, 0);
         function updateDirectorCam(simT, rx, ry, alt, pitch, exploded) {{
             const upX = Math.sin(pitch);
@@ -808,32 +803,44 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
 
             if (exploded) {{
                 document.getElementById('cam-tag').innerText = "OPTICAL TRACKER: CATASTROPHIC VEHICLE BREAKUP";
-                camera.position.lerp(new THREE.Vector3(rx + 9, ry + 3, 18), 0.1);
+                camera.position.lerp(new THREE.Vector3(rx + 12, ry + 4, 25), 0.1);
                 camTarget.lerp(new THREE.Vector3(rx, ry + 2, 0), 0.12);
             }} else if (simT < 0.0) {{
-                document.getElementById('cam-tag').innerText = "LC-1 HERO CAM: PAD CLOSE-UP";
-                camera.position.set(3.6, 1.8, 12.5);
-                camTarget.set(0, 5.5, 0);
-            }} else if (simT < 3.8) {{
-                document.getElementById('cam-tag').innerText = "TOWER TRACKER: LIFTOFF & UMBILICAL CLEAR";
-                camera.position.set(3.2, 1.4, 10.2);
-                camTarget.set(rx, ry + 4.2, 0);
-            }} else if (simT < 26.0) {{
-                document.getElementById('cam-tag').innerText = "LONG RANGE OPTICAL: COASTAL ASCENT TRACK";
-                camera.position.set(-18, 2.5, 44);
-                camTarget.lerp(new THREE.Vector3(rx, ry + 3.8, 0), 0.08);
-            }} else if (alt < 65.0) {{
-                document.getElementById('cam-tag').innerText = "BOOSTER FORWARD ONBOARD: ATMOSPHERIC CHASE";
-                const ox = -upX * 5.4 + upY * 2.8;
-                const oy = -upY * 5.4 - upX * 2.8;
-                camera.position.lerp(new THREE.Vector3(rx + ox, ry + oy, 8.8), 0.12);
-                camTarget.lerp(new THREE.Vector3(rx + upX * 5.0, ry + upY * 5.0, 0), 0.12);
+                // 【ステージ1: 発射直前 T-10s】発射台ローアングル見上げ
+                document.getElementById('cam-tag').innerText = "LC-1 PAD HERO TRACKER [OPTICAL 4K]";
+                camera.position.set(4.2, 1.8, 14.5);
+                camTarget.set(0, 6.0, 0);
+            }} else if (simT < 4.0) {{
+                // 【ステージ2: 離床 T+0〜4s】タワークリアランス＆デリュージ白煙
+                document.getElementById('cam-tag').innerText = "TOWER RETRACT CAM: LIFTOFF DYNAMICS";
+                camera.position.set(3.5, 2.2, 12.0);
+                camTarget.set(rx, ry + 5.0, 0);
+            }} else if (alt < 15.0) {{
+                // 【ステージ3: 初期垂直上昇】地上固定追尾トラッカー（海と地平線を背景に上昇）
+                document.getElementById('cam-tag').innerText = "LONG RANGE SURFACE TRACKER [FLAME CHASE]";
+                camera.position.lerp(new THREE.Vector3(-25.0, 3.5, 55.0), 0.08);
+                camTarget.lerp(new THREE.Vector3(rx, ry + 4.0, 0), 0.15);
+            }} else if (alt < 60.0) {{
+                // 【ステージ4: Max-Q & 超音速音速突破】機体オンボード後方追尾（翼面とエンジン火炎、湾岸を見下ろす）
+                document.getElementById('cam-tag').innerText = "AETHEL-9 ONBOARD CAM: INTERSTAGE DOWNSIGHT";
+                const camOffX = -upX * 6.5 + upY * 3.2;
+                const camOffY = -upY * 6.5 - upX * 3.2;
+                camera.position.lerp(new THREE.Vector3(rx + camOffX, ry + camOffY, 9.5), 0.20);
+                camTarget.lerp(new THREE.Vector3(rx + upX * 4.0, ry + upY * 4.0, 0), 0.20);
+            }} else if (alt < 110.0) {{
+                // 【ステージ5: ホットステージング & 成層圏】中継ヘリ・高空長距離追跡（クラゲ雲排気プルーム）
+                document.getElementById('cam-tag').innerText = "STRATOSPHERIC TRACKER: HOT-STAGING PROFILE";
+                const chaseX = -upX * 12.0 + upY * 5.0;
+                const chaseY = -upY * 12.0 - upX * 5.0;
+                camera.position.lerp(new THREE.Vector3(rx + chaseX, ry + chaseY, 18.0), 0.12);
+                camTarget.lerp(new THREE.Vector3(rx, ry, 0), 0.15);
             }} else {{
-                document.getElementById('cam-tag').innerText = "ORBITAL INSERTION CAM: 160KM TELEMETRY";
-                const ox = -upX * 10.0;
-                const oy = -upY * 10.0;
-                camera.position.lerp(new THREE.Vector3(rx + ox + 8, ry + oy + 5, 22), 0.08);
-                camTarget.lerp(new THREE.Vector3(rx, ry, 0), 0.1);
+                // 【ステージ6: 宇宙空間・軌道投入】オービター前方・地球リム（大気の青い円弧）背景
+                document.getElementById('cam-tag').innerText = "ORBITAL TELEMETRY: SECOND STAGE VACUUM BURN";
+                const fwdX = upX * 8.5;
+                const fwdY = upY * 8.5;
+                camera.position.lerp(new THREE.Vector3(rx + fwdX + 5.0, ry + fwdY + 3.0, 14.0), 0.15);
+                camTarget.lerp(new THREE.Vector3(rx, ry, 0), 0.18);
             }}
 
             if (cameraShake > 0.005) {{
@@ -867,7 +874,7 @@ if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:
             let alpha = 0.0;
             if (pt1.t > pt0.t) alpha = Math.max(0, Math.min(1, (simT - pt0.t) / (pt1.t - pt0.t)));
 
-            // 1単位 = 10m
+            // スケール変換: 10m = 1単位
             const rx = (pt0.x + (pt1.x - pt0.x) * alpha) * 0.1;
             const ry = (pt0.y + (pt1.y - pt0.y) * alpha) * 0.1;
             const alt = pt0.alt + (pt1.alt - pt0.alt) * alpha;
