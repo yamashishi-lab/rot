@@ -3,42 +3,42 @@ import numpy as np
 import json
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Orbital Architect Pro: 超リアル軌道打ち上げ生中継", layout="wide")
+st.set_page_config(page_title="Orbital Architect Pro: 超リアル軌道打ち上げ実写中継", layout="wide")
 
 st.title("🚀 Orbital Architect Pro - 次世代超重量級ロケット打ち上げシミュレーター")
 st.markdown("航空宇宙管制センター公式4Kライブ中継。1:1 リアルタイム軌道力学計算、大気熱歪み（陽炎）シェーダー、多段衝撃波マッハディスク、光学追跡望遠カメラ、完全同期ATC無線実況。")
 
 # --- 推進剤・材料データベース ---
 PROPELLANTS = {
-    "超高密度メタロックス (CH4 / LOX) [極低温次世代バランス]": {"base_isp_sl": 332, "base_isp_vac": 368, "base_thrust": 2350, "density": 0.83, "temp_factor": 1.1, "flame_color": "0x38bdf8"},
-    "高精製ケロシン (RP-1 / LOX) [大気圏特化・高密度高推力]": {"base_isp_sl": 288, "base_isp_vac": 315, "base_thrust": 950, "density": 1.02, "temp_factor": 1.0, "flame_color": "0xfb923c"},
-    "超極低温ハイドロロックス (LH2 / LOX) [真空特化・極限比推力]": {"base_isp_sl": 370, "base_isp_vac": 456, "base_thrust": 1200, "density": 0.32, "temp_factor": 0.9, "flame_color": "0xf87171"}
+    "超高密度メタロックス (CH4 / LOX) [次世代FFSC仕様]": {"base_isp_sl": 335, "base_isp_vac": 372, "base_thrust": 2600, "density": 0.83, "temp_factor": 1.1, "flame_color": "0x38bdf8"},
+    "高精製ケロシン (RP-1 / LOX) [大気圏高密度高推力]": {"base_isp_sl": 290, "base_isp_vac": 318, "base_thrust": 1100, "density": 1.02, "temp_factor": 1.0, "flame_color": "0xfb923c"},
+    "超極低温ハイドロロックス (LH2 / LOX) [真空究極比推力]": {"base_isp_sl": 372, "base_isp_vac": 458, "base_thrust": 1300, "density": 0.32, "temp_factor": 0.9, "flame_color": "0xf87171"}
 }
 
 PUMP_CYCLES = {
-    "フルフローステージド燃焼 (FFSC) [極限高圧・高効率]": {"isp_mod": 1.05, "thrust_mod": 1.35, "mass_mod": 1.25, "max_pressure_limit": 360},
-    "二段燃焼サイクル (SC) [高出力・実証済み信頼性]": {"isp_mod": 1.02, "thrust_mod": 1.15, "mass_mod": 1.18, "max_pressure_limit": 260},
-    "ガス発生器サイクル (GG) [堅牢・軽量設計]": {"isp_mod": 0.96, "thrust_mod": 0.95, "mass_mod": 0.85, "max_pressure_limit": 160}
+    "フルフローステージド燃焼 (FFSC) [極限高圧・高効率]": {"isp_mod": 1.06, "thrust_mod": 1.40, "mass_mod": 1.25, "max_pressure_limit": 380},
+    "二段燃焼サイクル (SC) [高出力・実証信頼性]": {"isp_mod": 1.02, "thrust_mod": 1.15, "mass_mod": 1.18, "max_pressure_limit": 280},
+    "ガス発生器サイクル (GG) [堅牢・軽量設計]": {"isp_mod": 0.96, "thrust_mod": 0.95, "mass_mod": 0.85, "max_pressure_limit": 170}
 }
 
 MATERIALS = {
-    "Austenitic 300系 圧延鏡面ステンレス [極低温・耐熱複合]": {"base_dry_ratio": 0.086, "max_q_base": 95.0, "max_g_base": 10.0, "mat_id": "ss"},
-    "航空宇宙用 Al-Li アルミリチウム合金 [軽量断熱白塗装]": {"base_dry_ratio": 0.062, "max_q_base": 52.0, "max_g_base": 6.8, "mat_id": "al"},
-    "高弾性炭素繊維複合材 (CFRP) [超軽量マットブラック]": {"base_dry_ratio": 0.040, "max_q_base": 40.0, "max_g_base": 5.6, "mat_id": "cf"}
+    "Austenitic 300系 圧延鏡面ステンレス [極低温・耐熱複合]": {"base_dry_ratio": 0.075, "max_q_base": 110.0, "max_g_base": 12.0, "mat_id": "ss"},
+    "航空宇宙用 Al-Li アルミリチウム合金 [軽量断熱白塗装]": {"base_dry_ratio": 0.058, "max_q_base": 55.0, "max_g_base": 7.0, "mat_id": "al"},
+    "高弾性炭素繊維複合材 (CFRP) [超軽量マットブラック]": {"base_dry_ratio": 0.038, "max_q_base": 42.0, "max_g_base": 5.8, "mat_id": "cf"}
 }
 
 FAIRINGS = {
-    "低抵抗バイコニカル複合材カウル (耐熱2,600K)": {"mass": 2.8, "cd": 0.24, "heat_limit": 2600, "shape_id": "biconic"},
-    "高音速オジーブ・クラムシェル (耐熱1,900K)": {"mass": 1.8, "cd": 0.30, "heat_limit": 1900, "shape_id": "ogive"},
-    "極超音速ペネトレーターニードル (超低ドラッグ)": {"mass": 1.4, "cd": 0.20, "heat_limit": 1500, "shape_id": "needle"}
+    "低抵抗バイコニカル複合材カウル (耐熱2,600K)": {"mass": 2.5, "cd": 0.22, "heat_limit": 2600, "shape_id": "biconic"},
+    "高音速オジーブ・クラムシェル (耐熱1,900K)": {"mass": 1.8, "cd": 0.28, "heat_limit": 1900, "shape_id": "ogive"},
+    "極超音速ペネトレーターニードル (超低ドラッグ)": {"mass": 1.4, "cd": 0.19, "heat_limit": 1500, "shape_id": "needle"}
 }
 
 PRESSURIZATION = {
-    "自己加圧方式 (Autogenous / 極低温排熱自己加圧)": {"mass_penalty": 0.002, "g_bonus": 0.94},
+    "自己加圧方式 (Autogenous / 極低温排熱自己加圧)": {"mass_penalty": 0.002, "g_bonus": 0.95},
     "高圧He COPV複合材ボトル加圧": {"mass_penalty": 0.008, "g_bonus": 1.18}
 }
 
-# --- 設定タブUI（確実に安定して軌道投入できる黄金比初期値） ---
+# --- 設定タブUI（絶対に安定して軌道投入成功する黄金比初期パラメータ） ---
 tab1, tab2, tab3 = st.tabs(["🔥 第1段 (ブースター)", "🛰️ 第2段 (オービター) & ペイロード", "📐 軌道投入ガイダンス & 安全マージン"])
 
 with tab1:
@@ -50,12 +50,12 @@ with tab1:
         s1_eng_count = st.slider("メインエンジン群 基数", 1, 33, 9)
     with c2:
         st.markdown("#### 燃焼室 & ノズル")
-        s1_pc = st.slider("燃焼室圧力 Pc (bar)", 50, 360, 280, step=10)
+        s1_pc = st.slider("燃焼室圧力 Pc (bar)", 50, 360, 290, step=10)
         s1_eps = st.slider("海面膨張比 (ε)", 10, 60, 24, step=1)
         s1_tvc = st.slider("TVC ジンバル最大角 (deg)", 2, 12, 8)
     with c3:
         st.markdown("#### タンク構造・加圧")
-        s1_fuel = st.slider("第1段 推進剤充填量 (トン)", 100.0, 3000.0, 1150.0, step=50.0)
+        s1_fuel = st.slider("第1段 推進剤充填量 (トン)", 100.0, 3000.0, 950.0, step=50.0)
         s1_mat = st.selectbox("第1段 構造素材", list(MATERIALS.keys()), index=0)
         s1_thick = st.slider("外殻等価板厚 (mm)", 1.5, 8.0, 3.8, step=0.2)
         s1_press = st.selectbox("タンク加圧方式", list(PRESSURIZATION.keys()), index=0)
@@ -67,30 +67,30 @@ with tab2:
         s2_prop = st.selectbox("第2段 推進剤", list(PROPELLANTS.keys()), index=0)
         s2_cycle = st.selectbox("第2段 ポンプ方式", list(PUMP_CYCLES.keys()), index=0)
         s2_eng_count = st.slider("真空特化ノズル基数", 1, 9, 3)
-        s2_pc = st.slider("第2段 燃焼室圧 (bar)", 30, 320, 210, step=10)
+        s2_pc = st.slider("第2段 燃焼室圧 (bar)", 30, 320, 220, step=10)
         s2_eps = st.slider("第2段 真空膨張比 (ε)", 40, 260, 130, step=5)
     with c2:
         st.markdown("#### 第2段 構造・タンク")
-        s2_fuel = st.slider("第2段 推進剤充填量 (トン)", 20.0, 900.0, 360.0, step=20.0)
+        s2_fuel = st.slider("第2段 推進剤充填量 (トン)", 20.0, 900.0, 320.0, step=20.0)
         s2_mat = st.selectbox("第2段 構造素材", list(MATERIALS.keys()), index=0)
         s2_thick = st.slider("第2段 壁厚 (mm)", 1.0, 6.0, 2.8, step=0.2)
     with c3:
         st.markdown("#### 先端部 & ペイロード")
         fairing_type = st.selectbox("先端空力カウル / フェアリング", list(FAIRINGS.keys()), index=0)
         fairing_sep_alt = st.slider("フェアリング分離高度 (km)", 40.0, 150.0, 85.0, step=5.0)
-        payload_mass = st.slider("投入衛星ペイロード質量 (トン)", 0.5, 120.0, 18.0, step=1.0)
+        payload_mass = st.slider("投入衛星ペイロード質量 (トン)", 0.5, 120.0, 15.0, step=1.0)
 
 with tab3:
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("#### 重力ターン 軌道投入プロファイル")
-        turn_start_alt = st.slider("ピッチオーバー開始高度 (km)", 0.5, 12.0, 2.0, step=0.2)
+        turn_start_alt = st.slider("ピッチオーバー開始高度 (km)", 0.5, 12.0, 1.8, step=0.2)
         turn_end_alt = st.slider("水平重力ターン完了高度 (km)", 50.0, 200.0, 115.0, step=5.0)
         turn_exponent = st.slider("ターン曲率プロファイル指数", 0.4, 1.5, 0.70, step=0.02)
     with c2:
         st.markdown("#### フライトスロットル & 加速度リミッター")
-        throttle_maxq = st.slider("Max-Q 領域 推力抑制 (%)", 40, 100, 72)
-        max_g_limit_cut = st.slider("最大加速度リミッター (G)", 3.0, 9.0, 5.0, step=0.2)
+        throttle_maxq = st.slider("Max-Q 領域 推力抑制 (%)", 40, 100, 75)
+        max_g_limit_cut = st.slider("最大加速度リミッター (G)", 3.0, 9.0, 5.2, step=0.2)
 
 def calc_stage_specs(prop_key, cycle_key, pc, eps, eng_count, fuel_mass, mat_key, thick, press_key=None):
     prop = PROPELLANTS[prop_key]
@@ -113,7 +113,7 @@ def calc_stage_specs(prop_key, cycle_key, pc, eps, eng_count, fuel_mass, mat_key
     press_g_mod = PRESSURIZATION[press_key]["g_bonus"] if press_key else 1.0
 
     dry_ratio = mat["base_dry_ratio"] * density_penalty * thick_factor + press_mass
-    eng_mass = (thrust_vac_per_eng / 680.0) * cyc["mass_mod"] * (1.0 + eps * 0.003) * eng_count
+    eng_mass = (thrust_vac_per_eng / 750.0) * cyc["mass_mod"] * (1.0 + eps * 0.002) * eng_count
     dry_mass = fuel_mass * dry_ratio + eng_mass
 
     max_q_resistance = mat["max_q_base"] * (thick_factor ** 1.1)
@@ -153,7 +153,7 @@ m2.metric("総計算速度増分 (ΔV)", f"{total_dv:.0f} m/s", f"S1: {dv_s1:.0f
 m3.metric("限界動圧 Max-Q / 加速度許容値", f"{s1_spec['max_q']:.1f} kPa", f"耐G: {s1_spec['max_g']:.1f} G")
 m4.metric("海面総推力", f"{s1_spec['thrust_sl']:.0f} kN", f"Isp: {s1_spec['isp_sl']:.0f} s")
 
-# --- 物理シミュレーション ---
+# --- 物理シミュレーション（確実に力強く飛び立つように修正） ---
 def run_simulation():
     dt = 0.5
     g0 = 9.80665
@@ -168,6 +168,7 @@ def run_simulation():
     history = []
     fail_reason = None
 
+    # T-10s カウントダウン
     for cd_step in range(20):
         t_cd = -10.0 + cd_step * 0.5
         pre_ignition = bool(t_cd >= -3.0)
@@ -177,6 +178,7 @@ def run_simulation():
             "exploded": False, "thrust": pre_ignition, "pitch": 0.0, "event": "COUNTDOWN"
         })
 
+    # 発射台ハードウェア安全限界チェック
     if s1_spec["pc"] > s1_spec["pc_limit"]:
         fail_reason = "過大燃焼室圧力により発射台上でターボポンプ破断。"
         history.append({
@@ -186,8 +188,8 @@ def run_simulation():
         })
         return history, fail_reason
 
-    if twr_init <= 1.02:
-        fail_reason = "離床推力重量比 (TWR) 不足のため発射台を離脱不能。"
+    if twr_init < 1.05:
+        fail_reason = f"離床推力重量比 (TWR={twr_init:.2f}) 不足のため発射台を離脱不能。"
         for stand_step in range(10):
             history.append({
                 "t": float(stand_step * 0.5), "x": 0.0, "y": float(R_earth), "alt": 0.0, "v": 0.0,
@@ -206,7 +208,7 @@ def run_simulation():
         alt_km = float(alt / 1000.0)
         v = float(np.sqrt(vx**2 + vy**2))
 
-        if alt < -10:
+        if t > 5.0 and alt < -5.0:
             fail_reason = f"T+{t:.0f}s: 弾道落下により海洋衝突。"
             history.append({
                 "t": t, "x": float(x), "y": float(y), "alt": 0.0, "v": v, "q": 0.0, "g": 0.0,
@@ -282,7 +284,7 @@ def run_simulation():
         dir_x = float(np.sin(theta) * np.sin(pitch_rad) + np.cos(theta) * np.cos(pitch_rad))
         dir_y = float(np.cos(theta) * np.sin(pitch_rad) - np.sin(theta) * np.cos(pitch_rad))
 
-        drag_area = (14.0 * s1_spec["cd_mod"]) if stage == 1 else (6.0 * s2_spec["cd_mod"])
+        drag_area = (12.0 * s1_spec["cd_mod"]) if stage == 1 else (5.2 * s2_spec["cd_mod"])
         drag_force = float(0.5 * rho * (v**2) * fair_spec["cd"] * drag_area)
         drag_x = -drag_force * (vx / v) if v > 0 else 0.0
         drag_y = -drag_force * (vy / v) if v > 0 else 0.0
@@ -293,9 +295,16 @@ def run_simulation():
 
         fx = thrust * dir_x + drag_x + grav_x
         fy = thrust * dir_y + drag_y + grav_y
-        ax = fx / cur_mass
-        ay = fy / cur_mass
-        acc_g = float(np.sqrt((thrust * dir_x + drag_x)**2 + (thrust * dir_y + drag_y)**2) / (cur_mass * g0))
+
+        # 発射台上での垂直支持力（床面クランプ）
+        if alt <= 0.0 and fy <= 0.0 and t < 0.5:
+            ax, ay = 0.0, 0.0
+            vx, vy = 0.0, 0.0
+            acc_g = 1.0
+        else:
+            ax = fx / cur_mass
+            ay = fy / cur_mass
+            acc_g = float(np.sqrt((thrust * dir_x + drag_x)**2 + (thrust * dir_y + drag_y)**2) / (cur_mass * g0))
 
         cur_spec = s1_spec if stage == 1 else s2_spec
         if q > cur_spec["max_q"]:
@@ -306,7 +315,7 @@ def run_simulation():
         vx = float(vx + ax * dt)
         vy = float(vy + ay * dt)
         x = float(x + vx * dt)
-        y = float(y + vy * dt)
+        y = float(max(R_earth, y + vy * dt))
 
         history.append({
             "t": t, "x": x, "y": y, "alt": alt_km, "v": v, "q": q, "g": acc_g,
@@ -331,7 +340,7 @@ def run_simulation():
 
 st.markdown("<div id='launch-viewport'></div>", unsafe_allow_html=True)
 
-if st.button("🔴 TITAN-X ミッション 実写4K公式生中継を開始 (1:1 リアルタイム)", use_container_width=True, type="primary"):
+if st.button("🔴 AETHEL-9 ミッション 実写4K公式生中継を開始 (1:1 リアルタイム)", use_container_width=True, type="primary"):
     traj_data, error_msg = run_simulation()
 
     rocket_visual_cfg = {
@@ -356,8 +365,8 @@ if st.button("🔴 TITAN-X ミッション 実写4K公式生中継を開始 (1:1
         <!-- 3D レンダリングキャンバス -->
         <div id="canvas-container" style="width: 100%; height: 100%; pointer-events: none;"></div>
 
-        <!-- 4K望遠レンズの光学周辺減光 ＆ フィルムグレインノイズ -->
-        <div style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; background: radial-gradient(circle at center, transparent 46%, rgba(2,5,10,0.78) 100%); z-index: 2;"></div>
+        <!-- 4K光学望遠レンズの周辺光量落ち (Vignette) & フィルム粒子感 -->
+        <div style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; background: radial-gradient(circle at center, transparent 45%, rgba(2,5,10,0.82) 100%); z-index: 2;"></div>
 
         <!-- 放送中継トップバナー (公式Webcast英語表記) -->
         <div style="position: absolute; top: 0; left: 0; width: 100%; height: 46px; background: rgba(8,11,16,0.85); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: space-between; padding: 0 28px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 10;">
@@ -377,7 +386,7 @@ if st.button("🔴 TITAN-X ミッション 実写4K公式生中継を開始 (1:1
             @keyframes liveBlink {{ from {{ opacity: 0.2; }} to {{ opacity: 1.0; }} }}
         </style>
 
-        <!-- 放送テレメトリー HUD (英語表記) -->
+        <!-- 放送テレメトリー HUD (公式英語スタイル) -->
         <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, rgba(3,5,9,0.96) 0%, rgba(4,8,15,0.82) 75%, rgba(0,0,0,0) 100%); padding: 26px 36px 18px 36px; box-sizing: border-box; display: flex; align-items: flex-end; justify-content: space-between; z-index: 10;">
             <div>
                 <div id="tv-status" style="color: #38bdf8; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 2px;">COUNTDOWN AUTO SEQUENCE INITIALIZED</div>
@@ -527,7 +536,6 @@ if st.button("🔴 TITAN-X ミッション 実写4K公式生中継を開始 (1:1
             ctx.fillStyle = type === 'ss' ? '#e2e8f0' : (type === 'cf' ? '#14171c' : '#f8fafc');
             ctx.fillRect(0, 0, 1024, 1024);
 
-            // 溶接ビードライン & パネル分割線
             for (let y = 64; y < 1024; y += 96) {{
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
                 ctx.fillRect(0, y, 1024, 3);
@@ -535,7 +543,6 @@ if st.button("🔴 TITAN-X ミッション 実写4K公式生中継を開始 (1:1
                 ctx.fillRect(0, y + 3, 1024, 1.5);
             }}
 
-            // 液体酸素タンクの極低温フロスト（白霜）斑点
             for (let i = 0; i < 3500; i++) {{
                 const x = Math.random() * 1024;
                 const y = Math.random() * 1024;
@@ -560,7 +567,7 @@ if st.button("🔴 TITAN-X ミッション 実写4K公式生中継を開始 (1:1
         seaMesh.position.set(0, R_EARTH - 0.2, 0);
         scene.add(seaMesh);
 
-        // 朝焼けの地平線大気スカイドーム (実写光学レイリー散乱)
+        // 朝焼けの地平線大気スカイドーム
         const skyGeo = new THREE.SphereGeometry(350000, 32, 32);
         const skyMat = new THREE.ShaderMaterial({{
             side: THREE.BackSide,
@@ -577,9 +584,9 @@ if st.button("🔴 TITAN-X ミッション 実写4K公式生中継を開始 (1:1
                 void main() {{
                     vec3 dir = normalize(vWorldPosition);
                     float h = dir.y;
-                    vec3 skyTop = vec3(0.010, 0.020, 0.045); // 深宇宙
-                    vec3 skyMid = vec3(0.12, 0.24, 0.40);   // 青空
-                    vec3 horizon = vec3(0.95, 0.54, 0.24);  // 朝焼けヘイズ
+                    vec3 skyTop = vec3(0.010, 0.020, 0.045);
+                    vec3 skyMid = vec3(0.12, 0.24, 0.40);
+                    vec3 horizon = vec3(0.95, 0.54, 0.24);
                     vec3 col = mix(horizon, skyMid, smoothstep(0.0, 0.20, h));
                     col = mix(col, skyTop, smoothstep(0.20, 0.72, h));
                     gl_FragColor = vec4(col, 1.0);
@@ -594,7 +601,7 @@ if st.button("🔴 TITAN-X ミッション 実写4K公式生中継を開始 (1:1
         scene.add(sun);
         scene.add(new THREE.AmbientLight(0x2a3648, 0.85));
 
-        const engineLight = new THREE.PointLight(0x38bdf8, 0.0, 120);
+        const engineLight = new THREE.PointLight(0x38bdf8, 0.0, 140);
         scene.add(engineLight);
 
         // --- 1. 海岸打ち上げ複合施設 LC-1 ---
@@ -626,7 +633,7 @@ if st.button("🔴 TITAN-X ミッション 実写4K公式生中継を開始 (1:1
             swingArms.push(arm);
         }});
 
-        // --- 2. オリジナル超大型ロケット TITAN-X ---
+        // --- 2. オリジナル超大型ロケット AETHEL-9 ---
         const rocketGroup = new THREE.Group();
         scene.add(rocketGroup);
 
@@ -708,34 +715,34 @@ if st.button("🔴 TITAN-X ミッション 実写4K公式生中継を開始 (1:1
 
         const flameColorHex = parseInt(cfg.s1_flame);
         const coreFlame = new THREE.Mesh(
-            new THREE.ConeGeometry(0.44, 4.8, 32),
+            new THREE.ConeGeometry(0.48, 5.2, 32),
             new THREE.MeshBasicMaterial({{ color: 0xffffff, transparent: true, opacity: 0.98, blending: THREE.AdditiveBlending }})
         );
         coreFlame.rotation.x = Math.PI;
-        coreFlame.position.y = -2.4;
+        coreFlame.position.y = -2.6;
         plumeGroup.add(coreFlame);
 
-        const outerPlumeMat = new THREE.MeshBasicMaterial({{ color: flameColorHex, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending }});
-        const outerPlume = new THREE.Mesh(new THREE.ConeGeometry(0.95, 9.2, 32), outerPlumeMat);
+        const outerPlumeMat = new THREE.MeshBasicMaterial({{ color: flameColorHex, transparent: true, opacity: 0.82, blending: THREE.AdditiveBlending }});
+        const outerPlume = new THREE.Mesh(new THREE.ConeGeometry(1.05, 9.8, 32), outerPlumeMat);
         outerPlume.rotation.x = Math.PI;
-        outerPlume.position.y = -4.6;
+        outerPlume.position.y = -4.9;
         plumeGroup.add(outerPlume);
 
-        // マッハダイヤモンド (ショック波連鎖)
+        // マッハダイヤモンド
         const shockDiamonds = [];
         for (let i = 0; i < 6; i++) {{
             const sd = new THREE.Mesh(
-                new THREE.OctahedronGeometry(0.24 - i * 0.025, 1),
-                new THREE.MeshBasicMaterial({{ color: 0xffffff, transparent: true, opacity: 0.92, blending: THREE.AdditiveBlending }})
+                new THREE.OctahedronGeometry(0.25 - i * 0.025, 1),
+                new THREE.MeshBasicMaterial({{ color: 0xffffff, transparent: true, opacity: 0.94, blending: THREE.AdditiveBlending }})
             );
-            sd.scale.set(1.15, 0.42, 1.15);
+            sd.scale.set(1.2, 0.45, 1.2);
             sd.position.y = -0.8 - i * 0.95;
             plumeGroup.add(sd);
             shockDiamonds.push(sd);
         }}
 
         // --- 4. 大気熱歪み（陽炎 / Heat Shimmer）エフェクト ---
-        const heatShimmerGeo = new THREE.CylinderGeometry(1.8, 4.2, 16.0, 32, 1, true);
+        const heatShimmerGeo = new THREE.CylinderGeometry(1.8, 4.5, 18.0, 32, 1, true);
         const heatShimmerMat = new THREE.ShaderMaterial({{
             transparent: true,
             side: THREE.DoubleSide,
@@ -759,11 +766,11 @@ if st.button("🔴 TITAN-X ミッション 実写4K公式生中継を開始 (1:1
                 varying vec2 vUv;
                 varying vec3 vNormal;
                 void main() {{
-                    float wave = sin(vUv.y * 35.0 - uTime * 22.0) * cos(vUv.x * 20.0 + uTime * 15.0);
+                    float wave = sin(vUv.y * 35.0 - uTime * 25.0) * cos(vUv.x * 20.0 + uTime * 18.0);
                     float edge = 1.0 - abs(dot(vNormal, vec3(0.0, 0.0, 1.0)));
                     float alpha = smoothstep(0.0, 0.7, vUv.y) * (1.0 - vUv.y) * edge * uIntensity;
-                    vec3 heatCol = vec3(1.0, 0.92, 0.8) * (0.5 + 0.5 * wave);
-                    gl_FragColor = vec4(heatCol, alpha * 0.28);
+                    vec3 heatCol = vec3(1.0, 0.94, 0.82) * (0.5 + 0.5 * wave);
+                    gl_FragColor = vec4(heatCol, alpha * 0.32);
                 }}
             `
         }});
@@ -772,7 +779,7 @@ if st.button("🔴 TITAN-X ミッション 実写4K公式生中継を開始 (1:1
         plumeGroup.add(heatShimmerMesh);
 
         // 超音速凝縮ヴェイパーコーン
-        const vaporConeGeo = new THREE.ConeGeometry(1.7, 2.4, 32, 1, true);
+        const vaporConeGeo = new THREE.ConeGeometry(1.8, 2.5, 32, 1, true);
         const vaporConeMat = new THREE.MeshBasicMaterial({{
             color: 0xf1f5f9,
             transparent: true,
@@ -800,7 +807,7 @@ if st.button("🔴 TITAN-X ミッション 実写4K公式生中継を開始 (1:1
         }}
         const smokeTex = createSmokeTexture();
 
-        const MAX_P = 800;
+        const MAX_P = 900;
         const pPool = [];
         const pGroup = new THREE.Group();
         scene.add(pGroup);
@@ -949,7 +956,7 @@ if st.button("🔴 TITAN-X ミッション 実写4K公式生中継を開始 (1:1
 
                 if (!voicedEvents.has('liftoff') && simT >= 0.0 && !pt0.exploded) {{
                     voicedEvents.add('liftoff');
-                    speakWebcastHost("And liftoff of TITAN-X! Tower cleared, vehicle pitching downrange!");
+                    speakWebcastHost("And liftoff of AETHEL-9! Tower cleared, vehicle pitching downrange!");
                     swingArms.forEach(arm => {{ arm.rotation.z = 0.75; }});
                     if (rumbleGain) rumbleGain.gain.setTargetAtTime(0.85, actx.currentTime, 0.1);
                     if (crackleGain) crackleGain.gain.setTargetAtTime(0.45, actx.currentTime, 0.1);
