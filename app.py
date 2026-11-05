@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 st.title("🚀 Orbital Architect Extreme - 4K実写級航空宇宙シミュレーター")
-st.caption("※ 完全復元仕様：高精細多重構造ロケット・個別ノズル直結流体バーナー炎・ケープカナベラルPBRランドスケープ")
+st.caption("※ 完全復元仕様：実時間同期リアル物理・ケープカナベラルPad 39A実写級ランドスケープ・2画面独立シネマ中継")
 
 # =========================================================================
 # 🔬 推進剤・材料・空力パーツ・ブースターデータベース
@@ -111,7 +111,7 @@ with tab3:
         wing_type = st.selectbox("機体外部 空力パーツ", list(AERO_WINGS.keys()), index=0)
         angle_of_attack = st.slider("固定取り付け迎角 AoA (deg)", -3.0, 12.0, 0.5, step=0.5)
     with c2:
-        st.info("💡 **実写ディテール完全復元**: 鉛筆のような簡易円筒を完全撤廃。各ノズル直結の流体バーナー火炎、ストリンガー、TPS耐熱タイル、金箔衛星をフルスペックで再構築しました。")
+        st.info("💡 **実写ディテール完全復元**: 各ノズル直結の流体バーナー火炎、ストリンガー、TPS耐熱タイル、精密発射台トラスをフルスペックで再構築しました。")
 
 with tab4:
     c1, c2, c3 = st.columns(3)
@@ -211,7 +211,7 @@ m3.metric("構造限界動圧 / 耐G", f"{s1_spec['max_q']:.1f} kPa", f"耐G: {s
 m4.metric("ブースター追加推力", f"+{strapon_spec['thrust_add']:.0f} kN", f"基数: {strapon_spec['count']} 基")
 
 # =========================================================================
-# 💥 物理シミュレーション (離床過渡応答)
+# 💥 物理シミュレーション (現実時間軸1:1完全同期)
 # =========================================================================
 def run_simulation(preview_only=False):
     if preview_only:
@@ -460,7 +460,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 完全描画テンプレート (4K実写シネマ仕様魔改造)
+# 📺 HTML / JS 完全描画テンプレート (実時間同期 ＆ CAM 02完全稼働)
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -471,7 +471,7 @@ html_template = """
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #01040a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; }
         #canvas-main { width: 100%; height: 100%; display: block; }
         .vignette { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; box-shadow: inset 0 0 160px rgba(0,0,0,0.88); z-index: 5; }
-        .grain { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 6; opacity: 0.035; background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 3px 3px; }
+        .grain { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 6; opacity: 0.03; background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 3px 3px; }
         
         /* 🎥 PiP 右上完全独立配置 (被り防止ベゼル ＆ 実写シネマアスペクト) */
         .pip-border { position: absolute; top: 54px; right: 20px; width: 340px; height: 195px; border: 1.5px solid rgba(56, 189, 248, 0.65); border-radius: 4px; pointer-events: auto; cursor: pointer; z-index: 20; box-shadow: 0 14px 40px rgba(0,0,0,0.92); backdrop-filter: blur(4px); transition: all 0.2s ease; }
@@ -480,7 +480,7 @@ html_template = """
         .pip-alt { position: absolute; top: 222px; right: 28px; font-size: 10px; font-family: monospace; color: #38bdf8; font-weight: 700; background: rgba(15, 23, 42, 0.88); padding: 2px 6px; border-radius: 2px; z-index: 25; pointer-events: none; }
         .pip-toggle-hint { position: absolute; top: 60px; right: 26px; font-size: 9px; font-family: monospace; color: #94a3b8; background: rgba(15, 23, 42, 0.88); padding: 3px 6px; border-radius: 2px; z-index: 25; pointer-events: none; }
 
-        /* 🛰️ 軌道HUD 左上配置 (半透明・最小化可能・ロケット全景に被らない) */
+        /* 🛰️ 軌道HUD 左上配置 */
         .hud-orbit { position: absolute; top: 54px; left: 20px; width: 280px; background: rgba(3, 7, 18, 0.65); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; padding: 10px 12px; box-sizing: border-box; z-index: 15; color: #fff; }
         .hud-orbit:hover { background: rgba(3, 7, 18, 0.85); }
         
@@ -495,7 +495,7 @@ html_template = """
     <div class="vignette"></div>
     <div class="grain"></div>
     
-    <!-- 2画面用PiP 右上ベゼル枠 (CAM 02: 海岸線長距離超望遠実写カメラ) -->
+    <!-- 2画面用PiP 右上ベゼル枠 (CAM 02: 実写超望遠トラッカー) -->
     <div id="pip-frame" class="pip-border" title="クリックでPiPの表示/非表示を切り替え"></div>
     <div id="pip-tag" class="pip-tag">CAM 02: COASTAL TELEPHOTO</div>
     <div id="pip-hud-alt" class="pip-alt">ALT: 0.0 km</div>
@@ -516,7 +516,7 @@ html_template = """
         </div>
     </div>
 
-    <!-- 左上に配置された軌道トラジェクトリHUD ＆ 実況コールアウト -->
+    <!-- 左上軌道トラジェクトリHUD ＆ 実況コールアウト -->
     <div class="hud-orbit" id="hud-orbit-box">
         <div style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 1.2px; margin-bottom: 4px; display: flex; justify-content: space-between;">
             <span>DOWNRANGE TRAJECTORY</span>
@@ -595,7 +595,7 @@ html_template = """
         });
 
         // =========================================================================
-        // 🔊 映画級サブウーファー・ロケット音響エンジン
+        // 🔊 音響エンジン
         // =========================================================================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let actx = null, rumbleGain = null, crackleGain = null, delugeGain = null;
@@ -640,11 +640,12 @@ html_template = """
         }
 
         // =========================================================================
-        // 🌍 Three.js シーン ＆ リアル映画調ライティング
+        // 🌍 Three.js シーン ＆ カメラ構築 (CAM 02を完璧に調整)
         // =========================================================================
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x0a1628);
-        scene.fog = new THREE.FogExp2(0x0e1e36, 0.000035);
+        const sceneFog = new THREE.FogExp2(0x0e1e36, 0.000035);
+        scene.fog = sceneFog;
 
         const renderer = new THREE.WebGLRenderer({ canvas: canvasMain, antialias: true, powerPreference: "high-performance" });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -654,12 +655,13 @@ html_template = """
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-        // 🎥 CAM 01: 実写シネマ広角カメラ
+        // 🎥 CAM 01: 近接シネマ広角カメラ (FOV 38度)
         const cameraMain = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 1.0, 50000000);
         
-        // 🎥 CAM 02: 海岸線長距離超望遠実写トラッカー (クリッピング調整で確実にレンダリング)
-        const cameraPip = new THREE.PerspectiveCamera(9.0, 340 / 195, 1.0, 50000000);
-        cameraPip.position.set(-6200, 160, 7800);
+        // 🎥 CAM 02: 発射台から850m離れた南東の海岸線追尾マストに設置した超望遠実写カメラ (FOV 12度)
+        // 遠景クリッピングと距離を最適化し、何もない空間ではなくロケット・火炎・発射台を確実に捉える
+        const cameraPip = new THREE.PerspectiveCamera(12.0, 340 / 195, 2.0, 50000000);
+        cameraPip.position.set(-650, 45, 820);
 
         const sunLight = new THREE.DirectionalLight(0xfffaed, 5.8);
         sunLight.position.set(7000, 11000, 8000);
@@ -768,7 +770,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🏗️ 発射台 Pad 39A 精密フレームモデリング
+        // 🏗️ 発射台 Pad 39A 精密立体トラス・フレームモデリング
         // =========================================================================
         const pad = new THREE.Group();
         scene.add(pad);
@@ -783,24 +785,43 @@ html_template = """
         groundPlate.receiveShadow = true;
         pad.add(groundPlate);
 
+        // コンクリート掘削フレームトレンチ（火炎排気ダクト）
         const flameTrench = new THREE.Mesh(new THREE.BoxGeometry(22, 10, 42), concreteMat);
         flameTrench.position.set(0, -2.5, 0);
         pad.add(flameTrench);
 
+        // OLM (軌道発射マウント)
         const olmRing = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 4.2, 2.2, 32), darkSteelMat);
         olmRing.position.y = 5.2;
         olmRing.castShadow = true;
         pad.add(olmRing);
 
-        const tower = new THREE.Mesh(new THREE.BoxGeometry(5.2, 72.0, 5.2), darkSteelMat);
-        tower.position.set(-11.5, 36.0, 0);
-        tower.castShadow = true;
-        pad.add(tower);
+        // 巨大整備タワー (メインピラー ＋ 立体トラスクロスバー)
+        const towerGroup = new THREE.Group();
+        towerGroup.position.set(-11.5, 0, 0);
+        pad.add(towerGroup);
+
+        const towerMain = new THREE.Mesh(new THREE.BoxGeometry(5.2, 72.0, 5.2), darkSteelMat);
+        towerMain.position.y = 36.0;
+        towerMain.castShadow = true;
+        towerGroup.add(towerMain);
+
+        for(let ty = 6.0; ty < 70.0; ty += 8.0) {
+            const platform = new THREE.Mesh(new THREE.BoxGeometry(7.5, 0.4, 7.5), darkSteelMat);
+            platform.position.y = ty;
+            towerGroup.add(platform);
+        }
 
         const accessArm = new THREE.Mesh(new THREE.BoxGeometry(9.0, 2.4, 2.2), darkSteelMat);
         accessArm.position.set(-5.5, 52.0, 0);
         pad.add(accessArm);
 
+        // 極低温アンビリカル配管
+        const cryoPipes = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 65.0, 16), pipeMat);
+        cryoPipes.position.set(-9.2, 32.5, 2.4);
+        pad.add(cryoPipes);
+
+        // 避雷マスト4基
         for(let mAng of [0.6, 2.4, 3.9, 5.5]) {
             const lMast = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.55, 68.0, 8), hazardMat);
             lMast.position.set(Math.cos(mAng)*52, 34.0, Math.sin(mAng)*52);
@@ -1268,7 +1289,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🎥 カメラ追随制御 (引いた実写アングル ＆ 海岸線超望遠トラッカー)
+        // 🎥 カメラ追随制御 (現実シネマ構図 ＆ CAM 02超望遠追尾)
         // =========================================================================
         const smoothOffset = new THREE.Vector3(75.0, 26.0, 145.0);
         const activeFocusWorld = new THREE.Vector3();
@@ -1284,7 +1305,7 @@ html_template = """
                 rocket.localToWorld(activeFocusWorld);
             }
 
-            // 🎥 CAM 02: 海岸線長距離超望遠カメラ
+            // 🎥 CAM 02: 望遠カメラの被写体追随（発射台近辺〜上昇中も常に対象を中心にロック）
             cameraPip.lookAt(activeFocusWorld);
             document.getElementById('pip-hud-alt').innerText = `ALT: ${Math.max(0, alt).toFixed(1)} km`;
 
@@ -1329,7 +1350,7 @@ html_template = """
         }
 
         // =========================================================================
-        // ⏱️ アニメーション・メインループ (実写級物理分離＆実況コールアウト)
+        // ⏱️ アニメーション・メインループ (実時間1:1同期 ＆ CAM 02完全描画)
         // =========================================================================
         const tStart = performance.now();
         let boosterDetached = false;
@@ -1343,6 +1364,7 @@ html_template = """
             requestAnimationFrame(animate);
             initAudio();
 
+            // 1秒＝1秒の完全実時間軸同期
             const elapsedSec = (now - tStart) / 1000.0;
             const simT = simCfg.is_preview ? -10.0 : (-10.0 + elapsedSec);
             plumeShaderMat.uniforms.uTime.value = elapsedSec;
@@ -1372,9 +1394,7 @@ html_template = """
             const ux = Math.sin(pitch), uy = Math.cos(pitch);
             const perpX = Math.cos(pitch), perpY = -Math.sin(pitch);
 
-            // =====================================================================
-            // 🚀 リアル実況コールアウトシステム (Flight Operations Audio Sync)
-            // =====================================================================
+            // 実況コールアウト (同期アナウンス)
             if (!simCfg.is_preview) {
                 if (simT >= -10.0 && simT < -5.0 && !voicedEvents.has('t_minus_10')) {
                     voicedEvents.add('t_minus_10');
@@ -1403,9 +1423,7 @@ html_template = """
                 }
             }
 
-            // =====================================================================
-            // 🛩️ 1. ブースター実機風分離物理 (Korolev Cross: 先端ピッチアウト＆尾引き)
-            // =====================================================================
+            // 1. ブースター切り離し (Korolev Cross)
             if (!p0.strapon && !boosterDetached && boosterUnits.length > 0 && !simCfg.is_preview) {
                 boosterDetached = true;
                 playPyro();
@@ -1419,7 +1437,6 @@ html_template = """
                     const outX = Math.cos(b.angle);
                     const outZ = Math.sin(b.angle);
                     const sepP = simCfg.sep_thrust;
-                    // 先端ガスベントによるピッチアウトモーメント（外側に頭を開いて十字を描く）
                     b.vx = ux * (vel * 0.068) + perpX * outX * (3.8 * sepP);
                     b.vy = uy * (vel * 0.068) + perpY * outX * (3.8 * sepP) - 2.5;
                     b.vz = outZ * (3.8 * sepP);
@@ -1436,7 +1453,6 @@ html_template = """
                     b.mesh.rotation.x += b.rx * 0.016;
                     b.mesh.rotation.z += b.rz * 0.016;
 
-                    // 残存推進剤の微細な煙尾引き
                     if (Math.random() < 0.28) {
                         emitParticle(
                             b.mesh.position.x, b.mesh.position.y, b.mesh.position.z,
@@ -1447,9 +1463,7 @@ html_template = """
                 }
             }
 
-            // =====================================================================
-            // 🔥 2. 第1段ホットステージング分離 (高圧排気干渉＆段間リング排出)
-            // =====================================================================
+            // 2. 第1段ホットステージング分離
             if (p0.stage === 2 && !stage1Detached && !simCfg.is_preview) {
                 stage1Detached = true;
                 playPyro();
@@ -1466,7 +1480,6 @@ html_template = """
                 s1Vel.vy = uy * (vel * 0.068) - uy * 5.8;
                 s1Vel.rotZ = 0.42;
 
-                // ホットステージング時の火炎ブラスト衝撃波リング
                 for(let k=0; k<14; k++) {
                     const ang = (k / 14) * Math.PI * 2;
                     emitParticle(
@@ -1483,9 +1496,7 @@ html_template = """
                 s1Group.rotation.z += s1Vel.rotZ * 0.016;
             }
 
-            // =====================================================================
-            // 🛰️ 3. フェアリングクラムシェル分離 (横押しパイロピストン)
-            // =====================================================================
+            // 3. フェアリング分離
             if (!p0.fairing && !fairingDetached && fairingHalves.length > 0 && !simCfg.is_preview) {
                 fairingDetached = true;
                 playPyro();
@@ -1508,9 +1519,7 @@ html_template = """
                 }
             }
 
-            // =====================================================================
-            // 💥 4. ノズル直結スパークシャワー＆流体バーナー火炎
-            // =====================================================================
+            // 4. ノズル直結バーナー火炎
             if (p0.thrust && !p0.exploded && !simCfg.is_preview) {
                 const vacFactor = Math.min(1.0, alt / 65.0);
                 plumeShaderMat.uniforms.uVacFactor.value = vacFactor;
@@ -1561,7 +1570,7 @@ html_template = """
                 engineBounceLight.intensity = 0.0;
             }
 
-            // 5. 圧縮気体白煙RCSパルス噴射
+            // 5. RCSパルス噴射
             const pitchRate = Math.abs(pitch - prevPitch);
             prevPitch = pitch;
             let rcsFiring = false;
@@ -1588,7 +1597,7 @@ html_template = """
             updateDualCameraTracking(simT, elapsedSec, alt, pitch, p0.stage, p0.exploded);
             drawOrbitMap(alt, dRangeKm, p0.exploded);
 
-            // 6. カウントダウン・消音注水・先行点火・離床
+            // 6. カウントダウン・水冷注水・点火・離床
             if (simT < 0.0) {
                 const sec = Math.ceil(Math.abs(simT));
                 document.getElementById('tv-timer').innerText = simCfg.is_preview ? "PAD INSPECTION" : `T- 00:0${sec}.0`;
@@ -1700,6 +1709,8 @@ html_template = """
             const w = window.innerWidth;
             const h = window.innerHeight;
 
+            // 1. メイン画面描画 (全画面)
+            scene.fog = sceneFog;
             renderer.setScissorTest(false);
             renderer.clear();
 
@@ -1708,12 +1719,14 @@ html_template = """
             renderer.setViewport(0, 0, w, h);
             renderer.render(scene, cameraMain);
 
+            // 2. PiP 画面描画 (CAM 02: 望遠時はフォグを外してクリアに実写描画)
             if (pipVisible) {
                 const pipW = 340;
                 const pipH = 195;
                 const pipX = w - pipW - 20;
                 const pipY = h - pipH - 54;
 
+                scene.fog = null; // 望遠カメラの霧消失バグを防止
                 renderer.setScissorTest(true);
                 renderer.setScissor(pipX, pipY, pipW, pipH);
                 renderer.setViewport(pipX, pipY, pipW, pipH);
@@ -1721,6 +1734,7 @@ html_template = """
                 cameraPip.aspect = pipW / pipH;
                 cameraPip.updateProjectionMatrix();
                 renderer.render(scene, cameraPip);
+                scene.fog = sceneFog;
             }
         }
 
