@@ -4,13 +4,13 @@ import json
 import streamlit.components.v1 as components
 
 st.set_page_config(
-    page_title="Orbital Architect Extreme: 4K Cinema Dual Photoreal Engine", 
+    page_title="Orbital Architect Extreme: 極限リアリズム航空宇宙4K中継", 
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-st.title("🚀 Orbital Architect Extreme - 4K実写デュアル中継＆航空宇宙物理シミュレーター")
-st.caption("※ 完全復元版：流体GLSLプルーム・高密度PBRマテリアル・ケープカナベラル大西洋ランドスケープ・非干渉デュアル中継")
+st.title("🚀 Orbital Architect Extreme - 4K実写デュアル中継＆極限リアリズム航空宇宙シミュレーター")
+st.caption("※ 完全復元仕様：流体GLSLショックダイヤモンド・圧縮気体RCS・PBRケープ海岸線・金箔MLI衛星・非干渉デュアル中継")
 
 # =========================================================================
 # 🔬 超膨大！推進剤・サイクル・材料・ブースター・空力・先端部データベース
@@ -148,7 +148,7 @@ with tab3:
         wing_type = st.selectbox("機体外部 空力パーツ", list(AERO_WINGS.keys()), index=0)
         angle_of_attack = st.slider("固定取り付け迎角 AoA (deg)", -3.0, 12.0, 0.5, step=0.5)
     with c2:
-        st.info("💡 **高密度完全復元**: 削られていたパラボラ再生冷却ノズル、多層PBR海岸線地形、流体GLSLプルーム、RUD破片物理をすべて最高品質で復活させました。")
+        st.info("💡 **完全復元仕様**: 流体GLSLショックダイヤモンド火炎、圧縮気体白煙RCS、六角形TPS耐熱タイル、金箔MLI衛星、ケープ砂州・大西洋PBR海面をすべて完全実装。")
 
 with tab4:
     c1, c2, c3 = st.columns(3)
@@ -762,7 +762,7 @@ html_template = """
         oceanMesh.position.set(6500, -0.6, 0);
         landscapeGroup.add(oceanMesh);
 
-        // 遠景：NASA VAB
+        // 遠景ランドマーク：NASA VAB
         const vabGroup = new THREE.Group();
         vabGroup.position.set(-4200, 0, -1800);
         const vabMain = new THREE.Mesh(new THREE.BoxGeometry(160, 150, 180), new THREE.MeshStandardMaterial({ color: 0xdbeafe, roughness: 0.4 }));
@@ -916,8 +916,7 @@ html_template = """
         let pIdx = 0;
         function emitP(x, y, z, vx, vy, vz, s0, s1, life, op, col, add) {
             const p = pPool[pIdx]; pIdx = (pIdx + 1) % P_MAX;
-            p.active = true; p.sp.visible = true;
-            p.sp.position.set(x, y, z);
+            p.active = true; p.sp.visible = true; p.sp.position.set(x, y, z);
             p.vx = vx; p.vy = vy; p.vz = vz; p.age = 0; p.maxAge = life; p.s0 = s0; p.s1 = s1; p.o = op;
             p.sp.material.color.setHex(col);
             p.sp.material.blending = add ? THREE.AdditiveBlending : THREE.NormalBlending;
