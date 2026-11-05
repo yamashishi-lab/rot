@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 st.title("🚀 Orbital Architect Pro - 極限リアル航空宇宙シミュレーター")
-st.markdown("NASA/SpaceX公式Webcast仕様。実写衛星光学パイプライン、超望遠ディレクターカメラ、厳密軌道力学＆破壊力学。")
+st.markdown("NASA / SpaceX公式Webcast追尾仕様。光学トラッカー絶対ロックオン、リアル水蒸気消音噴射、実写大気散乱＆超音速破壊力学。")
 
 # =========================================================================
 # 🔬 推進剤・材料・空力パーツ データベース
@@ -107,7 +107,7 @@ with tab1:
         s1_press = st.selectbox("タンク加圧方式", list(PRESSURIZATION.keys()), index=0)
 
 with tab2:
-    st.markdown("#### 🚀 空力実験アドオン（ロケットに巨大翼をつけたらどうなるか？）")
+    st.markdown("#### 🚀 空力実験アドオン（ロケットに主翼を付けたらどうなるか？）")
     c1, c2 = st.columns(2)
     with c1:
         wing_type = st.selectbox("機体外部 主翼アドオン", list(AERO_WINGS.keys()), index=0)
@@ -240,7 +240,8 @@ def run_simulation():
         history.append({
             "t": float(t_cd), "x": 0.0, "y": 0.0, "alt": 0.0, "v": 0.0,
             "q": 0.0, "g": 1.0, "stage": 1, "fairing": True, "wings": wings_attached,
-            "exploded": False, "explosion_type": "NONE", "thrust": pre_ignition, "pitch": 0.0, "event": "COUNTDOWN"
+            "exploded": False, "explosion_type": "NONE", "thrust": pre_ignition, "pitch": 0.0,
+            "mach": 0.0, "event": "COUNTDOWN"
         })
 
     maxq_passed = False
@@ -252,7 +253,8 @@ def run_simulation():
         history.append({
             "t": 0.1, "x": 0.0, "y": 0.0, "alt": 0.0, "v": 0.0, "q": 0.0, "g": 0.0,
             "stage": 1, "fairing": True, "wings": wings_attached, "exploded": True,
-            "explosion_type": "PAD_OVERPRESSURE", "thrust": False, "pitch": 0.0, "event": "RUD"
+            "explosion_type": "PAD_OVERPRESSURE", "thrust": False, "pitch": 0.0,
+            "mach": 0.0, "event": "RUD"
         })
         return history, fail_reason
 
@@ -262,7 +264,8 @@ def run_simulation():
         history.append({
             "t": 0.2, "x": 0.0, "y": 0.0, "alt": 0.0, "v": 0.0, "q": 0.0, "g": 0.0,
             "stage": 1, "fairing": True, "wings": wings_attached, "exploded": True,
-            "explosion_type": "SINGULARITY", "thrust": False, "pitch": 0.0, "event": "RUD"
+            "explosion_type": "SINGULARITY", "thrust": False, "pitch": 0.0,
+            "mach": 0.0, "event": "RUD"
         })
         return history, fail_reason
 
@@ -374,7 +377,8 @@ def run_simulation():
                 history.append({
                     "t": t, "x": 0.0, "y": 0.0, "alt": 0.0, "v": 0.0, "q": 0.0, "g": 1.0,
                     "stage": 1, "fairing": True, "wings": wings_attached, "exploded": True,
-                    "explosion_type": "PAD_CRUSH", "thrust": False, "pitch": 0.0, "event": "RUD"
+                    "explosion_type": "PAD_CRUSH", "thrust": False, "pitch": 0.0,
+                    "mach": 0.0, "event": "RUD"
                 })
                 break
             ax, ay, vx, vy = 0.0, 0.0, 0.0, 0.0
@@ -388,20 +392,22 @@ def run_simulation():
 
         # 破壊判定
         if wings_attached and mach > wing_spec["flutter_mach"] and rho > 0.04:
-            fail_reason = f"主翼遷音速フラッター破壊: マッハ {mach:.2f} の衝撃波干渉でもぎ取られた主翼がタンクを直撃破壊。"
+            fail_reason = f"主翼遷音速フラッター破壊: マッハ {mach:.2f} の超音速衝撃波干渉でもぎ取られた主翼がタンクを直撃破壊。"
             history.append({
                 "t": t, "x": float(x), "y": float(y), "alt": alt_km, "v": v, "q": q, "g": acc_g,
                 "stage": int(stage), "fairing": fairing_attached, "wings": False, "exploded": True,
-                "explosion_type": "WING_TEAR", "thrust": False, "pitch": visual_pitch, "event": "RUD"
+                "explosion_type": "WING_TEAR", "thrust": False, "pitch": visual_pitch,
+                "mach": mach, "event": "RUD"
             })
             break
 
         if abs(extra_pitch_deflection) > 30.0 and q > 18.0:
-            fail_reason = f"空力トリム破綻（ピッチ反転）: 主翼の巨大揚力により横滑りし、動圧 {q:.1f} kPa で機体真っ二つ。"
+            fail_reason = f"空力トリム破綻（ピッチ反転）: 主翼の巨大揚力により横滑りし、横動圧 {q:.1f} kPa で機体真っ二つ。"
             history.append({
                 "t": t, "x": float(x), "y": float(y), "alt": alt_km, "v": v, "q": q, "g": acc_g,
                 "stage": int(stage), "fairing": fairing_attached, "wings": wings_attached, "exploded": True,
-                "explosion_type": "AERODYNAMIC_SNAP", "thrust": False, "pitch": visual_pitch, "event": "RUD"
+                "explosion_type": "AERODYNAMIC_SNAP", "thrust": False, "pitch": visual_pitch,
+                "mach": mach, "event": "RUD"
             })
             break
 
@@ -410,7 +416,8 @@ def run_simulation():
             history.append({
                 "t": t, "x": float(x), "y": float(y), "alt": alt_km, "v": v, "q": q, "g": acc_g,
                 "stage": int(stage), "fairing": fairing_attached, "wings": wings_attached, "exploded": True,
-                "explosion_type": "STRUCTURAL_COLLAPSE", "thrust": False, "pitch": visual_pitch, "event": "RUD"
+                "explosion_type": "STRUCTURAL_COLLAPSE", "thrust": False, "pitch": visual_pitch,
+                "mach": mach, "event": "RUD"
             })
             break
 
@@ -419,7 +426,8 @@ def run_simulation():
             history.append({
                 "t": t, "x": float(x), "y": float(y), "alt": alt_km, "v": v, "q": q, "g": acc_g,
                 "stage": int(stage), "fairing": fairing_attached, "wings": wings_attached, "exploded": True,
-                "explosion_type": "OVER_G", "thrust": False, "pitch": visual_pitch, "event": "RUD"
+                "explosion_type": "OVER_G", "thrust": False, "pitch": visual_pitch,
+                "mach": mach, "event": "RUD"
             })
             break
 
@@ -432,7 +440,7 @@ def run_simulation():
             "t": t, "x": x, "y": y, "alt": alt_km, "v": v, "q": q, "g": acc_g,
             "stage": int(stage), "fairing": bool(fairing_attached), "wings": bool(wings_attached),
             "exploded": False, "explosion_type": "NONE", "thrust": bool(thrust > 0),
-            "pitch": visual_pitch, "event": cur_event
+            "pitch": visual_pitch, "mach": mach, "event": cur_event
         })
 
         if alt_km >= 160.0 and vx >= 7780.0 and abs(vy) < 400.0:
@@ -440,7 +448,7 @@ def run_simulation():
                 "t": t + dt, "x": x, "y": y, "alt": alt_km, "v": v, "q": q, "g": 0.0,
                 "stage": int(stage), "fairing": bool(fairing_attached), "wings": bool(wings_attached),
                 "exploded": False, "explosion_type": "NONE", "thrust": False,
-                "pitch": visual_pitch, "event": "ORBIT"
+                "pitch": visual_pitch, "mach": mach, "event": "ORBIT"
             })
             break
 
@@ -475,27 +483,27 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
     fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
     html_code = f"""
-    <div id="broadcast-frame" style="position: relative; width: 100%; height: 900px; background: #000205; border-radius: 8px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none;">
+    <div id="broadcast-frame" style="position: relative; width: 100%; height: 920px; background: #000104; border-radius: 8px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none;">
         <script>
             window.parent.document.getElementById('launch-viewport').scrollIntoView({{ behavior: 'smooth', block: 'start' }});
         </script>
 
         <div id="canvas-container" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0;"></div>
 
-        <!-- 実写シネマティック光学フィルター (周辺光量落ち・アナモルフィック調・グレイン) -->
-        <div style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; background: radial-gradient(ellipse at center, transparent 35%, rgba(0, 1, 5, 0.8) 100%); mix-blend-mode: multiply; z-index: 2;"></div>
+        <!-- 実写シネマティック光学フィルター (周辺光量落ち・アナモルフィック調) -->
+        <div style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 1, 4, 0.82) 100%); mix-blend-mode: multiply; z-index: 2;"></div>
 
         <!-- 放送中継トップバナー -->
-        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 48px; background: rgba(3, 7, 18, 0.82); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 0 28px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 10;">
+        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 48px; background: rgba(3, 7, 18, 0.85); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 0 28px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 10;">
             <div style="display: flex; align-items: center; gap: 14px;">
                 <span id="live-indicator" style="display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 12px #ef4444; animation: livePulse 1.4s infinite alternate;"></span>
                 <span style="color: #ffffff; font-weight: 800; font-size: 13px; letter-spacing: 2px;">LIVE WEBCAST</span>
                 <span style="color: rgba(255,255,255,0.2);">|</span>
-                <span id="cam-tag" style="color: #38bdf8; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; font-family: monospace;">TRACKER: PAD ULTRA-TELEPHOTO (600mm)</span>
+                <span id="cam-tag" style="color: #38bdf8; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; font-family: monospace;">TRACKER: LC-39A OPTICAL GIMBAL (LOCK-ON)</span>
             </div>
             <div style="display: flex; align-items: center; gap: 20px; font-family: monospace; font-size: 11px;">
                 <span style="color: #94a3b8;">ATMOSPHERE: <strong id="hud-regime" style="color: #f8fafc;">SEA LEVEL</strong></span>
-                <span style="color: #10b981;">OPTICAL LOCK: 4K HDR NOMINAL</span>
+                <span style="color: #10b981;">OPTICAL TRACKER: 100% FRAMED</span>
             </div>
         </div>
 
@@ -504,7 +512,7 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
         </style>
 
         <!-- 🛰️ 軌道フライト HUD -->
-        <div style="position: absolute; top: 60px; right: 24px; width: 280px; background: rgba(3, 7, 18, 0.85); backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; padding: 14px; z-index: 10; color: #fff;">
+        <div style="position: absolute; top: 60px; right: 24px; width: 280px; background: rgba(3, 7, 18, 0.88); backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; padding: 14px; z-index: 10; color: #fff;">
             <div style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 1.5px; margin-bottom: 8px; display: flex; justify-content: space-between;">
                 <span>DOWNRANGE TRAJECTORY</span>
                 <span id="hud-downrange" style="color: #38bdf8; font-family: monospace;">0.0 km</span>
@@ -519,8 +527,8 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
         </div>
 
         <!-- 破壊アラート -->
-        <div id="rud-banner" style="display: none; position: absolute; top: 180px; left: 50%; transform: translateX(-50%); background: rgba(153, 27, 27, 0.95); backdrop-filter: blur(16px); border: 2px solid #ef4444; border-radius: 4px; padding: 18px 32px; z-index: 25; text-align: center; box-shadow: 0 0 50px rgba(239, 68, 68, 0.6);">
-            <div style="color: #fff; font-size: 18px; font-weight: 900; letter-spacing: 2.5px; font-family: monospace;">🚨 CATASTROPHIC VEHICLE ANOMALY (RUD) 🚨</div>
+        <div id="rud-banner" style="display: none; position: absolute; top: 180px; left: 50%; transform: translateX(-50%); background: rgba(140, 15, 15, 0.95); backdrop-filter: blur(16px); border: 2px solid #ef4444; border-radius: 4px; padding: 18px 32px; z-index: 25; text-align: center; box-shadow: 0 0 50px rgba(239, 68, 68, 0.6);">
+            <div style="color: #fff; font-size: 18px; font-weight: 900; letter-spacing: 2.5px; font-family: monospace;">🚨 CATASTROPHIC VEHICLE BREAKUP (RUD) 🚨</div>
             <div id="rud-desc" style="color: #fecaca; font-size: 13px; font-weight: 600; margin-top: 8px; max-width: 520px; line-height: 1.4;"></div>
         </div>
 
@@ -533,8 +541,8 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
 
             <div style="display: flex; gap: 40px; border-left: 1px solid rgba(255,255,255,0.15); padding-left: 36px;">
                 <div>
-                    <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px; text-transform: uppercase;">SPEED</div>
-                    <div style="color: #fff; font-size: 26px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-spd">0</span> <span style="font-size: 12px; color: #94a3b8;">km/h</span></div>
+                    <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px; text-transform: uppercase;">MACH / SPEED</div>
+                    <div style="color: #fff; font-size: 26px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-mach">M 0.0</span> <span style="font-size: 12px; color: #94a3b8;" id="tv-spd">(0 km/h)</span></div>
                 </div>
                 <div>
                     <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px; text-transform: uppercase;">ALTITUDE</div>
@@ -596,12 +604,12 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
             const osc = actx.createOscillator();
             const g = actx.createGain();
             osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(75, actx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(14, actx.currentTime + 1.6);
-            g.gain.setValueAtTime(0.95, actx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 3.0);
+            osc.frequency.setValueAtTime(80, actx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(12, actx.currentTime + 2.0);
+            g.gain.setValueAtTime(1.0, actx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 3.5);
             osc.connect(g); g.connect(actx.destination);
-            osc.start(); osc.stop(actx.currentTime + 3.0);
+            osc.start(); osc.stop(actx.currentTime + 3.5);
         }}
 
         const voicedEvents = new Set();
@@ -613,16 +621,16 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
         }}
 
         // =========================================================================
-        // 🌍 Three.js 実写光学＆実在衛星写真パイプライン
+        // 🌍 Three.js 空間・実写光学地球・発射台構築
         // =========================================================================
         const scene = new THREE.Scene();
-        // 望遠感を出すためFOVを22度に設定（超望遠シネマティックレンズ）
-        const camera = new THREE.PerspectiveCamera(22, container.clientWidth / container.clientHeight, 0.5, 50000000);
+        // 航空宇宙追尾望遠鏡レンズ (FOV 26度)
+        const camera = new THREE.PerspectiveCamera(26, container.clientWidth / container.clientHeight, 0.5, 50000000);
         const renderer = new THREE.WebGLRenderer({{ antialias: true, powerPreference: "high-performance" }});
         renderer.setSize(container.clientWidth, container.clientHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.25;
+        renderer.toneMappingExposure = 1.35;
         container.appendChild(renderer.domElement);
 
         // 恒星宇宙背景 (Starfield)
@@ -632,10 +640,8 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
         const starColors = new Float32Array(starCount * 3);
         for(let i=0; i<starCount*3; i+=3) {{
             const rad = 25000000;
-            const u = Math.random();
-            const v = Math.random();
-            const theta = u * 2.0 * Math.PI;
-            const phi = Math.acos(2.0 * v - 1.0);
+            const u = Math.random(), v = Math.random();
+            const theta = u * 2.0 * Math.PI, phi = Math.acos(2.0 * v - 1.0);
             starPositions[i] = rad * Math.sin(phi) * Math.cos(theta);
             starPositions[i+1] = rad * Math.sin(phi) * Math.sin(theta);
             starPositions[i+2] = rad * Math.cos(phi);
@@ -647,15 +653,13 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
         const starMat = new THREE.PointsMaterial({{ size: 1.8, vertexColors: true, transparent: true, opacity: 0.9 }});
         scene.add(new THREE.Points(starGeo, starMat));
 
-        // 🛰️ 実写地球テクスチャのロード (NASA Blue Marble / 高解像度衛星写真)
+        // 🛰️ 実写地球テクスチャ (NASA Blue Marble / 高解像度衛星写真)
         const texLoader = new THREE.TextureLoader();
-        // NASA実写テクスチャ (CORS対応オープンミラー)
         const earthMapTex = texLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_atmos_2048.jpg');
         const earthNormalTex = texLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_normal_2048.jpg');
         const earthSpecTex = texLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_specular_2048.jpg');
         const earthCloudsTex = texLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_clouds_1024.png');
 
-        // 地球本体 (半径 6,371 km)
         const R_EARTH = 6371.0;
         const earthMat = new THREE.MeshStandardMaterial({{
             map: earthMapTex,
@@ -666,12 +670,11 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
         }});
         const earthMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH, 160, 120), earthMat);
         earthMesh.position.set(0, -R_EARTH, 0);
-        // 発射台（ケネディ宇宙センター/海岸線）にカメラが正対するよう自転角調整
         earthMesh.rotation.y = -Math.PI * 0.62;
         earthMesh.rotation.x = 0.28;
         scene.add(earthMesh);
 
-        // 実写雲海レイヤー (実写クラウドマップ)
+        // 雲海レイヤー
         const cloudMesh = new THREE.Mesh(
             new THREE.SphereGeometry(R_EARTH + 4.5, 96, 72),
             new THREE.MeshStandardMaterial({{
@@ -686,7 +689,7 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
         cloudMesh.rotation.copy(earthMesh.rotation);
         scene.add(cloudMesh);
 
-        // 大気レイリー散乱リムグロー (青い大気のベール)
+        // 大気レイリー散乱光芒
         const atmoMat = new THREE.ShaderMaterial({{
             side: THREE.BackSide,
             transparent: true,
@@ -726,14 +729,27 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
         scene.add(sunLight);
         scene.add(new THREE.AmbientLight(0x0a192f, 0.7));
 
-        // 発射台 LC-39A 風ディテール
+        // 🏗️ NASA LC-39A 風 詳細発射台・アンビリカルタワー
         const pad = new THREE.Group();
         const metalMat = new THREE.MeshStandardMaterial({{ color: 0x1e293b, roughness: 0.35, metalness: 0.9 }});
-        const towerMat = new THREE.MeshStandardMaterial({{ color: 0x475569, wireframe: true }});
-        const tower = new THREE.Mesh(new THREE.BoxGeometry(5.0, 48, 5.0), towerMat);
-        tower.position.set(-7.5, 24, 0); pad.add(tower);
-        const mount = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 5.5, 3.5, 32), metalMat);
+        const trussMat = new THREE.MeshStandardMaterial({{ color: 0x64748b, wireframe: true }});
+        
+        // メインタワー (4段トラス)
+        const tower = new THREE.Mesh(new THREE.BoxGeometry(5.5, 52, 5.5), trussMat);
+        tower.position.set(-8.5, 26, 0); pad.add(tower);
+        
+        // アクセスアーム・トップクレーン
+        const crane = new THREE.Mesh(new THREE.BoxGeometry(10.0, 1.8, 1.8), metalMat);
+        crane.position.set(-5.0, 52, 0); pad.add(crane);
+        const crewArm = new THREE.Mesh(new THREE.BoxGeometry(6.5, 1.4, 1.4), metalMat);
+        crewArm.position.set(-4.5, 38, 0); pad.add(crewArm);
+
+        // 耐熱マウント・フレームトレンチ排気溝
+        const mount = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 6.0, 3.5, 32), metalMat);
         mount.position.set(0, 1.75, 0); pad.add(mount);
+        const trench = new THREE.Mesh(new THREE.BoxGeometry(16.0, 2.0, 8.0), new THREE.MeshStandardMaterial({{ color: 0x0f172a, roughness: 0.9 }}));
+        trench.position.set(4.0, 0.5, 0); pad.add(trench);
+
         scene.add(pad);
 
         // ロケット本体
@@ -777,6 +793,44 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
         }}
 
         // =========================================================================
+        // 💨 リアル音速突破（プラントル・グロワート ベイパーコーン）
+        // =========================================================================
+        const vaporConeGroup = new THREE.Group();
+        rocket.add(vaporConeGroup);
+
+        const vaporMat = new THREE.ShaderMaterial({{
+            transparent: true,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            uniforms: {{
+                opacity: {{ value: 0.0 }}
+            }},
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {{
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }}
+            `,
+            fragmentShader: `
+                uniform float opacity;
+                varying vec2 vUv;
+                void main() {{
+                    float edge = sin(vUv.y * 3.14159);
+                    float cone = smoothstep(0.0, 0.5, vUv.x) * smoothstep(1.0, 0.5, vUv.x);
+                    gl_FragColor = vec4(0.9, 0.95, 1.0, opacity * edge * 0.55);
+                }}
+            `
+        }});
+
+        // 2段円錐ベイパーコーン (機首部 & 段間部)
+        const cone1 = new THREE.Mesh(new THREE.CylinderGeometry(0.98, 4.2, 3.5, 32, 1, true), vaporMat);
+        cone1.position.y = s1Len + 1.8 + s2Len; vaporConeGroup.add(cone1);
+        const cone2 = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 5.0, 4.0, 32, 1, true), vaporMat);
+        cone2.position.y = s1Len * 0.7; vaporConeGroup.add(cone2);
+
+        // =========================================================================
         // 🔥 実写ロケット排気噴射炎＆超巨大真空プルーム
         // =========================================================================
         const plume = new THREE.Group();
@@ -785,24 +839,21 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
         const fColor = cfg.flame_hex;
         const oColor = cfg.outer_hex;
 
-        // 1. 中心部：超高温ホワイトコア
+        // 1. 超高温ホワイトコア
         const coreFlame = new THREE.Mesh(
             new THREE.ConeGeometry(0.65, 12.0, 32),
             new THREE.MeshBasicMaterial({{ color: 0xffffff, blending: THREE.AdditiveBlending }})
         );
         coreFlame.rotation.x = Math.PI; coreFlame.position.y = -6.0; plume.add(coreFlame);
 
-        // 2. マッハダイヤモンド群 (実写の超音速ショックコーン)
+        // 2. マッハダイヤモンド
         const shockDiamonds = [];
         for (let i = 0; i < 9; i++) {{
             const dia = new THREE.Mesh(
                 new THREE.OctahedronGeometry(0.42 - i * 0.035, 1),
                 new THREE.MeshBasicMaterial({{ color: 0xffffff, blending: THREE.AdditiveBlending }})
             );
-            dia.scale.set(1.15, 0.4, 1.15);
-            dia.position.y = -1.4 - i * 1.5;
-            plume.add(dia);
-            shockDiamonds.push(dia);
+            dia.scale.set(1.15, 0.4, 1.15); dia.position.y = -1.4 - i * 1.5; plume.add(dia); shockDiamonds.push(dia);
         }}
 
         // 3. メイン乱流炎
@@ -812,35 +863,30 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
         );
         outerPlume.rotation.x = Math.PI; outerPlume.position.y = -14.0; plume.add(outerPlume);
 
-        // 4. 真空巨大膨張クラゲプルーム (Jellyfish Effect: 高度40km以上で直径数百mに拡散)
+        // 4. 真空巨大膨張クラゲプルーム (Jellyfish Effect)
         const jellyfishGeo = new THREE.SphereGeometry(18.0, 32, 32);
         const jellyfishMat = new THREE.MeshBasicMaterial({{
-            color: oColor,
-            transparent: true,
-            opacity: 0.0,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false
+            color: oColor, transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, depthWrite: false
         }});
         const jellyfishPlume = new THREE.Mesh(jellyfishGeo, jellyfishMat);
-        jellyfishPlume.position.y = -22.0;
-        plume.add(jellyfishPlume);
+        jellyfishPlume.position.y = -22.0; plume.add(jellyfishPlume);
 
         // =========================================================================
-        // 💨 実写スモークトレイル＆発射台消火蒸気
+        // 💨 実写スモーク・サウンドサプレッション水蒸気マッシュルーム雲
         // =========================================================================
         function createSmokeParticleTexture() {{
             const c = document.createElement('canvas'); c.width = 128; c.height = 128;
             const ctx = c.getContext('2d');
             const g = ctx.createRadialGradient(64,64,8, 64,64,64);
             g.addColorStop(0, 'rgba(255,255,255,0.95)');
-            g.addColorStop(0.3, 'rgba(220,230,245,0.6)');
-            g.addColorStop(0.7, 'rgba(160,175,195,0.2)');
+            g.addColorStop(0.35, 'rgba(230,238,248,0.65)');
+            g.addColorStop(0.7, 'rgba(170,185,200,0.25)');
             g.addColorStop(1, 'rgba(120,135,150,0)');
             ctx.fillStyle = g; ctx.fillRect(0,0,128,128);
             return new THREE.CanvasTexture(c);
         }}
         const smokeTex = createSmokeParticleTexture();
-        const P_MAX = 1200;
+        const P_MAX = 1500;
         const pool = [];
         const pGroup = new THREE.Group(); scene.add(pGroup);
         for(let i=0; i<P_MAX; i++) {{
@@ -855,28 +901,42 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
             p.vx = vx; p.vy = vy; p.vz = vz; p.age = 0; p.maxAge = life; p.s0 = s0; p.s1 = s1; p.o = opacity;
         }}
 
-        // 破壊破片
-        const DEBRIS_MAX = 160;
+        // =========================================================================
+        // 💥 本物志向・航空宇宙空中分解（極低温雲 ＋ 高速ストリーマー）
+        // =========================================================================
+        const DEBRIS_MAX = 200;
         const debrisPool = [];
         const debrisGroup = new THREE.Group(); scene.add(debrisGroup);
         for(let i=0; i<DEBRIS_MAX; i++) {{
             const deb = new THREE.Mesh(
-                new THREE.BoxGeometry(0.8 + Math.random(), 0.3 + Math.random()*0.4, 0.4),
+                new THREE.BoxGeometry(0.8 + Math.random()*1.2, 0.3 + Math.random()*0.5, 0.4),
                 new THREE.MeshStandardMaterial({{ color: (i%2===0)?0xe2e8f0:0x334155, metalness: 0.9, roughness: 0.25 }})
             );
             deb.visible = false; debrisGroup.add(deb);
             debrisPool.push({{ mesh: deb, active: false, vx: 0, vy: 0, vz: 0, rx: 0, ry: 0, rz: 0 }});
         }}
 
-        function triggerDebrisExplosion(x, y, vBaseX, vBaseY) {{
+        function triggerRealRUD(x, y, vxBase, vyBase) {{
+            // 1. 液体酸素・メタンの瞬間気化（超巨大白色マッシュルーム雲）
+            for(let k=0; k<80; k++) {{
+                const ang = Math.random() * Math.PI * 2;
+                const spd = 1.0 + Math.random() * 4.0;
+                emitSmoke(
+                    x + (Math.random()-0.5)*8, y + (Math.random()-0.5)*12, (Math.random()-0.5)*8,
+                    vxBase * 0.05 + Math.cos(ang) * spd, vyBase * 0.05 + Math.sin(ang) * spd, (Math.random()-0.5)*spd,
+                    15.0, 85.0, 90, 0.95
+                );
+            }}
+
+            // 2. 超音速噴煙ストリーマー（破片が煙を引き連れて四方八方へ飛び散る）
             for(let i=0; i<DEBRIS_MAX; i++) {{
                 const d = debrisPool[i];
                 d.active = true; d.mesh.visible = true;
                 d.mesh.position.set(x + (Math.random()-0.5)*4, y + (Math.random()-0.5)*10, (Math.random()-0.5)*4);
                 const angle = Math.random() * Math.PI * 2;
-                const spd = 3.0 + Math.random() * 12.0;
-                d.vx = (vBaseX * 0.05) + Math.cos(angle) * spd;
-                d.vy = (vBaseY * 0.05) + Math.sin(angle) * spd;
+                const spd = 4.0 + Math.random() * 18.0;
+                d.vx = (vxBase * 0.06) + Math.cos(angle) * spd;
+                d.vy = (vyBase * 0.06) + Math.sin(angle) * spd;
                 d.vz = (Math.random()-0.5) * spd * 1.5;
                 d.rx = Math.random()*0.4; d.ry = Math.random()*0.4; d.rz = Math.random()*0.4;
             }}
@@ -898,50 +958,57 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
         }}
 
         // =========================================================================
-        // 🎥 超望遠（800mm〜1200mm相当）シネマティック・ディレクターカメラワーク
+        // 🎥 光学トラッカー・絶対ロックオン・ジンバルカメラ制御（見切れ完全解消）
         // =========================================================================
-        const camTarget = new THREE.Vector3(0, 12, 0);
+        const currentTargetPos = new THREE.Vector3(0, 15, 0);
         let camShake = 0.0;
 
-        function updateCam(simT, rx, ry, alt, pitch, exploded) {{
+        function updateGimbalTracker(simT, rx, ry, alt, pitch, exploded) {{
             const upX = Math.sin(pitch), upY = Math.cos(pitch);
 
+            // ロケットの未来位置を常に画角中心〜やや上部に絶対固定（見切れ完全防止）
+            const leadLookAhead = 25.0;
+            const targetX = rx + upX * leadLookAhead;
+            const targetY = ry + upY * leadLookAhead;
+            currentTargetPos.lerp(new THREE.Vector3(targetX, targetY, 0), 0.15);
+
             if (exploded) {{
-                document.getElementById('cam-tag').innerText = "TRACKER 1: CATASTROPHIC BREAKUP LONG-SHOT";
-                camera.position.lerp(new THREE.Vector3(rx + 80, ry + 30, 140), 0.08);
-                camTarget.lerp(new THREE.Vector3(rx, ry, 0), 0.12);
+                document.getElementById('cam-tag').innerText = "TRACKER 1: OPTICAL BREAKUP TRACKING";
+                camera.position.lerp(new THREE.Vector3(rx + 90, ry + 40, 160), 0.06);
             }} else if (simT < 0.0) {{
-                // 発射台点火前：海岸線越しの望遠
+                // 発射台点火前
                 document.getElementById('cam-tag').innerText = "TRACKER 1: PAD TELEPHOTO (400mm)";
-                camera.position.set(38.0, 8.0, 75.0);
-                camTarget.set(0, 12.0, 0);
-            }} else if (simT < 4.0) {{
-                // 発射直後：タワークリアランスを引いて全体を収める
+                camera.position.set(45.0, 12.0, 85.0);
+            }} else if (simT < 3.5) {{
+                // 発射直後：タワークリアランス
                 document.getElementById('cam-tag').innerText = "COASTAL TRACKER 1: LIFTOFF CLEARANCE";
-                camera.position.set(-65.0, 18.0, 120.0);
-                camTarget.set(rx, ry + 12.0, 0);
-            }} else if (alt < 15.0) {{
-                // 【低空〜音速突破】：数km離れた地上トラッカーから超ロング引き（機体全体＋長大な煙の柱を捉える）
-                document.getElementById('cam-tag').innerText = "COASTAL SUPER-TELEPHOTO TRACKER (800mm)";
-                const camDist = 280.0 + alt * 15.0;
-                camera.position.lerp(new THREE.Vector3(-camDist * 0.7, 18.0 + alt * 0.5, camDist * 0.9), 0.05);
-                // 画面上部にロケットを配置し、下部に伸びる巨大な排気煙トレイルを収める
-                camTarget.lerp(new THREE.Vector3(rx + upX * 15.0, ry + upY * 15.0, 0), 0.12);
-            }} else if (alt < 80.0) {{
-                // 【成層圏・Max-Q】：高空追尾機からの超望遠シネマティック。湾曲する地球の地平線とロケット全体が完全にフレームイン
-                document.getElementById('cam-tag').innerText = "AIRBORNE WB-57 CHASE TRACKER (WIDE HORIZON)";
-                const camX = rx - 240.0;
-                const camY = ry - 60.0;
-                const camZ = 380.0 + (alt - 15.0) * 3.5;
+                camera.position.lerp(new THREE.Vector3(-75.0, 22.0, 135.0), 0.08);
+            }} else if (alt < 18.0) {{
+                // 【低空〜音速突破】：地上長焦点追尾望遠鏡（機体＋長大なスモークトレイルを引いて全体を収める）
+                document.getElementById('cam-tag').innerText = "COASTAL KINETO TRACKER (1200mm)";
+                const camDist = 320.0 + alt * 18.0;
+                // 機体の真横やや後方から超望遠で捉え、画角から外れないように動的に追尾
+                const camX = rx - camDist * 0.75;
+                const camY = Math.max(15.0, ry * 0.35);
+                const camZ = camDist * 0.95;
                 camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.06);
-                camTarget.lerp(new THREE.Vector3(rx + upX * 25.0, ry + upY * 25.0, 0), 0.1);
+            }} else if (alt < 85.0) {{
+                // 【成層圏・重力ターン】：高空追尾機アングル（地平線の曲率とダウンレンジ水平飛行を完全に追尾）
+                document.getElementById('cam-tag').innerText = "AIRBORNE WB-57 CHASE TRACKER (WIDE HORIZON)";
+                const camDist = 550.0 + (alt - 18.0) * 4.0;
+                // 機体の移動ベクトルに合わせてカメラも並行追尾
+                const camX = rx - camDist * 0.65;
+                const camY = ry - camDist * 0.15;
+                const camZ = camDist * 0.9;
+                camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.06);
             }} else {{
-                // 【宇宙空間・LEO投入】：漆黒の真空空間、広大な地球の青い円弧を背景にした超広角ロングショット
+                // 【宇宙空間・LEO投入】：軌道上広角ショット
                 document.getElementById('cam-tag').innerText = "ORBITAL TELEMETRY: ULTRA-WIDE VACUUM CAM";
-                const ox = -upX * 350.0 + upY * 120.0;
-                const oy = -upY * 350.0 - upX * 120.0;
-                camera.position.lerp(new THREE.Vector3(rx + ox, ry + oy, 580.0), 0.08);
-                camTarget.lerp(new THREE.Vector3(rx, ry, 0), 0.1);
+                const camDist = 950.0;
+                const camX = rx - upX * 450.0 + upY * 180.0;
+                const camY = ry - upY * 450.0 - upX * 180.0;
+                const camZ = camDist;
+                camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.08);
             }}
 
             if (camShake > 0.002) {{
@@ -949,7 +1016,7 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
                 camera.position.y += (Math.random() - 0.5) * camShake;
                 camShake *= 0.92;
             }}
-            camera.lookAt(camTarget);
+            camera.lookAt(currentTargetPos);
         }}
 
         // =========================================================================
@@ -976,6 +1043,7 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
             const vel = p0.v + (p1.v - p0.v) * a;
             const q   = p0.q + (p1.q - p0.q) * a;
             const pitch = p0.pitch + (p1.pitch - p0.pitch) * a;
+            const mach = p0.mach + (p1.mach - p0.mach) * a;
             const dRangeKm = (rx * 10.0) / 1000.0;
 
             rocket.position.set(rx, ry, 0);
@@ -985,25 +1053,21 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
             earthMesh.rotation.y = -Math.PI * 0.62 + (dRangeKm * 0.00003);
             cloudMesh.rotation.y = earthMesh.rotation.y + 0.00005;
 
-            updateCam(simT, rx, ry, alt, pitch, p0.exploded);
+            updateGimbalTracker(simT, rx, ry, alt, pitch, p0.exploded);
             drawOrbitMap(alt, dRangeKm, p0.exploded);
 
-            // 💥 爆発瞬間
+            // 💥 本物志向 RUD 爆発演出
             if (p0.exploded && !explodedTriggered) {{
                 explodedTriggered = true;
                 rocket.visible = false;
                 plume.visible = false;
-                camShake = 1.1;
+                vaporConeGroup.visible = false;
+                camShake = 1.35;
                 flashOverlay.style.opacity = '1.0';
-                setTimeout(() => {{ flashOverlay.style.opacity = '0.0'; }}, 80);
+                setTimeout(() => {{ flashOverlay.style.opacity = '0.0'; }}, 90);
 
                 playExplosionSound();
-                triggerDebrisExplosion(rx, ry, p0.v * Math.cos(p0.pitch), p0.v * Math.sin(p0.pitch));
-
-                for(let k=0; k<90; k++) {{
-                    const ang = Math.random()*Math.PI*2;
-                    emitSmoke(rx, ry, 0, Math.cos(ang)*2.2, Math.sin(ang)*2.2, (Math.random()-0.5)*2.5, 5.0, 28.0, 70, 0.95);
-                }}
+                triggerRealRUD(rx, ry, p0.v * Math.cos(p0.pitch), p0.v * Math.sin(p0.pitch));
 
                 rudBanner.style.display = 'block';
                 rudDesc.innerText = failMessage;
@@ -1020,6 +1084,10 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
                     d.mesh.position.z += d.vz * 0.016;
                     d.vy -= 9.8 * 0.016 * 0.1;
                     d.mesh.rotation.x += d.rx; d.mesh.rotation.y += d.ry;
+                    // 破片が引く煙の尾
+                    if (Math.random() < 0.25) {{
+                        emitSmoke(d.mesh.position.x, d.mesh.position.y, d.mesh.position.z, 0, 0, 0, 1.5, 8.0, 35, 0.45);
+                    }}
                 }}
             }}
 
@@ -1030,17 +1098,21 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
             document.getElementById('hud-regime').innerText = regime;
             document.getElementById('hud-downrange').innerText = `${{dRangeKm.toFixed(1)}} km`;
 
-            // カウントダウン＆点火時の巨大な発射台白煙
+            // カウントダウン＆巨大な水蒸気マッシュルーム雲（サウンドサプレッション消音注水）
             if (simT < 0.0) {{
                 const sec = Math.ceil(Math.abs(simT));
                 document.getElementById('tv-timer').innerText = `T- 00:0${{sec}}.0`;
                 if (simT >= -3.0 && !p0.exploded) {{
-                    camShake = 0.22;
-                    if (rumbleGain) rumbleGain.gain.setTargetAtTime(0.55, actx.currentTime, 0.1);
-                    // 発射台横から吹き出す巨大な消火スチーム
-                    for(let i=0; i<8; i++) {{
+                    camShake = 0.25;
+                    if (rumbleGain) rumbleGain.gain.setTargetAtTime(0.65, actx.currentTime, 0.1);
+                    // 水平トレンチから勢いよく湧き出す巨大な白色過熱蒸気雲
+                    for(let i=0; i<10; i++) {{
                         const side = (i%2 === 0)? 1 : -1;
-                        emitSmoke(rx + (Math.random()-0.5)*3, 1.0, (Math.random()-0.5)*3, side * (0.6 + Math.random()*0.8), 0.1, (Math.random()-0.5)*0.3, 3.0, 16.0, 50, 0.9);
+                        emitSmoke(
+                            rx + (Math.random()-0.5)*4, 1.2, (Math.random()-0.5)*4,
+                            side * (0.8 + Math.random()*1.2), 0.15 + Math.random()*0.25, (Math.random()-0.5)*0.5,
+                            4.0, 24.0, 60, 0.95
+                        );
                     }}
                 }}
             }} else if (!p0.exploded) {{
@@ -1049,38 +1121,47 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
                 if (simT >= 0 && !voicedEvents.has('liftoff')) {{
                     voicedEvents.add('liftoff');
                     speak("Liftoff of Aethel-9.");
-                    if (rumbleGain) rumbleGain.gain.setTargetAtTime(0.9, actx.currentTime, 0.1);
-                    if (crackleGain) crackleGain.gain.setTargetAtTime(0.48, actx.currentTime, 0.1);
+                    if (rumbleGain) rumbleGain.gain.setTargetAtTime(0.95, actx.currentTime, 0.1);
+                    if (crackleGain) crackleGain.gain.setTargetAtTime(0.52, actx.currentTime, 0.1);
                 }}
+            }}
+
+            // 💨 音速突破・ベイパーコーン (Mach 0.95〜1.15 の過渡期のみ出現)
+            if (mach >= 0.92 && mach <= 1.18 && alt < 25.0 && !p0.exploded) {{
+                const vaporFactor = Math.sin(((mach - 0.92) / (1.18 - 0.92)) * Math.PI);
+                vaporMat.uniforms.opacity.value = vaporFactor * 0.9;
+                vaporConeGroup.visible = true;
+            }} else {{
+                vaporConeGroup.visible = false;
             }}
 
             // 排気火炎・真空膨張・ショックダイヤモンド
             if (p0.thrust && !p0.exploded) {{
                 plume.visible = true;
-                const vacExp = 1.0 + Math.min(14.0, alt / 8.0);
+                const vacExp = 1.0 + Math.min(15.0, alt / 7.5);
                 const flicker = 0.94 + Math.random() * 0.12;
 
                 coreFlame.scale.set(1.0, flicker, 1.0);
                 outerPlume.scale.set(vacExp * 0.7, flicker * (1.0 + vacExp * 0.35), vacExp * 0.7);
 
-                // 高度によるマッハダイヤモンドの消失（大気圧低下に伴い拡散）
+                // マッハダイヤモンド消失
                 const shockVis = Math.max(0.0, 1.0 - alt / 35.0);
                 shockDiamonds.forEach(sd => {{ sd.visible = shockVis > 0.05; sd.material.opacity = shockVis; }});
 
-                // 高度40km以上のクラゲ状真空光彩 (Jellyfish Plume)
-                if (alt > 35.0 && alt < 130.0) {{
-                    const jProg = Math.sin(((alt - 35.0) / 95.0) * Math.PI);
-                    jellyfishPlume.material.opacity = jProg * 0.55;
+                // 真空クラゲ光彩
+                if (alt > 35.0 && alt < 135.0) {{
+                    const jProg = Math.sin(((alt - 35.0) / 100.0) * Math.PI);
+                    jellyfishPlume.material.opacity = jProg * 0.6;
                     jellyfishPlume.scale.set(vacExp * 1.6, vacExp * 2.8, vacExp * 1.6);
                 }} else {{
                     jellyfishPlume.material.opacity = 0.0;
                 }}
 
-                // 上昇中のスモークトレイル（大気圏内での長大な航跡）
+                // 上昇中のスモークトレイル
                 if (alt < 35.0) {{
                     const ux = Math.sin(pitch), uy = Math.cos(pitch);
                     for(let k=0; k<2; k++) {{
-                        emitSmoke(rx - ux * 2.0, ry - uy * 2.0, 0, -ux * 0.5 + (Math.random()-0.5)*0.2, -uy * 0.5, (Math.random()-0.5)*0.2, 2.5, 14.0, 48, 0.75);
+                        emitSmoke(rx - ux * 2.5, ry - uy * 2.5, 0, -ux * 0.6 + (Math.random()-0.5)*0.2, -uy * 0.6, (Math.random()-0.5)*0.2, 3.0, 16.0, 52, 0.75);
                     }}
                 }}
             }} else if (!p0.exploded) {{
@@ -1098,7 +1179,8 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
                 p.sp.material.opacity = p.o * (1.0 - pr * pr);
             }}
 
-            document.getElementById('tv-spd').innerText = Math.round(vel * 3.6).toLocaleString();
+            document.getElementById('tv-mach').innerText = `M ${{mach.toFixed(2)}}`;
+            document.getElementById('tv-spd').innerText = `(${{Math.round(vel * 3.6).toLocaleString()}} km/h)`;
             document.getElementById('tv-alt').innerText = Math.max(0, alt).toFixed(1);
             document.getElementById('tv-q').innerText   = q.toFixed(1);
             if (!p0.exploded) {{
@@ -1116,7 +1198,7 @@ if st.button("🔴 AETHEL-9 超精密実写中継 ＆ 軌道投入シミュレ�
         }});
     </script>
     """
-    components.html(html_code, height=920)
+    components.html(html_code, height=940)
 
 # =========================================================================
 # 📊 フライト解析レポート
