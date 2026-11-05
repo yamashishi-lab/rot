@@ -4,13 +4,13 @@ import json
 import streamlit.components.v1 as components
 
 st.set_page_config(
-    page_title="Orbital Architect Ultra", 
+    page_title="Orbital Architect Ultra - IFT-5 Edition", 
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 st.title("🚀 Orbital Architect Ultra")
-st.caption("※ 4K実写級：IFT-5タワーキャッチ完全追尾・物理連動4象限RCS・実音響合成・大気散乱スカイドーム")
+st.caption("※ 4K実写級：IFT-5タワーキャッチ地上完全追尾・重厚音響合成・物理連動4象限RCS")
 
 # =========================================================================
 # 🔬 推進剤・材料・空力パーツ・ブースターデータベース
@@ -105,7 +105,7 @@ with tab2:
         sep_thrust_factor = st.slider("分離パイロモーター推力倍率 (スロー連動)", 0.5, 3.0, 1.2, step=0.1)
     with c2:
         spacex_return_mode = st.checkbox("🔄 SpaceX型 ブースターRTLS帰還 ＆ チョップスティック・タワーキャッチ (IFT-5再現)", value=True)
-        st.caption("※ SpaceX型選択時のみ：分離後にカメラがブースターの反転・再突入・発射台チョップスティック進入まで完全自動追尾します。")
+        st.caption("※ SpaceX型選択時のみ：分離の瞬間にCAM 02が地上望遠カメラへ切り替わり、降下・ランディングバーン・タワーキャッチを完全再現します。")
 
 with tab3:
     c1, c2 = st.columns(2)
@@ -394,7 +394,7 @@ def run_simulation(preview_only=False):
                 b_thrust_force = s1_spec["thrust_vac"] * 1000.0 * 0.65
                 b_thrust = True
                 b_fuel -= (b_thrust_force / (s1_spec["isp_vac"] * g0)) * dt
-            # 3. 着陸・タワーキャッチ燃焼 (Mechazillaアーム直前で急減速)
+            # 3. 着陸・タワーキャッチ燃焼 (IFT-5 実写通り 13基点火→3基絞り込み減速)
             elif b_alt < 3500 and b_vy < -15 and b_fuel > 0:
                 target_ang = 3.14159 + np.clip(b_x / 1000.0, -0.2, 0.2)
                 b_pitch = target_ang
@@ -672,7 +672,7 @@ html_template = """
         });
 
         // =========================================================================
-        // 🎙️ 音声実況
+        // 🎙️ 音声実況 (SpaceX 中継コールアウト完全同期)
         // =========================================================================
         let voiceSynthesizer = window.speechSynthesis;
         function speakCallout(text) {
@@ -714,7 +714,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🔊 音響合成エンジン (重低音・衝撃波クラックル・高圧ガス・金属分離音)
+        // 🔊 音響合成エンジン (重厚超低周波・衝撃波クラックル・高圧ガス・重厚爆縮分離音)
         // =========================================================================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let actx = null, subRumble = null, shockCrackle = null, gasHiss = null;
@@ -725,30 +725,30 @@ html_template = """
                 const d = buf.getChannelData(0);
                 for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 
-                // 超重低音 35Hz レゾナンス（腹に響く燃焼音）
+                // 腹に響く 38Hz 超重低音ランブル
                 const rSrc = actx.createBufferSource(); rSrc.buffer = buf; rSrc.loop = true;
-                const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 42; lp.Q.value = 4.0;
+                const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 38; lp.Q.value = 5.0;
                 subRumble = actx.createGain(); subRumble.gain.value = 0.001;
                 rSrc.connect(lp); lp.connect(subRumble); subRumble.connect(actx.destination);
                 rSrc.start(0);
 
-                // 衝撃波クラックル（ロケット特有の破裂バリバリ音）
+                // 衝撃波クラックル（実写のバリバリ音）
                 const cSrc = actx.createBufferSource(); cSrc.buffer = buf; cSrc.loop = true;
                 const waveShaper = actx.createWaveShaper();
                 const curve = new Float32Array(256);
                 for (let i = 0; i < 256; i++) {
                     const x = (i * 2) / 256 - 1;
-                    curve[i] = Math.sign(x) * Math.pow(Math.abs(x), 0.35); // 非線形クリッピング
+                    curve[i] = Math.sign(x) * Math.pow(Math.abs(x), 0.32);
                 }
                 waveShaper.curve = curve;
-                const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 320; bp.Q.value = 2.5;
+                const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 280; bp.Q.value = 2.8;
                 shockCrackle = actx.createGain(); shockCrackle.gain.value = 0.001;
                 cSrc.connect(bp); bp.connect(waveShaper); waveShaper.connect(shockCrackle); shockCrackle.connect(actx.destination);
                 cSrc.start(0);
 
-                // 高圧ガス噴出ヒス
+                // 高圧ガス噴出音
                 const hSrc = actx.createBufferSource(); hSrc.buffer = buf; hSrc.loop = true;
-                const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2200;
+                const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2400;
                 gasHiss = actx.createGain(); gasHiss.gain.value = 0.001;
                 hSrc.connect(hp); hp.connect(gasHiss); gasHiss.connect(actx.destination);
                 hSrc.start(0);
@@ -760,37 +760,47 @@ html_template = """
             window.addEventListener(evt, () => { initAudio(); }, { once: true });
         });
 
-        // 鋭い金属分離衝撃音（ラッチ解除＋金属反響）
-        function playPyro() {
+        // 💥 超重厚なブースター切り離し音（重低音ブラスト＋長周期爆縮リバーブ）
+        function playHeavySeparationSound() {
             if (!actx) return;
             const now = actx.currentTime;
-            
-            // 衝撃波打撃音
-            const osc = actx.createOscillator();
-            const g = actx.createGain();
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(450, now);
-            osc.frequency.exponentialRampToValueAtTime(32, now + 0.18);
-            g.gain.setValueAtTime(1.5, now);
-            g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-            osc.connect(g); g.connect(actx.destination);
-            osc.start(now); osc.stop(now + 0.19);
 
-            // 金属反響リング（キィン…）
-            [880, 1420, 2600].forEach(freq => {
-                const ringOsc = actx.createOscillator();
-                const ringG = actx.createGain();
-                ringOsc.type = 'sine';
-                ringOsc.frequency.setValueAtTime(freq, now);
-                ringG.gain.setValueAtTime(0.35, now);
-                ringG.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
-                ringOsc.connect(ringG); ringG.connect(actx.destination);
-                ringOsc.start(now); ringOsc.stop(now + 0.72);
-            });
+            // 1. サブベース爆縮ショック（ドォォン！）
+            const subOsc = actx.createOscillator();
+            const subGain = actx.createGain();
+            subOsc.type = 'sine';
+            subOsc.frequency.setValueAtTime(80, now);
+            subOsc.frequency.exponentialRampToValueAtTime(22, now + 0.45);
+            subGain.gain.setValueAtTime(2.2, now);
+            subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+            subOsc.connect(subGain); subGain.connect(actx.destination);
+            subOsc.start(now); subOsc.stop(now + 0.56);
+
+            // 2. 超高圧気送ラッチ破砕ノイズ（圧縮窒素の瞬間爆砕）
+            const bLen = actx.sampleRate * 0.4;
+            const bBuf = actx.createBuffer(1, bLen, actx.sampleRate);
+            const bData = bBuf.getChannelData(0);
+            for(let i=0; i<bLen; i++) bData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (actx.sampleRate * 0.08));
+            const nSrc = actx.createBufferSource(); nSrc.buffer = bBuf;
+            const nFilter = actx.createBiquadFilter(); nFilter.type = 'lowpass'; nFilter.frequency.setValueAtTime(240, now);
+            const nGain = actx.createGain(); nGain.gain.setValueAtTime(1.8, now);
+            nSrc.connect(nFilter); nFilter.connect(nGain); nGain.connect(actx.destination);
+            nSrc.start(now);
+
+            // 3. 重厚チタンフレームの遠隔衝撃反響
+            const frameOsc = actx.createOscillator();
+            const fGain = actx.createGain();
+            frameOsc.type = 'triangle';
+            frameOsc.frequency.setValueAtTime(110, now);
+            frameOsc.frequency.exponentialRampToValueAtTime(45, now + 0.7);
+            fGain.gain.setValueAtTime(0.8, now);
+            fGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.75);
+            frameOsc.connect(fGain); fGain.connect(actx.destination);
+            frameOsc.start(now); frameOsc.stop(now + 0.76);
         }
 
         // =========================================================================
-        // 🌍 Three.js シーン ＆ 2画面レンダラー (チラつき防止・深度分離)
+        // 🌍 Three.js シーン ＆ 2画面レンダラー (チラつき防止・対数深度バッファ)
         // =========================================================================
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x020813);
@@ -818,7 +828,7 @@ html_template = """
         rendererPip.toneMappingExposure = 1.45;
 
         const cameraMain = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 1.0, 2000000);
-        const cameraPip = new THREE.PerspectiveCamera(6.2, 340 / 195, 1.0, 2000000);
+        const cameraPip = new THREE.PerspectiveCamera(12.0, 340 / 195, 1.0, 2000000);
 
         const sunLight = new THREE.DirectionalLight(0xfffaed, 5.5);
         sunLight.position.set(12000, 18000, 10000);
@@ -850,31 +860,31 @@ html_template = """
         scene.add(new THREE.Points(starGeo, starMat));
 
         // =========================================================================
-        // 🏝️ PBR立体ケープカナベラル・ランドスケープ＆リアル海面
+        // 🏝️ PBR立体ボカチカ・ランドスケープ＆リアル海面 (写真級ディテール)
         // =========================================================================
         const landscapeGroup = new THREE.Group();
         scene.add(landscapeGroup);
 
-        // 超精細海岸線テクスチャ（砂浜・浅瀬・湿地帯・道路）
         const coastCvs = document.createElement('canvas'); coastCvs.width = 2048; coastCvs.height = 2048;
         const cctx = coastCvs.getContext('2d');
         cctx.fillStyle = '#020b14'; cctx.fillRect(0, 0, 2048, 2048);
         
+        // リアルなメキシコ湾岸グラデーション
         const surfGrad = cctx.createLinearGradient(0, 0, 1400, 2048);
-        surfGrad.addColorStop(0.30, '#041d33');
-        surfGrad.addColorStop(0.48, '#083c5a');
-        surfGrad.addColorStop(0.55, '#0e6284');
-        surfGrad.addColorStop(0.58, '#d2b588'); // 砂浜
-        surfGrad.addColorStop(0.63, '#433c2a');
-        surfGrad.addColorStop(0.70, '#1c2616'); // 沿岸植生
+        surfGrad.addColorStop(0.28, '#03182b');
+        surfGrad.addColorStop(0.46, '#06354f');
+        surfGrad.addColorStop(0.54, '#0a5675');
+        surfGrad.addColorStop(0.57, '#c2a477'); // ボカチカ白砂
+        surfGrad.addColorStop(0.62, '#3f3827');
+        surfGrad.addColorStop(0.70, '#192214'); // 湿地低木
         cctx.fillStyle = surfGrad;
         cctx.beginPath();
         cctx.moveTo(0, 0); cctx.lineTo(1380, 0);
         cctx.bezierCurveTo(1280, 600, 1040, 1300, 900, 2048);
         cctx.lineTo(0, 2048); cctx.closePath(); cctx.fill();
 
-        // 発射場アクセスロード＆誘導路
-        cctx.strokeStyle = '#27272a'; cctx.lineWidth = 14;
+        // スターベース幹線道路 (Highway 4)
+        cctx.strokeStyle = '#27272a'; cctx.lineWidth = 16;
         cctx.beginPath(); cctx.moveTo(0, 1024); cctx.lineTo(820, 1024); cctx.stroke();
 
         const coastTex = new THREE.CanvasTexture(coastCvs);
@@ -887,16 +897,16 @@ html_template = """
         coastPlane.receiveShadow = true;
         landscapeGroup.add(coastPlane);
 
-        // リアル海洋メッシュ（大西洋の深海シェーディング）
+        // 深海PBRシェーディング
         const oceanMat = new THREE.MeshStandardMaterial({
             color: 0x021729, roughness: 0.12, metalness: 0.92, transparent: true, opacity: 0.96
         });
         const oceanMesh = new THREE.Mesh(new THREE.PlaneGeometry(160000, 160000), oceanMat);
         oceanMesh.rotation.x = -Math.PI / 2;
-        oceanMesh.position.set(22000, -3.5, 0); // Z-fighting防止で高さを完全に分離
+        oceanMesh.position.set(22000, -3.5, 0);
         landscapeGroup.add(oceanMesh);
 
-        // VAB組立棟
+        // VAB / メガベイ組立棟
         const vabGroup = new THREE.Group();
         vabGroup.position.set(-6200, 0, -2800);
         const vabMain = new THREE.Mesh(
@@ -907,7 +917,7 @@ html_template = """
         vabGroup.add(vabMain);
         landscapeGroup.add(vabGroup);
 
-        // 球形推進剤極低温タンク群
+        // 燃料ファーム極低温球形タンク
         for(let g=0; g<8; g++) {
             const sphereTank = new THREE.Mesh(
                 new THREE.SphereGeometry(30, 32, 24),
@@ -1404,7 +1414,6 @@ html_template = """
 
         const tempTipPos = new THREE.Vector3();
 
-        // 軌道マップ再描画ルーチン（正確なアーク＆高度スケーリング）
         function drawOrbitMap(altKm, dRangeKm, exploded) {
             if (!orbitCvs) return;
             octx.clearRect(0, 0, 286, 52);
@@ -1418,7 +1427,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🎥 カメラ追随制御 (IFT-5 Super Heavy タワーキャッチ完全密着追随)
+        // 🎥 カメラ追随制御 (IFT-5 YouTube動画 RYUr-5PYA7s 完全準拠の地上追尾)
         // =========================================================================
         const smoothOffset = new THREE.Vector3(75.0, 26.0, 145.0);
         const activeFocusWorld = new THREE.Vector3();
@@ -1435,30 +1444,41 @@ html_template = """
                 rocket.localToWorld(activeFocusWorld);
             }
 
-            // 🎯 CAM 02: SpaceX回収型の場合、Super Heavyブースターを物理重心で完全追尾
+            // 🎯 CAM 02: SpaceX帰還モード時は分離した瞬間から「地上カメラ（ボカチカ発射場実況）」を完全再現！
             if (simCfg.spacex_return && bActive) {
                 s1Group.getWorldPosition(boosterWorldPos);
-                boosterWorldPos.y += s1Len * 0.45; // ブースターの中心を注視点にする
+                boosterWorldPos.y += s1Len * 0.45;
 
                 if (bCaught) {
-                    cameraPip.position.set(38.0, 44.0, 50.0);
-                    cameraPip.lookAt(0, 42.0, 0);
-                    document.getElementById('pip-tag').innerText = "CAM 02: TOWER CATCH CONFIRMED (IFT-5)";
-                    document.getElementById('pip-hud-alt').innerText = "CAUGHT BY CHOPSTICKS";
-                } else if (bY < 3500) {
-                    cameraPip.position.set(boosterWorldPos.x + 65.0, Math.max(12.0, boosterWorldPos.y + 14.0), boosterWorldPos.z + 85.0);
-                    cameraPip.lookAt(boosterWorldPos);
-                    document.getElementById('pip-tag').innerText = "CAM 02: LANDING BURN & HOVER";
+                    // 🦾 キャッチ成功時：タワー直近の地上超広角カメラ (YouTube動画 00:26〜00:35 構図)
+                    cameraPip.fov = 28.0;
+                    cameraPip.position.set(42.0, 32.0, 52.0);
+                    cameraPip.lookAt(0, 40.0, 0);
+                    cameraPip.updateProjectionMatrix();
+                    document.getElementById('pip-tag').innerText = "CAM 02: MECHAZILLA CATCH SUCCESS (IFT-5)";
+                    document.getElementById('pip-hud-alt').innerText = "SUPER HEAVY SECURED";
+                } else if (bY < 2500) {
+                    // 🚀 最終アプローチ＆ランディングバーン：地上からタワーとブースターを同時視野に入れる (00:18〜00:25 構図)
+                    cameraPip.fov = 18.0;
+                    cameraPip.position.set(65.0, 8.0, 120.0);
+                    cameraPip.lookAt(boosterWorldPos.x * 0.5, Math.max(25.0, boosterWorldPos.y * 0.6), 0);
+                    cameraPip.updateProjectionMatrix();
+                    document.getElementById('pip-tag').innerText = "CAM 02: STARBASE GROUND OPTICAL (LANDING BURN)";
                     document.getElementById('pip-hud-alt').innerText = `BOOSTER: ${(bY / 1000.0).toFixed(2)} km`;
                 } else {
-                    cameraPip.position.set(boosterWorldPos.x - 220.0, Math.max(25.0, boosterWorldPos.y + 45.0), boosterWorldPos.z + 280.0);
+                    // 🔭 上空降下中：地上光学追尾ステーションから雲間を抜けてくる機体を精密見上げ追尾 (00:00〜00:17 構図)
+                    cameraPip.fov = 4.2; // 超望遠
+                    cameraPip.position.set(120.0, 2.0, 220.0);
                     cameraPip.lookAt(boosterWorldPos);
-                    document.getElementById('pip-tag').innerText = "CAM 02: SUPER HEAVY RTLS TRACKER";
+                    cameraPip.updateProjectionMatrix();
+                    document.getElementById('pip-tag').innerText = "CAM 02: GROUND TRACKER KINETO (IFT-5 CHASE)";
                     document.getElementById('pip-hud-alt').innerText = `BOOSTER: ${(bY / 1000.0).toFixed(1)} km`;
                 }
             } else {
+                cameraPip.fov = 6.2;
                 cameraPip.position.set(-1400, Math.max(85, activeFocusWorld.y * 0.15 + 40), 1800);
                 cameraPip.lookAt(activeFocusWorld);
+                cameraPip.updateProjectionMatrix();
                 document.getElementById('pip-tag').innerText = "CAM 02: COASTAL TELEPHOTO (1200mm)";
                 document.getElementById('pip-hud-alt').innerText = `ALT: ${Math.max(0, alt).toFixed(1)} km`;
             }
@@ -1566,7 +1586,7 @@ html_template = """
             // 1. 外部ブースター分離
             if (!p0.strapon && !boosterDetached && boosterUnits.length > 0 && !simCfg.is_preview) {
                 boosterDetached = true;
-                playPyro();
+                playHeavySeparationSound();
                 for(let b of boosterUnits) {
                     b.detached = true;
                     b.tips.forEach(t => { t.plume.visible = false; });
@@ -1595,7 +1615,7 @@ html_template = """
             // 2. 第1段分離 ＆ SpaceX型RTLSタワーキャッチ
             if (p0.stage === 2 && !stage1Detached && !simCfg.is_preview) {
                 stage1Detached = true;
-                playPyro();
+                playHeavySeparationSound();
                 s1NozzleTips.forEach(t => { t.plume.visible = false; });
                 s2NozzleTips.forEach(t => { t.plume.visible = true; });
                 plumeShaderMat.uniforms.uMidColor.value.setHex(simCfg.s2_flame_hex);
@@ -1629,7 +1649,7 @@ html_template = """
             // 3. フェアリング分離
             if (!p0.fairing && !fairingDetached && fairingHalves.length > 0 && !simCfg.is_preview) {
                 fairingDetached = true;
-                playPyro();
+                playHeavySeparationSound();
                 for(let fh of fairingHalves) {
                     fh.detached = true;
                     scene.attach(fh.mesh);
@@ -1701,13 +1721,12 @@ html_template = """
             // 🤖 5. 4象限RCS姿勢制御 (物理フィードバック連動・実パルス噴射)
             // =========================================================================
             const dtReal = Math.max(0.001, simT - prevSimT);
-            const pitchRate = (pitch - prevPitch) / dtReal; // 角速度
+            const pitchRate = (pitch - prevPitch) / dtReal;
             prevPitch = pitch;
             prevSimT = simT;
             let rcsFiring = false;
 
             const deadband = (simCfg.rcs_deadband * Math.PI) / 180.0;
-            // 物理的に姿勢修正が必要な瞬間（角加速度・ターン誤差が発生した瞬間のみ）を検知
             const needsPitchUp = (pitchRate < -0.015);
             const needsPitchDown = (pitchRate > 0.015);
             const needsYawCorrection = (alt > 35.0 && Math.abs(rx) > 200.0 && (now % 300 < 50));
@@ -1725,7 +1744,6 @@ html_template = """
                     }
                 }
                 if (stage1Detached && rcs.isS1 && p0.b_active && !p0.b_caught && (Math.abs(bPitch - Math.PI) > 0.05)) {
-                    // RTLS帰還時の姿勢反転制御
                     if (rcs.dir.id === "+Pitch") shouldFire = true;
                 }
 
