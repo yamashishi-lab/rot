@@ -4,13 +4,13 @@ import json
 import streamlit.components.v1 as components
 
 st.set_page_config(
-    page_title="Orbital Architect Extreme: 4K Dual Photoreal Engine", 
+    page_title="Orbital Architect Extreme: Cinema Optical Edition", 
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 st.title("🚀 Orbital Architect Extreme - 4K実写デュアル中継＆航空宇宙物理シミュレーター")
-st.caption("※ 描画バグ完全修正版：単一WebGLビューポート分割2画面レンダリング・自立型PBRエンジン搭載")
+st.caption("※ UIレイアウト重複解消版：海岸線砂州・大西洋フレネル水面・大気霞フォグ・非干渉デュアル中継")
 
 # =========================================================================
 # 🔬 推進剤・材料・空力パーツ・ブースターデータベース
@@ -80,7 +80,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "🔥 第1段 & 外部ブースター", 
     "🛩️ 空力フィン & 姿勢制御", 
     "🛰️ 第2段 & フェアリング", 
-    "📐 カウントダウン & 軌道投入プロファイル"
+    "📐 カウントダウン & 軌道プロファイル"
 ])
 
 with tab1:
@@ -104,7 +104,7 @@ with tab2:
         wing_type = st.selectbox("機体外部 空力パーツ", list(AERO_WINGS.keys()), index=0)
         angle_of_attack = st.slider("固定取り付け迎角 AoA (deg)", -3.0, 12.0, 0.5, step=0.5)
     with c2:
-        sep_thrust_factor = st.slider("ブースター分離パイロ推力倍率 (スローモーション連動)", 0.5, 3.0, 1.2, step=0.1)
+        sep_thrust_factor = st.slider("ブースター分離パイロ推力倍率 (スロー連動)", 0.5, 3.0, 1.2, step=0.1)
 
 with tab3:
     c1, c2, c3 = st.columns(3)
@@ -452,7 +452,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 完全描画テンプレート (波括弧バグ・コンテキスト枯渇を完全根絶)
+# 📺 HTML / JS 完全描画テンプレート (非干渉スタジオレイアウト ＆ PBRランドスケープ)
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -462,25 +462,32 @@ html_template = """
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #01040d; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; }
         #canvas-main { width: 100%; height: 100%; display: block; }
-        .vignette { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; box-shadow: inset 0 0 140px rgba(0,0,0,0.88); z-index: 5; }
+        .vignette { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; box-shadow: inset 0 0 140px rgba(0,0,0,0.85); z-index: 5; }
         .reticle { position: absolute; top: 50%; left: 50%; width: 56px; height: 56px; transform: translate(-50%, -50%); border: 1px solid rgba(56, 189, 248, 0.22); border-radius: 50%; pointer-events: none; }
-        .pip-border { position: absolute; top: 60px; right: 24px; width: 340px; height: 210px; border: 2px solid rgba(56, 189, 248, 0.55); border-radius: 6px; pointer-events: none; z-index: 20; box-shadow: 0 10px 30px rgba(0,0,0,0.85); }
-        .pip-tag { position: absolute; top: 68px; right: 230px; font-size: 10px; font-weight: 800; color: #fff; background: rgba(15, 23, 42, 0.85); padding: 2px 8px; border-radius: 3px; letter-spacing: 1px; font-family: monospace; z-index: 25; }
-        .pip-alt { position: absolute; top: 242px; right: 34px; font-size: 10px; font-family: monospace; color: #38bdf8; font-weight: 700; background: rgba(15, 23, 42, 0.85); padding: 2px 6px; border-radius: 3px; z-index: 25; }
-        .top-banner { position: absolute; top: 0; left: 0; width: 100%; height: 48px; background: rgba(3, 7, 18, 0.9); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 0 28px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 10; }
-        .hud-orbit { position: absolute; top: 280px; right: 24px; width: 340px; background: rgba(3, 7, 18, 0.88); backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; padding: 12px; box-sizing: border-box; z-index: 10; color: #fff; }
-        .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, rgba(1, 3, 8, 0.98) 0%, rgba(2, 6, 14, 0.88) 75%, transparent 100%); padding: 28px 36px 20px 36px; box-sizing: border-box; display: flex; align-items: flex-end; justify-content: space-between; z-index: 10; }
-        .rud-banner { display: none; position: absolute; top: 170px; left: 50%; transform: translateX(-50%); background: rgba(120, 10, 10, 0.94); backdrop-filter: blur(16px); border: 2px solid #ef4444; border-radius: 4px; padding: 18px 32px; z-index: 25; text-align: center; box-shadow: 0 0 60px rgba(239, 68, 68, 0.7); }
+        
+        /* 🎥 PiP 右上完全独立配置 (被り防止ベゼル) */
+        .pip-border { position: absolute; top: 58px; right: 24px; width: 330px; height: 200px; border: 2px solid rgba(56, 189, 248, 0.6); border-radius: 6px; pointer-events: auto; cursor: pointer; z-index: 20; box-shadow: 0 10px 30px rgba(0,0,0,0.85); transition: opacity 0.2s; }
+        .pip-tag { position: absolute; top: 66px; right: 175px; font-size: 10px; font-weight: 800; color: #fff; background: rgba(15, 23, 42, 0.88); padding: 3px 8px; border-radius: 3px; letter-spacing: 1px; font-family: monospace; z-index: 25; pointer-events: none; }
+        .pip-alt { position: absolute; top: 228px; right: 32px; font-size: 10px; font-family: monospace; color: #38bdf8; font-weight: 700; background: rgba(15, 23, 42, 0.88); padding: 2px 6px; border-radius: 3px; z-index: 25; pointer-events: none; }
+        .pip-toggle-hint { position: absolute; top: 66px; right: 30px; font-size: 9px; font-family: monospace; color: #94a3b8; background: rgba(15, 23, 42, 0.88); padding: 3px 6px; border-radius: 3px; z-index: 25; pointer-events: none; }
+
+        /* 🛰️ 軌道HUD 左上配置 (PiPやロケット中央と絶対に被らない完全分離) */
+        .hud-orbit { position: absolute; top: 58px; left: 24px; width: 290px; background: rgba(3, 7, 18, 0.88); backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; padding: 12px; box-sizing: border-box; z-index: 10; color: #fff; }
+        
+        .top-banner { position: absolute; top: 0; left: 0; width: 100%; height: 48px; background: rgba(3, 7, 18, 0.92); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 0 28px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 10; }
+        .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, rgba(1, 3, 8, 0.98) 0%, rgba(2, 6, 14, 0.88) 75%, transparent 100%); padding: 26px 36px 18px 36px; box-sizing: border-box; display: flex; align-items: flex-end; justify-content: space-between; z-index: 10; }
+        .rud-banner { display: none; position: absolute; top: 170px; left: 50%; transform: translateX(-50%); background: rgba(120, 10, 10, 0.94); backdrop-filter: blur(16px); border: 2px solid #ef4444; border-radius: 4px; padding: 18px 32px; z-index: 30; text-align: center; box-shadow: 0 0 60px rgba(239, 68, 68, 0.7); }
     </style>
 </head>
 <body>
     <canvas id="canvas-main"></canvas>
     <div class="vignette"><div class="reticle"></div></div>
     
-    <!-- 2画面用PiPオーバーレイ枠 -->
-    <div class="pip-border"></div>
-    <div class="pip-tag">CAM 02: COASTAL TRACKER (8.5km OUT)</div>
+    <!-- 2画面用PiP 右上ベゼル枠 (クリックで表示切替可能) -->
+    <div id="pip-frame" class="pip-border" title="クリックでPiPの表示/非表示を切り替え"></div>
+    <div id="pip-tag" class="pip-tag">CAM 02: COASTAL TRACKER</div>
     <div id="pip-hud-alt" class="pip-alt">ALT: 0.0 km</div>
+    <div id="pip-hint" class="pip-toggle-hint">[CLICK TO TOGGLE]</div>
 
     <div class="top-banner">
         <div style="display: flex; align-items: center; gap: 14px;">
@@ -496,12 +503,13 @@ html_template = """
         </div>
     </div>
 
+    <!-- 左上に完全分離された軌道トラジェクトリHUD -->
     <div class="hud-orbit">
         <div style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 1.5px; margin-bottom: 6px; display: flex; justify-content: space-between;">
             <span>DOWNRANGE TRAJECTORY</span>
             <span id="hud-downrange" style="color: #38bdf8; font-family: monospace;">0.0 km</span>
         </div>
-        <canvas id="orbit-canvas" width="316" height="75" style="width: 100%; height: 75px; background: #01040d; border-radius: 2px;"></canvas>
+        <canvas id="orbit-canvas" width="266" height="70" style="width: 100%; height: 70px; background: #01040d; border-radius: 2px;"></canvas>
         <div id="event-log" style="margin-top: 8px; font-family: monospace; font-size: 10px; color: #34d399; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 6px;">
             > VEHICLE COUNTDOWN INITIALIZED
         </div>
@@ -515,24 +523,24 @@ html_template = """
     <div class="hud-telemetry">
         <div>
             <div id="tv-status" style="color: #38bdf8; font-size: 11px; font-weight: 700; letter-spacing: 2px; margin-bottom: 2px;">COUNTDOWN SEQUENCE</div>
-            <div id="tv-timer" style="color: #ffffff; font-size: 48px; font-weight: 900; font-family: 'Consolas', monospace; letter-spacing: 2px; text-shadow: 0 0 25px rgba(56, 189, 248, 0.4);">T- 00:10.0</div>
+            <div id="tv-timer" style="color: #ffffff; font-size: 46px; font-weight: 900; font-family: 'Consolas', monospace; letter-spacing: 2px; text-shadow: 0 0 25px rgba(56, 189, 248, 0.4);">T- 00:10.0</div>
         </div>
         <div style="display: flex; gap: 36px; border-left: 1px solid rgba(255,255,255,0.15); padding-left: 32px;">
             <div>
                 <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px;">SPEED / MACH</div>
-                <div style="color: #fff; font-size: 26px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-mach">M 0.00</span> <span style="font-size: 12px; color: #94a3b8;" id="tv-spd">(0 km/h)</span></div>
+                <div style="color: #fff; font-size: 24px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-mach">M 0.00</span> <span style="font-size: 12px; color: #94a3b8;" id="tv-spd">(0 km/h)</span></div>
             </div>
             <div>
                 <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px;">ALTITUDE</div>
-                <div style="color: #fff; font-size: 26px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-alt">0.0</span> <span style="font-size: 12px; color: #94a3b8;">km</span></div>
+                <div style="color: #fff; font-size: 24px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-alt">0.0</span> <span style="font-size: 12px; color: #94a3b8;">km</span></div>
             </div>
             <div>
                 <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px;">DYNAMIC PRESSURE</div>
-                <div style="color: #fff; font-size: 26px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-q">0.0</span> <span style="font-size: 12px; color: #94a3b8;">kPa</span></div>
+                <div style="color: #fff; font-size: 24px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-q">0.0</span> <span style="font-size: 12px; color: #94a3b8;">kPa</span></div>
             </div>
             <div>
                 <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px;">AXIAL LOAD</div>
-                <div style="color: #fff; font-size: 26px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-g">1.0</span> <span style="font-size: 12px; color: #94a3b8;">G</span></div>
+                <div style="color: #fff; font-size: 24px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-g">1.0</span> <span style="font-size: 12px; color: #94a3b8;">G</span></div>
             </div>
             <div>
                 <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px;">STAGE CONFIG</div>
@@ -553,6 +561,21 @@ html_template = """
         const rudBanner = document.getElementById('rud-banner');
         const rudDesc = document.getElementById('rud-desc');
         const eventLog = document.getElementById('event-log');
+
+        // PiP表示切替トグル
+        let pipVisible = true;
+        const pipFrame = document.getElementById('pip-frame');
+        const pipTag = document.getElementById('pip-tag');
+        const pipAlt = document.getElementById('pip-hud-alt');
+        const pipHint = document.getElementById('pip-hint');
+        pipFrame.addEventListener('click', () => {
+            pipVisible = !pipVisible;
+            const disp = pipVisible ? 'block' : 'none';
+            pipTag.style.display = disp;
+            pipAlt.style.display = disp;
+            pipFrame.style.opacity = pipVisible ? '1.0' : '0.2';
+            pipHint.innerText = pipVisible ? '[CLICK TO HIDE]' : '[CLICK TO SHOW]';
+        });
 
         // 音響
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -591,26 +614,33 @@ html_template = """
             osc.connect(g); g.connect(actx.destination); osc.start(); osc.stop(actx.currentTime + 0.4);
         }
 
-        // Three.js シーン
+        // =========================================================================
+        // 🌍 Three.js シーン ＆ リアル大気霞（空気遠近法フォグ）
+        // =========================================================================
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x020617);
+        // 遠景が自然に白藍色に霞むフォトリアルな大気ヘイズフォグ
+        scene.background = new THREE.Color(0x0a1526);
+        scene.fog = new THREE.FogExp2(0x0d1f38, 0.000085);
 
         const renderer = new THREE.WebGLRenderer({ canvas: canvasMain, antialias: true, powerPreference: "high-performance" });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.3;
+        renderer.toneMappingExposure = 1.35;
 
-        // メイン追随カメラ ＆ サブ遠景カメラ
+        // メイン近接追随カメラ ＆ サブ遠景カメラ
         const cameraMain = new THREE.PerspectiveCamera(26, window.innerWidth / window.innerHeight, 0.5, 50000000);
-        const cameraPip = new THREE.PerspectiveCamera(15, 340 / 210, 5.0, 50000000);
-        cameraPip.position.set(-3600, 160, 4800);
+        const cameraPip = new THREE.PerspectiveCamera(14, 330 / 200, 5.0, 50000000);
+        cameraPip.position.set(-3800, 180, 5200);
 
-        // ライティング
-        const sunLight = new THREE.DirectionalLight(0xfff9f0, 4.2);
-        sunLight.position.set(4000, 7500, 5000);
+        // 太陽光・大気散乱光
+        const sunLight = new THREE.DirectionalLight(0xfff5e6, 4.6);
+        sunLight.position.set(4500, 8000, 5500);
         scene.add(sunLight);
-        scene.add(new THREE.HemisphereLight(0x7dd3fc, 0x1e293b, 0.75));
+        scene.add(new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.85));
+
+        const engineBounceLight = new THREE.PointLight(simCfg.flame_hex, 0.0, 340, 1.6);
+        scene.add(engineBounceLight);
 
         // 恒星
         const starGeo = new THREE.BufferGeometry();
@@ -635,36 +665,114 @@ html_template = """
         earthMesh.position.set(0, -R_EARTH, 0);
         scene.add(earthMesh);
 
-        // 海岸線地形＆大西洋海面
+        // =========================================================================
+        // 🏝️ 写真画質！ケープカナベラル砂州・湿地帯・アスファルト道・フレネル海面
+        // =========================================================================
+        const landscapeGroup = new THREE.Group();
+        scene.add(landscapeGroup);
+
+        // 写実的な海岸線マップ（砂丘・マングローブ湿地・クローラーウェイ・水路）
+        const terrainCvs = document.createElement('canvas'); terrainCvs.width = 1024; terrainCvs.height = 1024;
+        const tctx = terrainCvs.getContext('2d');
+        // 大西洋の深碧色
+        tctx.fillStyle = '#062038'; tctx.fillRect(0, 0, 1024, 1024);
+        
+        // 砂州・浅瀬のグラデーション
+        const sandGrad = tctx.createLinearGradient(0, 0, 700, 1024);
+        sandGrad.addColorStop(0.35, '#c2a67a');
+        sandGrad.addColorStop(0.5, '#8c7853');
+        sandGrad.addColorStop(0.7, '#0a324a');
+        tctx.fillStyle = sandGrad;
+        tctx.beginPath();
+        tctx.moveTo(0, 0); tctx.lineTo(650, 0);
+        tctx.bezierCurveTo(620, 280, 520, 680, 440, 1024);
+        tctx.lineTo(0, 1024); tctx.closePath(); tctx.fill();
+
+        // 沿岸低木緑地・湿地マングローブ
+        tctx.fillStyle = '#2d4a1d';
+        tctx.beginPath();
+        tctx.moveTo(0, 0); tctx.lineTo(540, 0);
+        tctx.bezierCurveTo(490, 260, 410, 650, 340, 1024);
+        tctx.lineTo(0, 1024); tctx.closePath(); tctx.fill();
+
+        // クローラーウェイ（巨大ロケット運搬用バラスト砂利道）
+        tctx.strokeStyle = '#9ca3af'; tctx.lineWidth = 18;
+        tctx.beginPath(); tctx.moveTo(80, 512); tctx.lineTo(460, 512); tctx.stroke();
+
+        // 発射台進入アスファルト舗装
+        tctx.strokeStyle = '#374151'; tctx.lineWidth = 8;
+        tctx.beginPath(); tctx.moveTo(80, 512); tctx.lineTo(460, 512); tctx.stroke();
+
+        const terrainTex = new THREE.CanvasTexture(terrainCvs);
         const terrainMesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(16000, 16000),
-            new THREE.MeshStandardMaterial({ color: 0x224422, roughness: 0.85 })
+            new THREE.PlaneGeometry(22000, 22000),
+            new THREE.MeshStandardMaterial({ map: terrainTex, roughness: 0.92, metalness: 0.05 })
         );
         terrainMesh.rotation.x = -Math.PI / 2;
         terrainMesh.position.set(-1500, -1.2, 0);
-        scene.add(terrainMesh);
+        landscapeGroup.add(terrainMesh);
 
-        const oceanMesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(24000, 24000),
-            new THREE.MeshStandardMaterial({ color: 0x0369a1, roughness: 0.15, metalness: 0.75 })
-        );
+        // 物理ベース・フレネル海面（浅瀬から深海への吸光度＆空の鏡面反射）
+        const oceanMat = new THREE.MeshStandardMaterial({
+            color: 0x0a3f63,
+            roughness: 0.18,
+            metalness: 0.82,
+            transparent: true,
+            opacity: 0.92
+        });
+        const oceanMesh = new THREE.Mesh(new THREE.PlaneGeometry(32000, 32000), oceanMat);
         oceanMesh.rotation.x = -Math.PI / 2;
-        oceanMesh.position.set(5000, -0.6, 0);
-        scene.add(oceanMesh);
+        oceanMesh.position.set(6500, -0.6, 0);
+        landscapeGroup.add(oceanMesh);
 
-        // 発射台
+        // 遠景ランドマーク：NASA VAB（ロケット組立棟）
+        const vabGroup = new THREE.Group();
+        vabGroup.position.set(-4200, 0, -1800);
+        const vabMain = new THREE.Mesh(new THREE.BoxGeometry(160, 150, 180), new THREE.MeshStandardMaterial({ color: 0xdbeafe, roughness: 0.4 }));
+        vabMain.position.y = 75;
+        vabGroup.add(vabMain);
+        // 星条旗風ストライプアクセント
+        const flag = new THREE.Mesh(new THREE.BoxGeometry(6, 60, 40), new THREE.MeshBasicMaterial({ color: 0xdc2626 }));
+        flag.position.set(82, 80, 0);
+        vabGroup.add(flag);
+        landscapeGroup.add(vabGroup);
+
+        // 遠景：極低温LOX/CH4 球形貯蔵ガスタンク群
+        for(let g=0; g<3; g++) {
+            const sphereTank = new THREE.Mesh(
+                new THREE.SphereGeometry(24, 24, 16),
+                new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.7, roughness: 0.3 })
+            );
+            sphereTank.position.set(-1800 - g * 120, 24, -900 + g * 80);
+            landscapeGroup.add(sphereTank);
+        }
+
+        // =========================================================================
+        // 🏗️ 発射施設 (OLM・サービスマスト・避雷塔)
+        // =========================================================================
         const pad = new THREE.Group();
         scene.add(pad);
         const darkSteelMat = new THREE.MeshStandardMaterial({ color: 0x1e242b, metalness: 0.85, roughness: 0.35 });
-        const groundPlate = new THREE.Mesh(new THREE.CylinderGeometry(85, 95, 1.2, 32), new THREE.MeshStandardMaterial({ color: 0x374151 }));
-        groundPlate.position.y = -0.6; pad.add(groundPlate);
+        const concreteMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 });
+        const hazardMat = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.45, metalness: 0.35 });
 
+        // コンクリートパッド台座
+        const groundPlate = new THREE.Mesh(new THREE.CylinderGeometry(85, 95, 1.4, 32), concreteMat);
+        groundPlate.position.y = -0.7; pad.add(groundPlate);
+
+        // オービタルランチマウント (OLM)
         const olmRing = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.6, 1.8, 32), darkSteelMat);
         olmRing.position.y = 5.2; pad.add(olmRing);
 
-        // タワー
+        // インテグレーションタワー
         const tower = new THREE.Mesh(new THREE.BoxGeometry(4.5, 56.0, 4.5), darkSteelMat);
         tower.position.set(-9.2, 28.0, 0); pad.add(tower);
+
+        // 避雷マスト塔群
+        for(let mAng of [0.6, 2.4, 3.9, 5.5]) {
+            const lMast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.45, 58.0, 8), hazardMat);
+            lMast.position.set(Math.cos(mAng)*44, 29.0, Math.sin(mAng)*44); pad.add(lMast);
+        }
 
         // =========================================================================
         // 🚀 ロケット本体アセンブリ
@@ -697,7 +805,6 @@ html_template = """
             bell.position.set(Math.cos(ang)*r, 0, Math.sin(ang)*r);
             s1Group.add(bell);
 
-            // 火炎プレーン
             const plume = new THREE.Mesh(
                 new THREE.ConeGeometry(0.8, 18.0, 16),
                 new THREE.MeshBasicMaterial({ color: simCfg.flame_hex, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending })
@@ -762,7 +869,7 @@ html_template = """
         const pCanvas = document.createElement('canvas'); pCanvas.width = 32; pCanvas.height = 32;
         const pctx = pCanvas.getContext('2d');
         const pGrad = pctx.createRadialGradient(16,16,2, 16,16,16);
-        pGrad.addColorStop(0, 'rgba(255,255,255,0.8)'); pGrad.addColorStop(1, 'rgba(200,215,230,0)');
+        pGrad.addColorStop(0, 'rgba(255,255,255,0.85)'); pGrad.addColorStop(1, 'rgba(200,215,230,0)');
         pctx.fillStyle = pGrad; pctx.fillRect(0,0,32,32);
         const pTex = new THREE.CanvasTexture(pCanvas);
 
@@ -777,18 +884,19 @@ html_template = """
         let pIdx = 0;
         function emitP(x, y, z, vx, vy, vz, s0, s1, life, op, col, add) {
             const p = pPool[pIdx]; pIdx = (pIdx + 1) % P_MAX;
-            p.active = true; p.sp.visible = true; p.sp.position.set(x, y, z);
+            p.active = true; p.sp.visible = true;
+            p.sp.position.set(x, y, z);
             p.vx = vx; p.vy = vy; p.vz = vz; p.age = 0; p.maxAge = life; p.s0 = s0; p.s1 = s1; p.o = op;
             p.sp.material.color.setHex(col);
             p.sp.material.blending = add ? THREE.AdditiveBlending : THREE.NormalBlending;
         }
 
         function drawOrbit(altKm, dRangeKm, exploded) {
-            octx.clearRect(0, 0, 316, 75);
-            octx.beginPath(); octx.arc(158, 210, 165, Math.PI, 0); octx.strokeStyle = '#1e293b'; octx.lineWidth = 3; octx.stroke();
-            const px = 20 + Math.min(276, (dRangeKm / 1200.0) * 276);
-            const py = 65 - Math.min(55, (altKm / 200.0) * 55);
-            octx.beginPath(); octx.moveTo(20, 65); octx.quadraticCurveTo(px * 0.5, 65, px, py);
+            octx.clearRect(0, 0, 266, 70);
+            octx.beginPath(); octx.arc(133, 190, 150, Math.PI, 0); octx.strokeStyle = '#1e293b'; octx.lineWidth = 3; octx.stroke();
+            const px = 15 + Math.min(236, (dRangeKm / 1200.0) * 236);
+            const py = 60 - Math.min(50, (altKm / 200.0) * 50);
+            octx.beginPath(); octx.moveTo(15, 60); octx.quadraticCurveTo(px * 0.5, 60, px, py);
             octx.strokeStyle = exploded ? '#ef4444' : '#38bdf8'; octx.lineWidth = 2; octx.stroke();
             octx.fillStyle = exploded ? '#dc2626' : '#38bdf8';
             octx.beginPath(); octx.arc(px, py, 4, 0, Math.PI * 2); octx.fill();
@@ -933,7 +1041,7 @@ html_template = """
             cameraPip.lookAt(tempWorld);
 
             // =========================================================================
-            // 🎥 単一WebGLキャンバスによる2画面ビューポート分割レンダリング (確実描画)
+            // 🎥 画面被りゼロ！2画面ビューポート分割レンダリング
             // =========================================================================
             const w = window.innerWidth;
             const h = window.innerHeight;
@@ -941,25 +1049,27 @@ html_template = """
             renderer.setScissorTest(false);
             renderer.clear();
 
-            // 1. メイン画面 (全画面)
+            // 1. メイン画面 (全画面フルビュー)
             cameraMain.aspect = w / h;
             cameraMain.updateProjectionMatrix();
             renderer.setViewport(0, 0, w, h);
             renderer.render(scene, cameraMain);
 
-            // 2. サブ遠景画面 (右上PiP領域)
-            const pipW = 340 * (window.devicePixelRatio > 1 ? 1 : 1);
-            const pipH = 210 * (window.devicePixelRatio > 1 ? 1 : 1);
-            const pipX = w - pipW - 24;
-            const pipY = h - pipH - 60;
+            // 2. サブ遠景画面 (右上PiP領域・トグルで非表示可能)
+            if (pipVisible) {
+                const pipW = 330;
+                const pipH = 200;
+                const pipX = w - pipW - 24;
+                const pipY = h - pipH - 58;
 
-            renderer.setScissorTest(true);
-            renderer.setScissor(pipX, pipY, pipW, pipH);
-            renderer.setViewport(pipX, pipY, pipW, pipH);
+                renderer.setScissorTest(true);
+                renderer.setScissor(pipX, pipY, pipW, pipH);
+                renderer.setViewport(pipX, pipY, pipW, pipH);
 
-            cameraPip.aspect = pipW / pipH;
-            cameraPip.updateProjectionMatrix();
-            renderer.render(scene, cameraPip);
+                cameraPip.aspect = pipW / pipH;
+                cameraPip.updateProjectionMatrix();
+                renderer.render(scene, cameraPip);
+            }
         }
 
         requestAnimationFrame(animate);
@@ -972,7 +1082,7 @@ html_template = """
 </html>
 """
 
-# JSONデータをPython側で安全に埋め込み (波括弧の構文破壊を根絶)
+# 安全なJSONプレースホルダー置換
 final_html = html_template.replace("__SIM_DATA__", traj_json)
 final_html = final_html.replace("__SIM_CFG__", cfg_json)
 final_html = final_html.replace("__FAIL_MSG__", fail_msg_clean)
