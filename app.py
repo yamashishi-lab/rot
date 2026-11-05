@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 st.title("🚀 Orbital Architect Ultra")
-st.caption("※ 4K実写級：IFT-5タワーキャッチ地上完全追尾・リアル霧状パルスRCS・水蒸気雲完全復元版")
+st.caption("※ 4K実写級：IFT-5タワーキャッチ地上完全追尾・リアル霧状パルスRCS・黒線完全除去版")
 
 # =========================================================================
 # 🔬 推進剤・材料・空力パーツ・ブースターデータベース
@@ -553,8 +553,6 @@ html_template = """
         * { box-sizing: border-box; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #01040a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; }
         #canvas-main { width: 100%; height: 100%; display: block; position: absolute; top:0; left:0; z-index: 1; }
-        .vignette { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; box-shadow: inset 0 0 160px rgba(0,0,0,0.85); z-index: 5; }
-        .grain { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 6; opacity: 0.025; background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 3px 3px; }
         
         /* 📱 CAM 02 (PiP中継ウィンドウ) */
         .pip-container { position: absolute; top: 54px; right: 20px; width: 340px; height: 195px; border: 2px solid rgba(56, 189, 248, 0.9); border-radius: 4px; z-index: 60; box-shadow: 0 14px 45px rgba(0,0,0,0.98); background: #01040a; overflow: hidden; cursor: pointer; }
@@ -563,7 +561,7 @@ html_template = """
         .pip-alt { position: absolute; bottom: 6px; right: 8px; font-size: 10px; font-family: monospace; color: #38bdf8; font-weight: 700; background: rgba(15, 23, 42, 0.92); padding: 2px 6px; border-radius: 2px; z-index: 65; pointer-events: none; }
         .pip-toggle-hint { position: absolute; top: 6px; right: 8px; font-size: 9px; font-family: monospace; color: #94a3b8; background: rgba(15, 23, 42, 0.92); padding: 3px 6px; border-radius: 2px; z-index: 65; pointer-events: none; }
 
-        /* 🗺️ 軌道マップ (見切れ完全根絶・独立固定) */
+        /* 🗺️ 軌道マップ (見切れ完全根絶) */
         .hud-orbit { position: absolute; top: 54px; left: 20px; width: 304px; background: rgba(3, 7, 18, 0.88); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 4px; padding: 10px 12px; z-index: 50; color: #fff; box-shadow: 0 8px 32px rgba(0,0,0,0.85); }
         #orbit-canvas { width: 280px; height: 60px; background: #020617; border-radius: 2px; border: 1px solid rgba(255,255,255,0.12); display: block; margin-top: 4px; }
 
@@ -582,8 +580,6 @@ html_template = """
 </head>
 <body>
     <canvas id="canvas-main"></canvas>
-    <div class="vignette"></div>
-    <div class="grain"></div>
 
     <div id="pip-box" class="pip-container" title="クリックでPiPの表示/非表示を切り替え">
         <canvas id="canvas-pip"></canvas>
@@ -1343,7 +1339,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🛰️ 【完全実装】霧状パルスRCS (残像なく瞬時に霧散する冷ガス窒素)
+        // 🛰️ 【完全再構築】実機冷ガス窒素(GN2) 霧状パルスRCS (点滅を撤廃)
         // =========================================================================
         const rcsNozzles = [];
         const rcsDirs = [
@@ -1353,9 +1349,9 @@ html_template = """
             { id: "-Yaw",   dx:  0, dy:  0, dz: -1, rotX: -Math.PI / 2 }
         ];
 
-        // 霧状コーンジオメトリ
-        const rcsConeGeo = new THREE.ConeGeometry(0.38, 2.2, 16, 1, true);
-        rcsConeGeo.translate(0, 1.1, 0);
+        // 霧状コーンジオメトリ（頂点がノズル口、底面に向かって広がる）
+        const rcsConeGeo = new THREE.ConeGeometry(0.42, 2.4, 16, 1, true);
+        rcsConeGeo.translate(0, 1.2, 0);
 
         function createRcsJetUnit(parent, posX, posY, posZ, dir, isS1) {
             const mount = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.35, 0.2), darkSteelMat);
@@ -1500,7 +1496,7 @@ html_template = """
 
         function renderPipTracker(simT, bActive, bY, bCaught, stage) {
             if (simCfg.spacex_return && bActive) {
-                // ブースターの重心ワールド座標を厳密取得
+                // ブースターの重心ワールド座標を取得
                 s1Group.getWorldPosition(boosterWorldPos);
                 boosterWorldPos.y += s1Len * 0.45;
 
@@ -1729,13 +1725,14 @@ html_template = """
             }
 
             // =========================================================================
-            // 🤖 5. 【完全実装】一瞬だけ霧状に出るRCSパルス噴射 (残像ゼロ)
+            // 🤖 5. 【完全再構築】実機冷ガス窒素(GN2) 霧状パルスRCS (点滅を撤廃)
             // =========================================================================
             const dtReal = Math.max(0.001, simT - prevSimT);
             const pitchRate = (pitch - prevPitch) / dtReal;
             prevPitch = pitch;
             prevSimT = simT;
 
+            // 姿勢制御トルクが必要な瞬間（角加速度発生・反転制御時のみ）
             const pulseActive = (Math.abs(pitchRate) > 0.015) && (now % 320 < 90);
             const boosterPulseActive = stage1Detached && p0.b_active && !p0.b_caught && (Math.abs(bPitch - Math.PI) > 0.05) && (now % 250 < 80);
 
@@ -1758,7 +1755,7 @@ html_template = """
                     targetIntensity = 0.95;
                 }
 
-                // 一瞬で噴射し、即座にフェードアウト
+                // 一瞬で噴射し、即座に霧散フェードアウト
                 rcs.intensity += (targetIntensity - rcs.intensity) * 0.45;
                 rcs.jetMat.opacity = rcs.intensity;
                 if (rcs.intensity > 0.1) rcsActiveHUD = true;
