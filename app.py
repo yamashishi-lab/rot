@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 st.title("🚀 Orbital Architect Extreme - 4K実写級航空宇宙シミュレーター")
-st.caption("※ 完全復元仕様：実時間同期リアル物理・ケープカナベラルPad 39A実写級ランドスケープ・2画面独立シネマ中継")
+st.caption("※ 完全復元仕様：実時間同期リアル物理・ケープカナベラル広域PBRランドスケープ・2画面独立シネマ中継")
 
 # =========================================================================
 # 🔬 推進剤・材料・空力パーツ・ブースターデータベース
@@ -211,7 +211,7 @@ m3.metric("構造限界動圧 / 耐G", f"{s1_spec['max_q']:.1f} kPa", f"耐G: {s
 m4.metric("ブースター追加推力", f"+{strapon_spec['thrust_add']:.0f} kN", f"基数: {strapon_spec['count']} 基")
 
 # =========================================================================
-# 💥 物理シミュレーション (現実時間軸1:1完全同期)
+# 💥 物理シミュレーション (停止バグ解消・長距離周回軌道サポート)
 # =========================================================================
 def run_simulation(preview_only=False):
     if preview_only:
@@ -252,7 +252,7 @@ def run_simulation(preview_only=False):
     maxq_passed = False
     supersonic_called = False
 
-    for step in range(1600):
+    for step in range(2400):
         t = float(step * dt)
         alt = float(y)
         alt_km = float(alt / 1000.0)
@@ -401,12 +401,17 @@ def run_simulation(preview_only=False):
         })
 
         if alt_km >= 160.0 and vx >= 7780.0 and abs(vy) < 400.0:
-            history.append({
-                "t": t + dt, "x": x, "y": y, "alt": alt_km, "v": v, "q": q, "g": 0.0,
-                "stage": int(stage), "fairing": bool(fairing_attached), "wings": bool(wings_attached),
-                "strapon": False, "exploded": False, "explosion_type": "NONE", "thrust": False,
-                "pitch": visual_pitch, "mach": mach, "event": "ORBIT"
-            })
+            cur_event = "ORBIT"
+            # 軌道投入後もシミュレーションを継続させて映像が止まるのを防止
+            for orbit_step in range(400):
+                t_orb = t + (orbit_step + 1) * dt
+                x_orb = x + vx * (orbit_step + 1) * dt
+                history.append({
+                    "t": t_orb, "x": x_orb, "y": y, "alt": alt_km, "v": v, "q": 0.0, "g": 0.0,
+                    "stage": 2, "fairing": False, "wings": wings_attached,
+                    "strapon": False, "exploded": False, "explosion_type": "NONE", "thrust": False,
+                    "pitch": visual_pitch, "mach": mach, "event": "ORBIT"
+                })
             break
 
     if not fail_reason and history[-1]["event"] != "ORBIT":
@@ -460,7 +465,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 完全描画テンプレート (独立CAM02レンダラー＆作用反作用RCS)
+# 📺 HTML / JS 完全描画テンプレート (停止バグ解消＆広域実写ランドスケープ)
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -581,7 +586,6 @@ html_template = """
         const rudDesc = document.getElementById('rud-desc');
         const eventLog = document.getElementById('event-log');
         const subCallout = document.getElementById('sub-callout');
-        const voicedEvents = new Set();
 
         let pipVisible = true;
         const pipBox = document.getElementById('pip-box');
@@ -629,12 +633,10 @@ html_template = """
             if (actx && actx.state === 'suspended') actx.resume();
         }
 
-        // 💥 実録パイロ爆薬分離音（おもちゃピープ音を完全撤廃し実物インパルス衝撃波を合成）
+        // 💥 実録パイロ爆薬分離音
         function playPyro() {
             if (!actx) return;
             const now = actx.currentTime;
-            
-            // 1. パイロ爆薬ボルト破断の超高圧バースト
             const noiseBuf = actx.createBuffer(1, Math.floor(actx.sampleRate * 0.25), actx.sampleRate);
             const nd = noiseBuf.getChannelData(0);
             for(let i=0; i<nd.length; i++) nd[i] = (Math.random() * 2 - 1) * Math.exp(-i / (actx.sampleRate * 0.03));
@@ -646,7 +648,6 @@ html_template = """
             nSrc.connect(nFilt); nFilt.connect(nGain); nGain.connect(actx.destination);
             nSrc.start(now);
 
-            // 2. 胴体金属構造を伝わる重低音インパクト (45Hz〜25Hz)
             const osc = actx.createOscillator();
             const g = actx.createGain();
             osc.type = 'sine';
@@ -663,10 +664,9 @@ html_template = """
         // =========================================================================
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x0a1628);
-        const sceneFog = new THREE.FogExp2(0x0e1e36, 0.000035);
+        const sceneFog = new THREE.FogExp2(0x0e1e36, 0.000025);
         scene.fog = sceneFog;
 
-        // 🎥 レンダラー1 (メイン全画面)
         const rendererMain = new THREE.WebGLRenderer({ canvas: canvasMain, antialias: true, powerPreference: "high-performance" });
         rendererMain.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         rendererMain.setSize(window.innerWidth, window.innerHeight);
@@ -675,17 +675,13 @@ html_template = """
         rendererMain.shadowMap.enabled = true;
         rendererMain.shadowMap.type = THREE.PCFSoftShadowMap;
 
-        // 🎥 レンダラー2 (CAM 02 望遠専用独立レンダラー)
         const rendererPip = new THREE.WebGLRenderer({ canvas: canvasPip, antialias: true, powerPreference: "high-performance" });
         rendererPip.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         rendererPip.setSize(340, 195);
         rendererPip.toneMapping = THREE.ACESFilmicToneMapping;
         rendererPip.toneMappingExposure = 1.45;
 
-        // 🎥 CAM 01: 近接シネマ広角カメラ (FOV 38度)
         const cameraMain = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 1.0, 50000000);
-        
-        // 🎥 CAM 02: 海岸線長距離超望遠カメラ (発射台から1800m離れた南東の海岸線追尾マスト、超望遠狭角4.8度)
         const cameraPip = new THREE.PerspectiveCamera(4.8, 340 / 195, 2.0, 50000000);
         cameraPip.position.set(-1400, 85, 1800);
 
@@ -727,7 +723,7 @@ html_template = """
         scene.add(earthMesh);
 
         // =========================================================================
-        // 🏝️ PBR立体ケープカナベラル・ランドスケープ＆遠景山脈
+        // 🏝️ PBR立体ケープカナベラル・ランドスケープ＆広域施設群
         // =========================================================================
         const landscapeGroup = new THREE.Group();
         scene.add(landscapeGroup);
@@ -754,13 +750,14 @@ html_template = """
         cctx.bezierCurveTo(1000, 550, 850, 1250, 720, 2048);
         cctx.lineTo(0, 2048); cctx.closePath(); cctx.fill();
 
+        // 2条の砂利クローラーウェイ（VABから発射台への重運搬路）
         cctx.strokeStyle = '#9ca3af'; cctx.lineWidth = 14;
         cctx.beginPath(); cctx.moveTo(180, 1014); cctx.lineTo(950, 1014); cctx.stroke();
         cctx.beginPath(); cctx.moveTo(180, 1034); cctx.lineTo(950, 1034); cctx.stroke();
 
         const coastTex = new THREE.CanvasTexture(coastCvs);
         const coastPlane = new THREE.Mesh(
-            new THREE.PlaneGeometry(36000, 36000),
+            new THREE.PlaneGeometry(64000, 64000),
             new THREE.MeshStandardMaterial({ map: coastTex, roughness: 0.94, metalness: 0.04 })
         );
         coastPlane.rotation.x = -Math.PI / 2;
@@ -771,18 +768,19 @@ html_template = """
         const oceanMat = new THREE.MeshStandardMaterial({
             color: 0x072840, roughness: 0.14, metalness: 0.88, transparent: true, opacity: 0.94
         });
-        const oceanMesh = new THREE.Mesh(new THREE.PlaneGeometry(48000, 48000), oceanMat);
+        const oceanMesh = new THREE.Mesh(new THREE.PlaneGeometry(96000, 96000), oceanMat);
         oceanMesh.rotation.x = -Math.PI / 2;
-        oceanMesh.position.set(12000, -1.0, 0);
+        oceanMesh.position.set(16000, -1.0, 0);
         landscapeGroup.add(oceanMesh);
 
+        // 遠景：連なる山並み・稜線
         const mountainMat = new THREE.MeshStandardMaterial({ color: 0x172533, roughness: 0.95 });
-        for(let m=0; m<7; m++) {
+        for(let m=0; m<12; m++) {
             const mMesh = new THREE.Mesh(
-                new THREE.ConeGeometry(900 + m * 200, 380 + (m % 3) * 120, 8),
+                new THREE.ConeGeometry(1200 + m * 200, 480 + (m % 3) * 150, 8),
                 mountainMat
             );
-            mMesh.position.set(-7500 - m * 800, 150, -4200 + (m * 950));
+            mMesh.position.set(-9500 - m * 800, 200, -5200 + (m * 950));
             mMesh.scale.set(1.6, 1.0, 0.8);
             landscapeGroup.add(mMesh);
         }
@@ -797,7 +795,16 @@ html_template = """
         vabGroup.add(vabMain);
         landscapeGroup.add(vabGroup);
 
-        for(let g=0; g<4; g++) {
+        // Pad 39B (隣接発射台の遠景再現)
+        const padBGroup = new THREE.Group();
+        padBGroup.position.set(-2600, 0, 4200);
+        const padBMount = new THREE.Mesh(new THREE.CylinderGeometry(80, 95, 2.0, 32), new THREE.MeshStandardMaterial({ color: 0x3d4552, roughness: 0.94 }));
+        padBMount.position.y = 1.0; padBGroup.add(padBMount);
+        const padBTower = new THREE.Mesh(new THREE.BoxGeometry(4.8, 64.0, 4.8), new THREE.MeshStandardMaterial({ color: 0x1f242d, metalness: 0.9 }));
+        padBTower.position.y = 32.0; padBGroup.add(padBTower);
+        landscapeGroup.add(padBGroup);
+
+        for(let g=0; g<6; g++) {
             const sphereTank = new THREE.Mesh(
                 new THREE.SphereGeometry(28, 32, 24),
                 new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.85, roughness: 0.25 })
@@ -1229,7 +1236,7 @@ html_template = """
             fairingHalves.push({ mesh: halfMesh, side: side, detached: false, vx: 0, vy: 0, rotZ: 0 });
         }
 
-        // 4. RCSマウントノズル (作用・反作用配置: 左ノズルは右へ傾ける際に噴射、右ノズルは左へ傾ける際に噴射)
+        // 4. RCSマウントノズル
         const rcsMountNodes = [];
         for(let side of [-1, 1]) {
             const block = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.45, 0.25), darkSteelMat);
@@ -1338,7 +1345,6 @@ html_template = """
                 rocket.localToWorld(activeFocusWorld);
             }
 
-            // 🎥 CAM 02: 望遠カメラの被写体追随（フォーカスを常に対象中心にロック）
             cameraPip.lookAt(activeFocusWorld);
             document.getElementById('pip-hud-alt').innerText = `ALT: ${Math.max(0, alt).toFixed(1)} km`;
 
@@ -1383,7 +1389,33 @@ html_template = """
         }
 
         // =========================================================================
-        // ⏱️ アニメーション・メインループ (実時間1:1同期 ＆ CAM 02完全描画)
+        // 🎙️ 確実なコールアウト・イベント・ディスパッチャー
+        // =========================================================================
+        const calloutQueue = [
+            { t: -10.0, log: "> [FIDO] T-10s: TERMINAL COUNTDOWN INITIATED", sub: "> Flight computers aligned, vehicle on internal batteries" },
+            { t: -5.0,  log: "> [PAD] T-5s: SOUND SUPPRESSION WATER DELUGE ACTIVE", sub: "> 300,000 GPM water flowing into flame trench" },
+            { t: -3.8,  log: "> [ENG] T-3.8s: MAIN ENGINE START SEQUENCE", sub: "> Turbopumps spinning up, chamber pressure rising" },
+            { t: 0.0,   log: "> [COMM] T+0s: LIFTOFF! WE HAVE A LIFTOFF!", sub: "> Tower cleared, roll and pitch program nominal" },
+            { t: 10.0,  log: "> [NAV] GRAVITY TURN: PITCH OVER PROGRAM", sub: "> Trajectory shaping downrange toward low earth orbit" },
+            { t: 42.0,  log: "> [FDIR] TRANSONIC REGIME: MACH 1.0 PASSED", sub: "> Vehicle is supersonic; aerodynamic shock damping active" },
+            { t: 68.0,  log: "> [FDIR] MAX-Q: MAXIMUM DYNAMIC PRESSURE", sub: "> Engines throttled down for structural loading relief" },
+            { t: 135.0, log: "> [TEL] BECO: BOOSTER ENGINE CUTOFF", sub: "> Korolev Cross separation nominal; core continuing flight" },
+            { t: 162.0, log: "> [PROP] MECO & HOT-STAGING SEPARATION", sub: "> Stage 2 engine ignition verified, payload fairing primed" },
+            { t: 195.0, log: "> [AVIO] FAIRING JETTISON CONFIRMED", sub: "> Spacecraft exposed to vacuum of space" },
+            { t: 520.0, log: "> [ORB] SECO: SECOND STAGE ENGINE CUTOFF", sub: "> Insertion complete; stable low earth orbit achieved" }
+        ];
+
+        let calloutIdx = 0;
+        function updateFlightCallouts(simT) {
+            while (calloutIdx < calloutQueue.length && simT >= calloutQueue[calloutIdx].t) {
+                eventLog.innerText = calloutQueue[calloutIdx].log;
+                subCallout.innerText = calloutQueue[calloutIdx].sub;
+                calloutIdx++;
+            }
+        }
+
+        // =========================================================================
+        // ⏱️ アニメーション・メインループ (停止バグ解消＆実時間同期)
         // =========================================================================
         const tStart = performance.now();
         let boosterDetached = false;
@@ -1397,11 +1429,16 @@ html_template = """
             requestAnimationFrame(animate);
             initAudio();
 
-            // 1秒＝1秒の完全実時間軸同期
             const elapsedSec = (now - tStart) / 1000.0;
             const simT = simCfg.is_preview ? -10.0 : (-10.0 + elapsedSec);
             plumeShaderMat.uniforms.uTime.value = elapsedSec;
 
+            // 確実な実況コールアウトの更新
+            if (!simCfg.is_preview) {
+                updateFlightCallouts(simT);
+            }
+
+            // データ補間（配列外参照バグを完全に修正し、末尾到達時もスムーズに周回軌道上を継続飛行）
             let idx = 0;
             while (idx < simData.length - 1 && simData[idx + 1].t <= simT) idx++;
             const nIdx = Math.min(idx + 1, simData.length - 1);
@@ -1427,47 +1464,10 @@ html_template = """
             const ux = Math.sin(pitch), uy = Math.cos(pitch);
             const perpX = Math.cos(pitch), perpY = -Math.sin(pitch);
 
-            // =====================================================================
-            // 🎙️ 本格フライトディレクター実況・コールアウト音声ログ (完全復元・拡充)
-            // =====================================================================
-            if (!simCfg.is_preview) {
-                if (simT >= -10.0 && simT < -5.0 && !voicedEvents.has('t_minus_10')) {
-                    voicedEvents.add('t_minus_10');
-                    eventLog.innerText = "> [FIDO] T-10s: TERMINAL COUNTDOWN INITIATED";
-                    subCallout.innerText = "> Flight computers aligned, vehicle on internal batteries";
-                } else if (simT >= -5.0 && simT < -3.8 && !voicedEvents.has('deluge_start')) {
-                    voicedEvents.add('deluge_start');
-                    eventLog.innerText = "> [PAD] T-5s: SOUND SUPPRESSION WATER DELUGE ACTIVE";
-                    subCallout.innerText = "> 300,000 GPM water flowing into flame trench";
-                } else if (simT >= -3.8 && simT < 0.0 && !voicedEvents.has('ign_start')) {
-                    voicedEvents.add('ign_start');
-                    eventLog.innerText = "> [ENG] T-3.8s: MAIN ENGINE START SEQUENCE";
-                    subCallout.innerText = "> Turbopumps spinning up, chamber pressure rising";
-                } else if (simT >= 0.0 && simT < 4.0 && !voicedEvents.has('liftoff')) {
-                    voicedEvents.add('liftoff');
-                    eventLog.innerText = "> [COMM] T+0s: LIFTOFF! WE HAVE A LIFTOFF!";
-                    subCallout.innerText = "> Tower cleared, roll and pitch program nominal";
-                } else if (simT >= 12.0 && simT < 25.0 && !voicedEvents.has('gravity_turn')) {
-                    voicedEvents.add('gravity_turn');
-                    eventLog.innerText = "> [NAV] GRAVITY TURN INITIATED";
-                    subCallout.innerText = "> Vehicle pitching downrange toward orbital trajectory";
-                } else if (mach >= 1.0 && !voicedEvents.has('mach1')) {
-                    voicedEvents.add('mach1');
-                    eventLog.innerText = "> [FDIR] VEHICLE IS SUPERSONIC (MACH 1.0 PASS)";
-                    subCallout.innerText = "> Transonic shock collar dampening active";
-                } else if (p0.event === "MAX_Q" && !voicedEvents.has('max_q')) {
-                    voicedEvents.add('max_q');
-                    eventLog.innerText = "> [FDIR] MAX-Q: MAXIMUM DYNAMIC PRESSURE";
-                    subCallout.innerText = "> Throttling engines down to relieve aerodynamic loading";
-                }
-            }
-
             // 1. ブースター切り離し (Korolev Cross)
             if (!p0.strapon && !boosterDetached && boosterUnits.length > 0 && !simCfg.is_preview) {
                 boosterDetached = true;
                 playPyro();
-                eventLog.innerText = "> [TEL] BECO & BOOSTER SEPARATION CONFIRMED";
-                subCallout.innerText = "> Korolev Cross jettison confirmed; nose vent thrusters active";
 
                 for(let b of boosterUnits) {
                     b.detached = true;
@@ -1506,8 +1506,6 @@ html_template = """
             if (p0.stage === 2 && !stage1Detached && !simCfg.is_preview) {
                 stage1Detached = true;
                 playPyro();
-                eventLog.innerText = "> [PROP] MECO & SECOND STAGE IGNITION";
-                subCallout.innerText = "> Hot-staging successful; Stage 1 boostback flip maneuvering";
 
                 s1NozzleTips.forEach(t => { t.plume.visible = false; });
                 s2NozzleTips.forEach(t => { t.plume.visible = true; });
@@ -1539,8 +1537,6 @@ html_template = """
             if (!p0.fairing && !fairingDetached && fairingHalves.length > 0 && !simCfg.is_preview) {
                 fairingDetached = true;
                 playPyro();
-                eventLog.innerText = "> [AVIO] FAIRING DEPLOYMENT NOMINAL";
-                subCallout.innerText = "> Clamshell pyrotechnic separation, payload in vacuum exposure";
                 for(let fh of fairingHalves) {
                     fh.detached = true;
                     scene.attach(fh.mesh);
@@ -1612,21 +1608,16 @@ html_template = """
             // =====================================================================
             // 🤖 5. 作用・反作用＆デッドバンド制御に基づく実機志向の間欠RCS噴射
             // =====================================================================
-            const pitchRate = (pitch - prevPitch) / 0.016; // 角速度 (rad/s)
+            const pitchRate = (pitch - prevPitch) / 0.016;
             prevPitch = pitch;
             let rcsFiring = false;
 
-            // デッドバンド制御（閾値を超えた瞬間だけ短いパルスを噴射して姿勢を保つ）
             const targetPitchProg = (alt > 2.0 && alt < 120.0);
             const pitchAccelNeeded = targetPitchProg && (pitchRate < 0.002);
             const dampingNeeded = (Math.abs(pitchRate) > 0.008);
-            
-            // 0.1秒ごとのパルスウィンドウ（連続噴射せず間欠的にプシュッと噴射）
             const pulseClock = (now % 800) < 110;
 
             for(let rcs of rcsMountNodes) {
-                // 機首を右へ倒す加速時: 左ノズル(side=-1)から右向きに噴射
-                // 角速度が行き過ぎて抑える制動時: 右ノズル(side=1)から左向きに逆噴射
                 let shouldFire = false;
                 if (!simCfg.is_preview && simT > 2.0 && pulseClock && !rcs.isS1) {
                     if (pitchAccelNeeded && rcs.side === -1) shouldFire = true;
@@ -1634,7 +1625,7 @@ html_template = """
                     if (dampingNeeded && pitchRate < 0 && rcs.side === -1) shouldFire = true;
                 }
                 if (stage1Detached && rcs.isS1 && rcs.side === 1 && (now % 600) < 120) {
-                    shouldFire = true; // 第1段反転ブーストバック用パルス
+                    shouldFire = true;
                 }
 
                 if (shouldFire) {
@@ -1764,15 +1755,13 @@ html_template = """
             // =====================================================================
             // 🎥 完全独立デュアルレンダリング (CAM 01全画面 ＋ CAM 02独立Canvas)
             // =====================================================================
-            // 1. CAM 01 メイン画面描画 (全画面)
             scene.fog = sceneFog;
             cameraMain.aspect = window.innerWidth / window.innerHeight;
             cameraMain.updateProjectionMatrix();
             rendererMain.render(scene, cameraMain);
 
-            // 2. CAM 02 望遠画面描画 (独立したrendererPipで専用Canvasへ直接描画)
             if (pipVisible) {
-                scene.fog = null; // 望遠トラッカー時の霧干渉・ボケを完全に排除
+                scene.fog = null;
                 cameraPip.aspect = 340 / 195;
                 cameraPip.updateProjectionMatrix();
                 rendererPip.render(scene, cameraPip);
