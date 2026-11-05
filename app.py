@@ -460,7 +460,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 完全描画テンプレート (4K実写シネマ仕様魔改造)
+# 📺 HTML / JS 完全描画テンプレート (独立CAM02レンダラー＆作用反作用RCS)
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -473,21 +473,21 @@ html_template = """
         .vignette { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; box-shadow: inset 0 0 160px rgba(0,0,0,0.88); z-index: 5; }
         .grain { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 6; opacity: 0.035; background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 3px 3px; }
         
-        /* 🎥 PiP 右上完全独立配置 (被り防止ベゼル ＆ 実写シネマアスペクト) */
-        .pip-border { position: absolute; top: 54px; right: 20px; width: 340px; height: 195px; border: 1.5px solid rgba(56, 189, 248, 0.75); border-radius: 4px; pointer-events: auto; cursor: pointer; z-index: 50; box-shadow: 0 14px 40px rgba(0,0,0,0.95); background: #01040a; transition: all 0.2s ease; }
-        .pip-border:hover { border-color: #38bdf8; box-shadow: 0 0 20px rgba(56, 189, 248, 0.5); }
-        .pip-tag { position: absolute; top: 60px; right: 185px; font-size: 9px; font-weight: 800; color: #fff; background: rgba(15, 23, 42, 0.92); padding: 3px 6px; border-radius: 2px; letter-spacing: 1px; font-family: monospace; z-index: 55; pointer-events: none; border-left: 2px solid #38bdf8; }
-        .pip-alt { position: absolute; top: 222px; right: 28px; font-size: 10px; font-family: monospace; color: #38bdf8; font-weight: 700; background: rgba(15, 23, 42, 0.92); padding: 2px 6px; border-radius: 2px; z-index: 55; pointer-events: none; }
-        .pip-toggle-hint { position: absolute; top: 60px; right: 26px; font-size: 9px; font-family: monospace; color: #94a3b8; background: rgba(15, 23, 42, 0.92); padding: 3px 6px; border-radius: 2px; z-index: 55; pointer-events: none; }
+        /* 🎥 PiP 右上完全独立配置 (被り防止ベゼル ＆ 独立Canvas) */
+        .pip-container { position: absolute; top: 58px; right: 24px; width: 340px; height: 195px; border: 2px solid rgba(56, 189, 248, 0.85); border-radius: 4px; z-index: 60; box-shadow: 0 14px 45px rgba(0,0,0,0.98); background: #01040a; overflow: hidden; cursor: pointer; }
+        #canvas-pip { width: 100%; height: 100%; display: block; }
+        .pip-tag { position: absolute; top: 6px; left: 8px; font-size: 9px; font-weight: 800; color: #fff; background: rgba(15, 23, 42, 0.92); padding: 3px 6px; border-radius: 2px; letter-spacing: 1px; font-family: monospace; z-index: 65; pointer-events: none; border-left: 2px solid #38bdf8; }
+        .pip-alt { position: absolute; bottom: 6px; right: 8px; font-size: 10px; font-family: monospace; color: #38bdf8; font-weight: 700; background: rgba(15, 23, 42, 0.92); padding: 2px 6px; border-radius: 2px; z-index: 65; pointer-events: none; }
+        .pip-toggle-hint { position: absolute; top: 6px; right: 8px; font-size: 9px; font-family: monospace; color: #94a3b8; background: rgba(15, 23, 42, 0.92); padding: 3px 6px; border-radius: 2px; z-index: 65; pointer-events: none; }
 
         /* 🛰️ 軌道HUD 左上配置 (PiPやロケット中央と絶対に被らない完全分離) */
-        .hud-orbit { position: absolute; top: 54px; left: 20px; width: 280px; background: rgba(3, 7, 18, 0.72); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; padding: 10px 12px; box-sizing: border-box; z-index: 25; color: #fff; }
+        .hud-orbit { position: absolute; top: 58px; left: 24px; width: 280px; background: rgba(3, 7, 18, 0.72); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; padding: 10px 12px; box-sizing: border-box; z-index: 25; color: #fff; }
         .hud-orbit:hover { background: rgba(3, 7, 18, 0.9); }
         
         .top-banner { position: absolute; top: 0; left: 0; width: 100%; height: 44px; background: rgba(2, 6, 16, 0.88); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 20; }
         .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, rgba(1, 3, 8, 0.95) 0%, rgba(2, 6, 14, 0.72) 75%, transparent 100%); padding: 22px 32px 14px 32px; box-sizing: border-box; display: flex; align-items: flex-end; justify-content: space-between; z-index: 20; pointer-events: none; }
         .hud-telemetry > * { pointer-events: auto; }
-        .rud-banner { display: none; position: absolute; top: 150px; left: 50%; transform: translateX(-50%); background: rgba(120, 10, 10, 0.94); backdrop-filter: blur(16px); border: 2px solid #ef4444; border-radius: 4px; padding: 16px 28px; z-index: 60; text-align: center; box-shadow: 0 0 60px rgba(239, 68, 68, 0.7); }
+        .rud-banner { display: none; position: absolute; top: 150px; left: 50%; transform: translateX(-50%); background: rgba(120, 10, 10, 0.94); backdrop-filter: blur(16px); border: 2px solid #ef4444; border-radius: 4px; padding: 16px 28px; z-index: 70; text-align: center; box-shadow: 0 0 60px rgba(239, 68, 68, 0.7); }
     </style>
 </head>
 <body>
@@ -495,11 +495,13 @@ html_template = """
     <div class="vignette"></div>
     <div class="grain"></div>
     
-    <!-- 2画面用PiP 右上ベゼル枠 (CAM 02: 海岸線長距離超望遠実写カメラ) -->
-    <div id="pip-frame" class="pip-border" title="クリックでPiPの表示/非表示を切り替え"></div>
-    <div id="pip-tag" class="pip-tag">CAM 02: COASTAL TELEPHOTO</div>
-    <div id="pip-hud-alt" class="pip-alt">ALT: 0.0 km</div>
-    <div id="pip-hint" class="pip-toggle-hint">[CLICK TO TOGGLE]</div>
+    <!-- 2画面用PiP 右上ベゼル枠 (CAM 02: 独立描画Canvas) -->
+    <div id="pip-box" class="pip-container" title="クリックでPiPの表示/非表示を切り替え">
+        <canvas id="canvas-pip"></canvas>
+        <div id="pip-tag" class="pip-tag">CAM 02: COASTAL TELEPHOTO (1200mm)</div>
+        <div id="pip-hud-alt" class="pip-alt">ALT: 0.0 km</div>
+        <div id="pip-hint" class="pip-toggle-hint">[CLICK TO TOGGLE]</div>
+    </div>
 
     <div class="top-banner">
         <div style="display: flex; align-items: center; gap: 12px;">
@@ -572,6 +574,7 @@ html_template = """
         const failMessage = "__FAIL_MSG__";
 
         const canvasMain = document.getElementById('canvas-main');
+        const canvasPip = document.getElementById('canvas-pip');
         const orbitCvs = document.getElementById('orbit-canvas');
         const octx = orbitCvs.getContext('2d');
         const rudBanner = document.getElementById('rud-banner');
@@ -581,16 +584,14 @@ html_template = """
         const voicedEvents = new Set();
 
         let pipVisible = true;
-        const pipFrame = document.getElementById('pip-frame');
-        const pipTag = document.getElementById('pip-tag');
-        const pipAlt = document.getElementById('pip-hud-alt');
+        const pipBox = document.getElementById('pip-box');
         const pipHint = document.getElementById('pip-hint');
-        pipFrame.addEventListener('click', () => {
+        pipBox.addEventListener('click', () => {
             pipVisible = !pipVisible;
-            const disp = pipVisible ? 'block' : 'none';
-            pipTag.style.display = disp;
-            pipAlt.style.display = disp;
-            pipFrame.style.opacity = pipVisible ? '1.0' : '0.2';
+            canvasPip.style.display = pipVisible ? 'block' : 'none';
+            document.getElementById('pip-tag').style.display = pipVisible ? 'block' : 'none';
+            document.getElementById('pip-hud-alt').style.display = pipVisible ? 'block' : 'none';
+            pipBox.style.height = pipVisible ? '195px' : '32px';
             pipHint.innerText = pipVisible ? '[CLICK TO HIDE]' : '[CLICK TO SHOW]';
         });
 
@@ -640,27 +641,35 @@ html_template = """
         }
 
         // =========================================================================
-        // 🌍 Three.js シーン ＆ カメラ構築 (CAM 02を完璧に調整)
+        // 🌍 Three.js シーン ＆ 完全独立2画面レンダラー
         // =========================================================================
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x0a1628);
         const sceneFog = new THREE.FogExp2(0x0e1e36, 0.000035);
         scene.fog = sceneFog;
 
-        const renderer = new THREE.WebGLRenderer({ canvas: canvasMain, antialias: true, powerPreference: "high-performance" });
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.35;
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        // 🎥 レンダラー1 (メイン全画面)
+        const rendererMain = new THREE.WebGLRenderer({ canvas: canvasMain, antialias: true, powerPreference: "high-performance" });
+        rendererMain.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        rendererMain.setSize(window.innerWidth, window.innerHeight);
+        rendererMain.toneMapping = THREE.ACESFilmicToneMapping;
+        rendererMain.toneMappingExposure = 1.35;
+        rendererMain.shadowMap.enabled = true;
+        rendererMain.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        // 🎥 レンダラー2 (CAM 02 望遠専用独立レンダラー: 描画被り・黒画面バグを完全解消)
+        const rendererPip = new THREE.WebGLRenderer({ canvas: canvasPip, antialias: true, powerPreference: "high-performance" });
+        rendererPip.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        rendererPip.setSize(340, 195);
+        rendererPip.toneMapping = THREE.ACESFilmicToneMapping;
+        rendererPip.toneMappingExposure = 1.45;
 
         // 🎥 CAM 01: 近接シネマ広角カメラ (FOV 38度)
         const cameraMain = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 1.0, 50000000);
         
-        // 🎥 CAM 02: 海岸線長距離超望遠カメラ (焦点距離1200mm相当、クリアでシャープな狭角4.8度)
-        const cameraPip = new THREE.PerspectiveCamera(4.8, 340 / 195, 10.0, 50000000);
-        cameraPip.position.set(-2400, 120, 3100);
+        // 🎥 CAM 02: 海岸線長距離超望遠カメラ (発射台から1800m離れた南東の海岸線追尾マスト、超望遠狭角4.8度)
+        const cameraPip = new THREE.PerspectiveCamera(4.8, 340 / 195, 2.0, 50000000);
+        cameraPip.position.set(-1400, 85, 1800);
 
         const sunLight = new THREE.DirectionalLight(0xfffaed, 5.8);
         sunLight.position.set(7000, 11000, 8000);
@@ -727,6 +736,7 @@ html_template = """
         cctx.bezierCurveTo(1000, 550, 850, 1250, 720, 2048);
         cctx.lineTo(0, 2048); cctx.closePath(); cctx.fill();
 
+        // 2条の砂利クローラーウェイ（VABから発射台への重運搬路）
         cctx.strokeStyle = '#9ca3af'; cctx.lineWidth = 14;
         cctx.beginPath(); cctx.moveTo(180, 1014); cctx.lineTo(950, 1014); cctx.stroke();
         cctx.beginPath(); cctx.moveTo(180, 1034); cctx.lineTo(950, 1034); cctx.stroke();
@@ -1586,17 +1596,17 @@ html_template = """
             let rcsFiring = false;
 
             for(let rcs of rcsMountNodes) {
-                // 右へ倒れる（pitchRate > 0）場合は、機首を左へ押し戻すため「右側のノズル(side=1)が外側へ」噴射する
-                // 左へ倒れる（pitchRate < 0）場合は、機首を右へ押し戻すため「左側のノズル(side=-1)が外側へ」噴射する
-                const isCorrectingRightDrift = (rcs.side === 1 && pitchRate > 0.004);
-                const isCorrectingLeftDrift  = (rcs.side === -1 && pitchRate < -0.004);
+                // 機首を右（水平）へ倒し込む時は「左側のノズル(side=-1)が右へ」ガスを噴射してモーメントを発生
+                // 行き過ぎた角速度を抑え制動をかける時は「右側のノズル(side=1)が左へ」カウンター噴射
+                const wantsPitchOver = (pitchRate > 0.003 && rcs.side === -1);
+                const needsCounterBrake = (pitchRate < -0.003 && rcs.side === 1);
                 const isPulseTriggered = (Math.sin(now * 0.045) > 0.65); // 常に出ずミリ秒パルスで断続噴射
                 const isS1Boostback = (stage1Detached && rcs.isS1 && rcs.side === 1);
 
-                if (!simCfg.is_preview && simT > 0.5 && (((isCorrectingRightDrift || isCorrectingLeftDrift) && isPulseTriggered && !rcs.isS1) || isS1Boostback)) {
+                if (!simCfg.is_preview && simT > 0.5 && (((wantsPitchOver || needsCounterBrake) && isPulseTriggered && !rcs.isS1) || isS1Boostback)) {
                     rcsFiring = true;
                     rcs.node.getWorldPosition(tempTipPos);
-                    // 噴射ガスはノズル外側（機体側面の法線方向）へと吹き出し、反作用で機首を制御
+                    // 噴射ガスは外側へ激しく吹き出し、反作用で機体姿勢を制御
                     const jetDirX = perpX * rcs.side;
                     const jetDirY = perpY * rcs.side;
                     emitParticle(
@@ -1719,36 +1729,20 @@ html_template = """
             }
 
             // =====================================================================
-            // 🎥 2画面完全描画 (CAM 01全画面 ＋ CAM 02超望遠独立ビューポート)
+            // 🎥 完全独立デュアルレンダリング (CAM 01全画面 ＋ CAM 02独立Canvas)
             // =====================================================================
-            const w = window.innerWidth;
-            const h = window.innerHeight;
-
             // 1. CAM 01 メイン画面描画 (全画面)
             scene.fog = sceneFog;
-            renderer.setScissorTest(false);
-            renderer.clear();
-
-            cameraMain.aspect = w / h;
+            cameraMain.aspect = window.innerWidth / window.innerHeight;
             cameraMain.updateProjectionMatrix();
-            renderer.setViewport(0, 0, w, h);
-            renderer.render(scene, cameraMain);
+            rendererMain.render(scene, cameraMain);
 
-            // 2. CAM 02 望遠画面描画 (WebGLのY軸反転を完全補正し鮮明に表示)
+            // 2. CAM 02 望遠画面描画 (独立したrendererPipで専用Canvasへ直接描画)
             if (pipVisible) {
-                const pipW = 340;
-                const pipH = 195;
-                const pipX = w - pipW - 20;
-                const pipY = h - pipH - 54; // WebGL座標系での下からのオフセット
-
                 scene.fog = null; // 望遠トラッカー時の霧干渉・ボケを完全に排除
-                renderer.setScissorTest(true);
-                renderer.setScissor(pipX, pipY, pipW, pipH);
-                renderer.setViewport(pipX, pipY, pipW, pipH);
-
-                cameraPip.aspect = pipW / pipH;
+                cameraPip.aspect = 340 / 195;
                 cameraPip.updateProjectionMatrix();
-                renderer.render(scene, cameraPip);
+                rendererPip.render(scene, cameraPip);
                 scene.fog = sceneFog;
             }
         }
@@ -1756,7 +1750,7 @@ html_template = """
         requestAnimationFrame(animate);
 
         window.addEventListener('resize', () => {
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            rendererMain.setSize(window.innerWidth, window.innerHeight);
         });
     </script>
 </body>
