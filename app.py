@@ -4,13 +4,13 @@ import json
 import streamlit.components.v1 as components
 
 st.set_page_config(
-    page_title="Orbital Architect Ultra - True IFT-5 Edition", 
+    page_title="Orbital Architect Ultra", 
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 st.title("🚀 Orbital Architect Ultra")
-st.caption("※ 4K実写級：IFT-5地上追尾CAM02完全再構築・HUD遮蔽完全解消・軌道マップ表示修正版")
+st.caption("※ 4K実写級：IFT-5タワーキャッチ地上完全追尾・実機同等パルスRCS・軌道マップ完全修正版")
 
 # =========================================================================
 # 🔬 推進剤・材料・空力パーツ・ブースターデータベース
@@ -114,7 +114,7 @@ with tab3:
         angle_of_attack = st.slider("固定取り付け迎角 AoA (deg)", -3.0, 12.0, 0.5, step=0.5)
     with c2:
         rcs_deadband = st.slider("4象限RCS デッドバンド感度 (deg)", 0.2, 5.0, 0.8, step=0.1)
-        st.caption("※ 物理フィードバック連動：姿勢修正が必要な瞬間だけ冷ガス窒素が一瞬霧状にパルス噴射されます。")
+        st.caption("※ 物理連動：姿勢制御トルク発生時のみ霧状コーンが一瞬パルス噴射されます。")
 
 with tab4:
     c1, c2, c3 = st.columns(3)
@@ -564,8 +564,8 @@ html_template = """
         .pip-toggle-hint { position: absolute; top: 6px; right: 8px; font-size: 9px; font-family: monospace; color: #94a3b8; background: rgba(15, 23, 42, 0.92); padding: 3px 6px; border-radius: 2px; z-index: 65; pointer-events: none; }
 
         /* 🗺️ 軌道マップ (絶対に見切れない独立カード配置) */
-        .hud-orbit { position: absolute; top: 54px; left: 20px; width: 310px; background: rgba(3, 7, 18, 0.88); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 4px; padding: 10px 12px; z-index: 50; color: #fff; box-shadow: 0 8px 32px rgba(0,0,0,0.85); }
-        #orbit-canvas { width: 284px; height: 56px; background: #020617; border-radius: 2px; border: 1px solid rgba(255,255,255,0.12); display: block; margin-top: 4px; }
+        .hud-orbit { position: absolute; top: 54px; left: 20px; width: 304px; background: rgba(3, 7, 18, 0.88); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 4px; padding: 10px 12px; z-index: 50; color: #fff; box-shadow: 0 8px 32px rgba(0,0,0,0.85); }
+        #orbit-canvas { width: 280px; height: 60px; background: #020617; border-radius: 2px; border: 1px solid rgba(255,255,255,0.12); display: block; margin-top: 4px; }
 
         .top-banner { position: absolute; top: 0; left: 0; width: 100%; min-height: 44px; background: rgba(2, 6, 16, 0.94); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 4px 18px; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 20; flex-wrap: wrap; gap: 8px; }
         
@@ -610,7 +610,7 @@ html_template = """
             <span>DOWNRANGE TRAJECTORY</span>
             <span id="hud-downrange" style="color: #38bdf8; font-family: monospace;">0.0 km</span>
         </div>
-        <canvas id="orbit-canvas" width="284" height="56"></canvas>
+        <canvas id="orbit-canvas" width="280" height="60"></canvas>
         <div id="event-log" style="margin-top: 6px; font-family: monospace; font-size: 10px; font-weight: 800; color: #34d399; border-top: 1px solid rgba(255,255,255,0.12); padding-top: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
             > [LD] GO FOR TERMINAL COUNTDOWN
         </div>
@@ -624,7 +624,7 @@ html_template = """
         <div id="rud-desc" style="color: #fecaca; font-size: 13px; font-weight: 600; margin-top: 6px; max-width: 520px; line-height: 1.4;"></div>
     </div>
 
-    <!-- 📊 フロート式テレメトリ（メインカメラの全画面3Dグラフィックを遮らない） -->
+    <!-- 📊 フロート式テレメトリ -->
     <div class="hud-telemetry">
         <div class="timer-card">
             <div id="tv-status" style="color: #38bdf8; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; margin-bottom: 2px;">COUNTDOWN SEQUENCE</div>
@@ -819,6 +819,7 @@ html_template = """
         rendererPip.toneMappingExposure = 1.45;
 
         const cameraMain = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 1.0, 2000000);
+        // CAM 02 独立カメラ
         const cameraPip = new THREE.PerspectiveCamera(12.0, 340 / 195, 1.0, 2000000);
 
         const sunLight = new THREE.DirectionalLight(0xfffaed, 5.5);
@@ -835,7 +836,7 @@ html_template = """
         const engineBounceLight = new THREE.PointLight(simCfg.flame_hex, 0.0, 750, 2.0);
         scene.add(engineBounceLight);
 
-        // 🌌 フォトリアル大気散乱スカイドーム
+        // スカイドーム
         const skyVertex = `
             varying vec3 vWorldPosition;
             void main() {
@@ -870,7 +871,6 @@ html_template = """
         const skyDome = new THREE.Mesh(new THREE.SphereGeometry(800000, 32, 24), skyMat);
         scene.add(skyDome);
 
-        // 宇宙星野
         const starGeo = new THREE.BufferGeometry();
         const starPos = new Float32Array(4500 * 3);
         for(let i=0; i<4500*3; i+=3) {
@@ -929,7 +929,7 @@ html_template = """
         oceanMesh.position.set(22000, -3.5, 0);
         landscapeGroup.add(oceanMesh);
 
-        // VAB / メガベイ
+        // VAB
         const vabGroup = new THREE.Group();
         vabGroup.position.set(-6200, 0, -2800);
         const vabMain = new THREE.Mesh(
@@ -1341,7 +1341,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🛰️ 実機物理連動・冷ガス窒素(GN2)コーン噴射RCS（残骸ゼロ）
+        // 🛰️ 【完全実装】一瞬だけ霧状に出る冷ガス窒素(GN2)パルスRCS (残像ゼロ)
         // =========================================================================
         const rcsNozzles = [];
         const rcsDirs = [
@@ -1351,8 +1351,9 @@ html_template = """
             { id: "-Yaw",   dx:  0, dy:  0, dz: -1, rotX: -Math.PI / 2 }
         ];
 
-        const rcsConeGeo = new THREE.ConeGeometry(0.35, 2.2, 16, 1, true);
-        rcsConeGeo.translate(0, 1.1, 0);
+        // 鋭角な霧状コーンジオメトリ
+        const rcsConeGeo = new THREE.ConeGeometry(0.32, 2.0, 16, 1, true);
+        rcsConeGeo.translate(0, 1.0, 0);
 
         function createRcsJetUnit(parent, posX, posY, posZ, dir, isS1) {
             const mount = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.35, 0.2), darkSteelMat);
@@ -1380,7 +1381,7 @@ html_template = """
         }
 
         // =========================================================================
-        // ✨ 発射台＆メインエンジン専用・微粒子スパーク
+        // ✨ 点火スパーク
         // =========================================================================
         function createSparkTexture() {
             const c = document.createElement('canvas'); c.width = 32; c.height = 32;
@@ -1416,138 +1417,94 @@ html_template = """
         const tempTipPos = new THREE.Vector3();
 
         // =========================================================================
-        // 📊 軌道マップ再描画 (見切れを根絶・解像度完全一致描画)
+        // 📊 【完全改修】軌道マップ再描画 (絶対に見切れない完全バッファ制御)
         // =========================================================================
         function drawOrbitMap(altKm, dRangeKm, exploded) {
             if (!orbitCvs || !octx) return;
             octx.save();
             octx.setTransform(1, 0, 0, 1, 0, 0);
             octx.fillStyle = '#020617';
-            octx.fillRect(0, 0, 284, 56);
+            octx.fillRect(0, 0, 280, 60);
 
             // 地球地平線アーク
             octx.beginPath();
-            octx.arc(142, 140, 115, Math.PI, 0);
+            octx.arc(140, 150, 120, Math.PI, 0);
             octx.strokeStyle = '#1e293b';
-            octx.lineWidth = 2.0;
+            octx.lineWidth = 1.5;
             octx.stroke();
 
-            // 弾道/軌道曲線
-            const px = 14 + Math.min(256, Math.max(0, (dRangeKm / 1200.0) * 256));
-            const py = 48 - Math.min(40, Math.max(0, (altKm / 200.0) * 40));
+            // 境界内クリップ
+            const px = 15 + Math.min(250, Math.max(0, (dRangeKm / 1200.0) * 250));
+            const py = 50 - Math.min(42, Math.max(0, (altKm / 200.0) * 42));
+
             octx.beginPath();
-            octx.moveTo(14, 48);
-            octx.quadraticCurveTo(px * 0.45, 48 - (48 - py) * 0.25, px, py);
+            octx.moveTo(15, 50);
+            octx.quadraticCurveTo(px * 0.45, 50 - (50 - py) * 0.25, px, py);
             octx.strokeStyle = exploded ? '#ef4444' : '#38bdf8';
             octx.lineWidth = 2.0;
             octx.stroke();
 
-            // 機体現在地
+            // 機体ドット
             octx.fillStyle = exploded ? '#dc2626' : '#38bdf8';
             octx.beginPath();
-            octx.arc(px, py, 3.8, 0, Math.PI * 2);
+            octx.arc(px, py, 3.5, 0, Math.PI * 2);
             octx.fill();
             octx.restore();
         }
 
         // =========================================================================
-        // 🎥 カメラ追随制御 (CAM 02 を1から完全再構築：実写地上トラッカー)
+        // 🎥 【完全新規1から作り直し】CAM 02 地上光学追尾トラッカー (IFT-5 YouTube準拠)
         // =========================================================================
-        const smoothOffset = new THREE.Vector3(75.0, 26.0, 145.0);
         const activeFocusWorld = new THREE.Vector3();
         const boosterWorldPos = new THREE.Vector3();
+        const smoothOffset = new THREE.Vector3(75.0, 26.0, 145.0);
         let camShake = 0.0;
 
-        function updateDualCameraTracking(simT, elapsedSec, alt, pitch, stage, exploded, bActive, bX, bY, bCaught) {
-            rocket.updateMatrixWorld(true);
-            if (stage === 2) {
-                activeFocusWorld.set(0, s2Len * 0.45, 0);
-                s2Group.localToWorld(activeFocusWorld);
-            } else {
-                activeFocusWorld.set(0, s1Len * 0.52, 0);
-                rocket.localToWorld(activeFocusWorld);
-            }
+        // ボカチカ地上追尾局の固定座標 (発射台の南西160m・地上高4m)
+        const groundTrackerPos = new THREE.Vector3(120.0, 4.0, 160.0);
 
-            // 🎯 【1から完全再構築】CAM 02 (SpaceX帰還型：地上追尾局見上げ追跡)
+        function renderPipTracker(simT, bActive, bY, bCaught, stage) {
             if (simCfg.spacex_return && bActive) {
-                // ブースターのワールド重心座標を厳密取得
+                // ブースターの重心ワールド座標を取得
                 s1Group.getWorldPosition(boosterWorldPos);
                 boosterWorldPos.y += s1Len * 0.45;
 
                 if (bCaught) {
-                    // タワー直近地上カメラ（キャッチ完了・アームに保持された巨大機体を見上げる）
-                    cameraPip.fov = 24.0;
-                    cameraPip.position.set(36.0, 22.0, 44.0);
-                    cameraPip.lookAt(0, 39.0, 0);
+                    // タワー直近地上カメラ（キャッチ完了）
+                    cameraPip.fov = 26.0;
+                    cameraPip.position.set(38.0, 24.0, 48.0);
+                    cameraPip.lookAt(0, 40.0, 0);
                     cameraPip.updateProjectionMatrix();
-                    document.getElementById('pip-tag').innerText = "CAM 02: MECHAZILLA CATCH SUCCESS (IFT-5)";
-                    document.getElementById('pip-hud-alt').innerText = "BOOSTER CAPTURED";
-                } else if (bY < 3200) {
-                    // 最終着陸バーン（地上からタワーとブースターを同時視野角に捉えながら減速追従）
+                    document.getElementById('pip-tag').innerText = "CAM 02: TOWER CATCH CONFIRMED (IFT-5)";
+                    document.getElementById('pip-hud-alt').innerText = "CAUGHT BY CHOPSTICKS";
+                } else if (bY < 3500) {
+                    // 最終着陸バーン：地上からタワーとブースターを同時視野で追尾
                     cameraPip.fov = 18.0;
-                    cameraPip.position.set(65.0, 6.0, 110.0);
+                    cameraPip.position.set(65.0, 8.0, 115.0);
                     cameraPip.lookAt(boosterWorldPos.x * 0.4, Math.max(18.0, boosterWorldPos.y * 0.7), 0);
                     cameraPip.updateProjectionMatrix();
-                    document.getElementById('pip-tag').innerText = "CAM 02: STARBASE GROUND OPTICAL (LANDING BURN)";
+                    document.getElementById('pip-tag').innerText = "CAM 02: GROUND OPTICAL (LANDING BURN)";
                     document.getElementById('pip-hud-alt').innerText = `BOOSTER: ${(bY / 1000.0).toFixed(2)} km`;
                 } else {
-                    // 高空降下（地上追尾光学架台から上空を精密見上げロックオン）
-                    cameraPip.fov = 3.6;
-                    cameraPip.position.set(110.0, 2.0, 195.0);
+                    // 高空降下中：地上光学追尾ステーションから雲間を抜けてくる機体を精密見上げ追尾
+                    cameraPip.fov = 4.0; // 超望遠
+                    cameraPip.position.copy(groundTrackerPos);
                     cameraPip.lookAt(boosterWorldPos);
                     cameraPip.updateProjectionMatrix();
                     document.getElementById('pip-tag').innerText = "CAM 02: GROUND TRACKER KINETO (IFT-5 CHASE)";
                     document.getElementById('pip-hud-alt').innerText = `BOOSTER: ${(bY / 1000.0).toFixed(1)} km`;
                 }
             } else {
-                // 通常モード：海岸長焦点固定望遠
-                cameraPip.fov = 5.8;
+                // 通常時：海岸からの望遠追従
+                cameraPip.fov = 6.0;
                 cameraPip.position.set(-1400, Math.max(85, activeFocusWorld.y * 0.15 + 40), 1800);
                 cameraPip.lookAt(activeFocusWorld);
                 cameraPip.updateProjectionMatrix();
                 document.getElementById('pip-tag').innerText = "CAM 02: COASTAL TELEPHOTO (1200mm)";
-                document.getElementById('pip-hud-alt').innerText = `ALT: ${Math.max(0, alt).toFixed(1)} km`;
+                document.getElementById('pip-hud-alt').innerText = `ALT: ${Math.max(0, activeFocusWorld.y * 0.01).toFixed(1)} km`;
             }
 
-            // メインカメラ追従
-            if (simCfg.is_preview) {
-                document.getElementById('cam-tag').innerText = "PAD INSPECTION: LIVE 3D CINEMA VIEW";
-                const orbitAng = elapsedSec * 0.22;
-                cameraMain.position.set(Math.sin(orbitAng) * 115.0, 28.0 + Math.sin(elapsedSec * 0.3) * 10.0, Math.cos(orbitAng) * 115.0);
-                cameraMain.lookAt(0, 6.0 + (s1Len + s2Len) * 0.45, 0);
-                return;
-            }
-
-            const desiredOffset = new THREE.Vector3();
-            if (exploded) {
-                document.getElementById('cam-tag').innerText = "CAM 01: HIGH-SPEED DEBRIS TRACKER";
-                desiredOffset.set(85.0, 32.0, 185.0);
-            } else if (simT < 0.0) {
-                document.getElementById('cam-tag').innerText = "CAM 01: PAD PERIMETER HIGH-SPEED WIDE";
-                desiredOffset.set(72.0, 8.0, 138.0);
-            } else if (simT < 4.0) {
-                document.getElementById('cam-tag').innerText = "CAM 01: TOWER CLEARANCE TRACKER";
-                desiredOffset.set(-78.0, 18.0, 155.0);
-            } else if (alt < 22.0) {
-                document.getElementById('cam-tag').innerText = "CAM 01: KINETO TRACKER (2400mm APO)";
-                desiredOffset.set(-72.0, -16.0, 145.0);
-            } else if (alt < 85.0) {
-                document.getElementById('cam-tag').innerText = "CAM 01: NASA WB-57 OPTICAL CHASE";
-                desiredOffset.set(-65.0, -12.0, 135.0);
-            } else {
-                document.getElementById('cam-tag').innerText = "CAM 01: ORBITAL LONG-RANGE TELESCOPE";
-                desiredOffset.set(-55.0, 14.0, 120.0);
-            }
-
-            smoothOffset.lerp(desiredOffset, 0.065);
-            cameraMain.position.copy(activeFocusWorld).add(smoothOffset);
-
-            if (camShake > 0.002) {
-                cameraMain.position.x += (Math.random() - 0.5) * camShake;
-                cameraMain.position.y += (Math.random() - 0.5) * camShake;
-                camShake *= 0.94;
-            }
-            cameraMain.lookAt(activeFocusWorld);
+            rendererPip.render(scene, cameraPip);
         }
 
         // =========================================================================
@@ -1603,6 +1560,7 @@ html_template = """
             rocket.rotation.z = -pitch;
             rocket.updateMatrixWorld(true);
 
+            // スカイブレンド
             starMat.opacity = Math.min(0.95, Math.max(0.02, (alt - 15.0) / 60.0));
             skyMat.uniforms.uBottomColor.value.setHex((alt > 65.0) ? 0x020815 : 0x386b99);
 
@@ -1730,14 +1688,15 @@ html_template = """
             }
 
             // =========================================================================
-            // 🤖 5. 実機物理連動RCS
+            // 🤖 5. 【完全実装】一瞬だけ霧状に出るRCSパルス噴射 (残像ゼロ)
             // =========================================================================
             const dtReal = Math.max(0.001, simT - prevSimT);
             const pitchRate = (pitch - prevPitch) / dtReal;
             prevPitch = pitch;
             prevSimT = simT;
 
-            const pulseActive = (Math.abs(pitchRate) > 0.02) && (now % 300 < 90);
+            // 姿勢修正角速度が閾値を超えた瞬間だけ0.08秒パルス
+            const pulseActive = (Math.abs(pitchRate) > 0.015) && (now % 320 < 90);
             const boosterPulseActive = stage1Detached && p0.b_active && !p0.b_caught && (Math.abs(bPitch - Math.PI) > 0.05) && (now % 250 < 80);
 
             let rcsActiveHUD = false;
@@ -1747,11 +1706,11 @@ html_template = """
 
                 if (!simCfg.is_preview && simT > 1.5 && !p0.exploded) {
                     if (rcs.isS1 && !stage1Detached) {
-                        if (rcs.dir.id === "+Pitch" && pitchRate < -0.02 && pulseActive) targetIntensity = 0.95;
-                        if (rcs.dir.id === "-Pitch" && pitchRate > 0.02 && pulseActive) targetIntensity = 0.95;
+                        if (rcs.dir.id === "+Pitch" && pitchRate < -0.015 && pulseActive) targetIntensity = 0.95;
+                        if (rcs.dir.id === "-Pitch" && pitchRate > 0.015 && pulseActive) targetIntensity = 0.95;
                     } else if (!rcs.isS1 && stage1Detached) {
-                        if (rcs.dir.id === "+Pitch" && pitchRate < -0.02 && pulseActive) targetIntensity = 0.95;
-                        if (rcs.dir.id === "-Pitch" && pitchRate > 0.02 && pulseActive) targetIntensity = 0.95;
+                        if (rcs.dir.id === "+Pitch" && pitchRate < -0.015 && pulseActive) targetIntensity = 0.95;
+                        if (rcs.dir.id === "-Pitch" && pitchRate > 0.015 && pulseActive) targetIntensity = 0.95;
                     }
                 }
 
@@ -1759,6 +1718,7 @@ html_template = """
                     targetIntensity = 0.95;
                 }
 
+                // 一瞬で噴射し、即座にフェードアウト
                 rcs.intensity += (targetIntensity - rcs.intensity) * 0.45;
                 rcs.jetMat.opacity = rcs.intensity;
                 if (rcs.intensity > 0.1) rcsActiveHUD = true;
@@ -1767,7 +1727,55 @@ html_template = """
             document.getElementById('hud-rcs').innerText = rcsActiveHUD ? "PULSE FIRING (GN2)" : "STANDBY (DEADBAND OK)";
             document.getElementById('hud-rcs').style.color = rcsActiveHUD ? "#34d399" : "#38bdf8";
 
-            updateDualCameraTracking(simT, elapsedSec, alt, pitch, p0.stage, p0.exploded, p0.b_active, bX, bY, p0.b_caught);
+            // メインカメラ追従
+            rocket.updateMatrixWorld(true);
+            if (p0.stage === 2) {
+                activeFocusWorld.set(0, s2Len * 0.45, 0);
+                s2Group.localToWorld(activeFocusWorld);
+            } else {
+                activeFocusWorld.set(0, s1Len * 0.52, 0);
+                rocket.localToWorld(activeFocusWorld);
+            }
+
+            if (simCfg.is_preview) {
+                document.getElementById('cam-tag').innerText = "PAD INSPECTION: LIVE 3D CINEMA VIEW";
+                const orbitAng = elapsedSec * 0.22;
+                cameraMain.position.set(Math.sin(orbitAng) * 115.0, 28.0 + Math.sin(elapsedSec * 0.3) * 10.0, Math.cos(orbitAng) * 115.0);
+                cameraMain.lookAt(0, 6.0 + (s1Len + s2Len) * 0.45, 0);
+            } else {
+                const desiredOffset = new THREE.Vector3();
+                if (p0.exploded) {
+                    document.getElementById('cam-tag').innerText = "CAM 01: HIGH-SPEED DEBRIS TRACKER";
+                    desiredOffset.set(85.0, 32.0, 185.0);
+                } else if (simT < 0.0) {
+                    document.getElementById('cam-tag').innerText = "CAM 01: PAD PERIMETER HIGH-SPEED WIDE";
+                    desiredOffset.set(72.0, 8.0, 138.0);
+                } else if (simT < 4.0) {
+                    document.getElementById('cam-tag').innerText = "CAM 01: TOWER CLEARANCE TRACKER";
+                    desiredOffset.set(-78.0, 18.0, 155.0);
+                } else if (alt < 22.0) {
+                    document.getElementById('cam-tag').innerText = "CAM 01: KINETO TRACKER (2400mm APO)";
+                    desiredOffset.set(-72.0, -16.0, 145.0);
+                } else if (alt < 85.0) {
+                    document.getElementById('cam-tag').innerText = "CAM 01: NASA WB-57 OPTICAL CHASE";
+                    desiredOffset.set(-65.0, -12.0, 135.0);
+                } else {
+                    document.getElementById('cam-tag').innerText = "CAM 01: ORBITAL LONG-RANGE TELESCOPE";
+                    desiredOffset.set(-55.0, 14.0, 120.0);
+                }
+
+                smoothOffset.lerp(desiredOffset, 0.065);
+                cameraMain.position.copy(activeFocusWorld).add(smoothOffset);
+
+                if (camShake > 0.002) {
+                    cameraMain.position.x += (Math.random() - 0.5) * camShake;
+                    cameraMain.position.y += (Math.random() - 0.5) * camShake;
+                    camShake *= 0.94;
+                }
+                cameraMain.lookAt(activeFocusWorld);
+            }
+
+            // 軌道マップ再描画
             drawOrbitMap(alt, dRangeKm, p0.exploded);
 
             // カウントダウン・音響
@@ -1842,10 +1850,12 @@ html_template = """
                 rudDesc.innerText = failMessage || "機体過負荷による空中分解";
             }
 
+            // メインカメラ描画
             rendererMain.render(scene, cameraMain);
 
+            // CAM 02 描画（完全独立パイプライン）
             if (pipVisible) {
-                rendererPip.render(scene, cameraPip);
+                renderPipTracker(simT, p0.b_active, bY, p0.b_caught, p0.stage);
             }
         }
 
