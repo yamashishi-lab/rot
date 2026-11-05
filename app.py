@@ -211,7 +211,7 @@ m3.metric("構造限界動圧 / 耐G", f"{s1_spec['max_q']:.1f} kPa", f"耐G: {s
 m4.metric("ブースター追加推力", f"+{strapon_spec['thrust_add']:.0f} kN", f"基数: {strapon_spec['count']} 基")
 
 # =========================================================================
-# 💥 物理シミュレーション (途中で止まらないエンドレス軌道ループ対応)
+# 💥 物理シミュレーション (停止バグ完全解消版)
 # =========================================================================
 def run_simulation(preview_only=False):
     if preview_only:
@@ -403,7 +403,7 @@ def run_simulation(preview_only=False):
         # 軌道投入到達判定
         if alt_km >= 160.0 and vx >= 7780.0 and abs(vy) < 400.0:
             cur_event = "ORBIT"
-            # 映像が途中で止まらないよう、余裕を持って長時間の軌道慣性航行データを追加
+            # 停止バグを防止するため、軌道慣性航行データを大量に追加
             for orbit_step in range(1200):
                 t_orb = t + (orbit_step + 1) * dt
                 x_orb = x + vx * (orbit_step + 1) * dt
@@ -479,8 +479,8 @@ html_template = """
         .vignette { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; box-shadow: inset 0 0 160px rgba(0,0,0,0.88); z-index: 5; }
         .grain { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 6; opacity: 0.035; background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 3px 3px; }
         
-        /* 🔊 音声起動オーバーレイ（ブラウザの自動再生ブロック解除用） */
-        .audio-start-btn { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 80; background: #ef4444; color: #fff; border: 2px solid #fff; border-radius: 20px; padding: 6px 18px; font-weight: 800; font-size: 11px; letter-spacing: 1.5px; cursor: pointer; box-shadow: 0 0 25px rgba(239, 68, 68, 0.8); animation: pulseBtn 1.8s infinite; }
+        /* 🔊 音声起動オーバーレイ */
+        .audio-start-btn { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 80; background: #ef4444; color: #fff; border: 2px solid #fff; border-radius: 20px; padding: 6px 18px; font-weight: 800; font-size: 11px; letter-spacing: 1.5px; cursor: pointer; box-shadow: 0 0 25px rgba(239, 68, 68, 0.8); animation: pulseBtn 1.8s infinite; }
         @keyframes pulseBtn { 0% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.05); } 100% { transform: translateX(-50%) scale(1); } }
 
         /* 🎥 PiP 右上完全独立配置 (被り防止ベゼル ＆ 独立Canvas) */
@@ -614,15 +614,15 @@ html_template = """
         });
 
         // =========================================================================
-        // 🎙️ 確実に耳で聞こえる音声合成（SpeechSynthesis）実況エンジン
+        // 🎙️ 確実に聞こえる音声合成（SpeechSynthesis）実況エンジン
         // =========================================================================
         let voiceActive = false;
         function speakCallout(text) {
             if (!voiceActive || !('speechSynthesis' in window)) return;
             try {
-                window.speechSynthesis.cancel(); // 連続キューの遅延を防ぎ即座に発話
+                window.speechSynthesis.cancel();
                 const u = new SpeechSynthesisUtterance(text);
-                u.rate = 1.15; // 緊迫感のある管制通信速度
+                u.rate = 1.15;
                 u.pitch = 0.95;
                 u.volume = 1.0;
                 u.lang = 'en-US';
@@ -668,7 +668,6 @@ html_template = """
         btnAudio.addEventListener('click', initAudio);
         window.addEventListener('click', () => { if (!actx) initAudio(); }, { once: true });
 
-        // 💥 実録パイロ爆薬分離音
         function playPyro() {
             if (!actx) return;
             const now = actx.currentTime;
@@ -1418,34 +1417,6 @@ html_template = """
                 camShake *= 0.94;
             }
             cameraMain.lookAt(activeFocusWorld);
-        }
-
-        // =========================================================================
-        // 🎙️ 確実に聞こえるフライト実況コールアウトキュー
-        // =========================================================================
-        const calloutQueue = [
-            { t: -10.0, log: "> [FIDO] T-10s: TERMINAL COUNTDOWN INITIATED", sub: "> Flight computers aligned, vehicle on internal batteries", voice: "Ten, nine, eight, seven, six" },
-            { t: -5.0,  log: "> [PAD] T-5s: SOUND SUPPRESSION WATER DELUGE ACTIVE", sub: "> 300,000 GPM water flowing into flame trench", voice: "Water deluge system activated" },
-            { t: -3.8,  log: "> [ENG] T-3.8s: MAIN ENGINE START SEQUENCE", sub: "> Turbopumps spinning up, chamber pressure rising", voice: "Engine ignition start" },
-            { t: 0.0,   log: "> [COMM] T+0s: LIFTOFF! WE HAVE A LIFTOFF!", sub: "> Tower cleared, roll and pitch program nominal", voice: "Liftoff! We have a liftoff of Orbital Architect!" },
-            { t: 10.0,  log: "> [NAV] GRAVITY TURN: PITCH OVER PROGRAM", sub: "> Trajectory shaping downrange toward low earth orbit", voice: "Pitch over initiated, roll program nominal" },
-            { t: 40.0,  log: "> [FDIR] TRANSONIC REGIME: MACH 1.0 PASSED", sub: "> Vehicle is supersonic; aerodynamic shock damping active", voice: "Vehicle is supersonic, passing Mach one" },
-            { t: 65.0,  log: "> [FDIR] MAX-Q: MAXIMUM DYNAMIC PRESSURE", sub: "> Engines throttled down for structural loading relief", voice: "Vehicle has passed Max-Q, maximum dynamic pressure" },
-            { t: 135.0, log: "> [TEL] BECO: BOOSTER ENGINE CUTOFF", sub: "> Korolev Cross separation nominal; core continuing flight", voice: "Booster cutoff, and booster separation confirmed" },
-            { t: 162.0, log: "> [PROP] MECO & HOT-STAGING SEPARATION", sub: "> Stage 2 engine ignition verified, payload fairing primed", voice: "Main engine cutoff, stage separation, second stage ignition" },
-            { t: 195.0, log: "> [AVIO] FAIRING JETTISON CONFIRMED", sub: "> Spacecraft exposed to vacuum of space", voice: "Payload fairing separation confirmed" },
-            { t: 520.0, log: "> [ORB] SECO: SECOND STAGE ENGINE CUTOFF", sub: "> Insertion complete; stable low earth orbit achieved", voice: "Second stage cutoff. Orbital insertion confirmed!" }
-        ];
-
-        let calloutIdx = 0;
-        function updateFlightCallouts(simT) {
-            while (calloutIdx < calloutQueue.length && simT >= calloutQueue[calloutIdx].t) {
-                const item = calloutQueue[calloutIdx];
-                eventLog.innerText = item.log;
-                subCallout.innerText = item.sub;
-                speakCallout(item.voice);
-                calloutIdx++;
-            }
         }
 
         // =========================================================================
