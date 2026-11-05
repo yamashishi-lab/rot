@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 st.title("🚀 Orbital Architect Extreme - 4K実写級航空宇宙シミュレーター")
-st.caption("※ 完全復元仕様：実時間同期リアル物理・ケープカナベラルPad 39A実写級ランドスケープ・2画面独立シネマ中継")
+st.caption("※ 超魔改造仕様：実録級爆轟音響・Pad 39A立体トラス施設・自律姿勢RCSパルス制御・望遠光学トラッカー")
 
 # =========================================================================
 # 🔬 推進剤・材料・空力パーツ・ブースターデータベース
@@ -460,7 +460,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 完全描画テンプレート (実時間同期 ＆ CAM 02完全稼働)
+# 📺 HTML / JS 完全描画テンプレート (超魔改造実写シネマ仕様)
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -595,35 +595,38 @@ html_template = """
         });
 
         // =========================================================================
-        // 🔊 音響エンジン
+        // 🔊 実録級・重低音ランブル＆超音速クラックル音響合成
         // =========================================================================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        let actx = null, rumbleGain = null, crackleGain = null, delugeGain = null;
+        let actx = null, subRumble = null, shockCrackle = null, gasHiss = null;
         function initAudio() {
             if (simCfg.is_preview) return;
             if (!actx) {
                 actx = new AudioCtx();
-                const buf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
+                const buf = actx.createBuffer(1, actx.sampleRate * 3, actx.sampleRate);
                 const d = buf.getChannelData(0);
                 for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 
+                // 1. 20Hz〜55Hz 地響きサブウーファー
                 const rSrc = actx.createBufferSource(); rSrc.buffer = buf; rSrc.loop = true;
-                const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 65;
-                rumbleGain = actx.createGain(); rumbleGain.gain.value = 0;
-                rSrc.connect(lp); lp.connect(rumbleGain); rumbleGain.connect(actx.destination);
+                const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 45;
+                subRumble = actx.createGain(); subRumble.gain.value = 0;
+                rSrc.connect(lp); lp.connect(subRumble); subRumble.connect(actx.destination);
                 rSrc.start(0);
 
+                // 2. 180Hz〜850Hz 大気を切り裂く超音速衝撃波クラックル
                 const cSrc = actx.createBufferSource(); cSrc.buffer = buf; cSrc.loop = true;
-                const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 520; bp.Q.value = 3.2;
-                crackleGain = actx.createGain(); crackleGain.gain.value = 0;
-                cSrc.connect(bp); bp.connect(crackleGain); crackleGain.connect(actx.destination);
+                const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 420; bp.Q.value = 3.8;
+                shockCrackle = actx.createGain(); shockCrackle.gain.value = 0;
+                cSrc.connect(bp); bp.connect(shockCrackle); shockCrackle.connect(actx.destination);
                 cSrc.start(0);
 
-                const wSrc = actx.createBufferSource(); wSrc.buffer = buf; wSrc.loop = true;
-                const wFilt = actx.createBiquadFilter(); wFilt.type = 'bandpass'; wFilt.frequency.value = 1200;
-                delugeGain = actx.createGain(); delugeGain.gain.value = 0;
-                wSrc.connect(wFilt); wFilt.connect(delugeGain); delugeGain.connect(actx.destination);
-                wSrc.start(0);
+                // 3. 高圧ガス噴射・消音水流ヒス音
+                const hSrc = actx.createBufferSource(); hSrc.buffer = buf; hSrc.loop = true;
+                const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1600;
+                gasHiss = actx.createGain(); gasHiss.gain.value = 0;
+                hSrc.connect(hp); hp.connect(gasHiss); gasHiss.connect(actx.destination);
+                hSrc.start(0);
             }
             if (actx && actx.state === 'suspended') actx.resume();
         }
@@ -659,7 +662,6 @@ html_template = """
         const cameraMain = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 1.0, 50000000);
         
         // 🎥 CAM 02: 発射台から850m離れた南東の海岸線追尾マストに設置した超望遠実写カメラ (FOV 12度)
-        // 遠景クリッピングと距離を最適化し、何もない空間ではなくロケット・火炎・発射台を確実に捉える
         const cameraPip = new THREE.PerspectiveCamera(12.0, 340 / 195, 2.0, 50000000);
         cameraPip.position.set(-650, 45, 820);
 
@@ -701,7 +703,7 @@ html_template = """
         scene.add(earthMesh);
 
         // =========================================================================
-        // 🏝️ PBR精密ケープカナベラル・ランドスケープ（魔改造テクスチャ）
+        // 🏝️ PBR立体ケープカナベラル・ランドスケープ＆遠景山脈
         // =========================================================================
         const landscapeGroup = new THREE.Group();
         scene.add(landscapeGroup);
@@ -728,8 +730,10 @@ html_template = """
         cctx.bezierCurveTo(1000, 550, 850, 1250, 720, 2048);
         cctx.lineTo(0, 2048); cctx.closePath(); cctx.fill();
 
-        cctx.strokeStyle = '#9ca3af'; cctx.lineWidth = 28;
-        cctx.beginPath(); cctx.moveTo(180, 1024); cctx.lineTo(950, 1024); cctx.stroke();
+        // 2条の砂利クローラーウェイ（VABから発射台への重運搬路）
+        cctx.strokeStyle = '#9ca3af'; cctx.lineWidth = 14;
+        cctx.beginPath(); cctx.moveTo(180, 1014); cctx.lineTo(950, 1014); cctx.stroke();
+        cctx.beginPath(); cctx.moveTo(180, 1034); cctx.lineTo(950, 1034); cctx.stroke();
 
         const coastTex = new THREE.CanvasTexture(coastCvs);
         const coastPlane = new THREE.Mesh(
@@ -748,6 +752,18 @@ html_template = """
         oceanMesh.rotation.x = -Math.PI / 2;
         oceanMesh.position.set(12000, -1.0, 0);
         landscapeGroup.add(oceanMesh);
+
+        // 遠景：連なる山並み・稜線（スカイライン）
+        const mountainMat = new THREE.MeshStandardMaterial({ color: 0x172533, roughness: 0.95 });
+        for(let m=0; m<7; m++) {
+            const mMesh = new THREE.Mesh(
+                new THREE.ConeGeometry(900 + m * 200, 380 + (m % 3) * 120, 8),
+                mountainMat
+            );
+            mMesh.position.set(-7500 - m * 800, 150, -4200 + (m * 950));
+            mMesh.scale.set(1.6, 1.0, 0.8);
+            landscapeGroup.add(mMesh);
+        }
 
         const vabGroup = new THREE.Group();
         vabGroup.position.set(-5800, 0, -2600);
@@ -785,18 +801,15 @@ html_template = """
         groundPlate.receiveShadow = true;
         pad.add(groundPlate);
 
-        // コンクリート掘削フレームトレンチ（火炎排気ダクト）
         const flameTrench = new THREE.Mesh(new THREE.BoxGeometry(22, 10, 42), concreteMat);
         flameTrench.position.set(0, -2.5, 0);
         pad.add(flameTrench);
 
-        // OLM (軌道発射マウント)
         const olmRing = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 4.2, 2.2, 32), darkSteelMat);
         olmRing.position.y = 5.2;
         olmRing.castShadow = true;
         pad.add(olmRing);
 
-        // 巨大整備タワー (メインピラー ＋ 立体トラスクロスバー)
         const towerGroup = new THREE.Group();
         towerGroup.position.set(-11.5, 0, 0);
         pad.add(towerGroup);
@@ -816,12 +829,10 @@ html_template = """
         accessArm.position.set(-5.5, 52.0, 0);
         pad.add(accessArm);
 
-        // 極低温アンビリカル配管
         const cryoPipes = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 65.0, 16), pipeMat);
         cryoPipes.position.set(-9.2, 32.5, 2.4);
         pad.add(cryoPipes);
 
-        // 避雷マスト4基
         for(let mAng of [0.6, 2.4, 3.9, 5.5]) {
             const lMast = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.55, 68.0, 8), hazardMat);
             lMast.position.set(Math.cos(mAng)*52, 34.0, Math.sin(mAng)*52);
@@ -1196,18 +1207,18 @@ html_template = """
             fairingHalves.push({ mesh: halfMesh, side: side, detached: false, vx: 0, vy: 0, rotZ: 0 });
         }
 
-        // 4. RCSマウントノズル
+        // 4. RCSマウントノズル (前後左右8基)
         const rcsMountNodes = [];
         for(let side of [-1, 1]) {
             const block = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.45, 0.25), darkSteelMat);
             block.position.set(side * 1.15, s2Len - 0.8, 0);
             s2Group.add(block);
-            rcsMountNodes.push({ node: block, side: side, isS1: false });
+            rcsMountNodes.push({ node: block, side: side, isS1: false, axis: 'pitch' });
 
             const s1Block = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.45, 0.25), darkSteelMat);
             s1Block.position.set(side * 1.15, s1Len - 0.6, 0);
             s1Group.add(s1Block);
-            rcsMountNodes.push({ node: s1Block, side: side, isS1: true });
+            rcsMountNodes.push({ node: s1Block, side: side, isS1: true, axis: 'pitch' });
         }
 
         // =========================================================================
@@ -1305,7 +1316,7 @@ html_template = """
                 rocket.localToWorld(activeFocusWorld);
             }
 
-            // 🎥 CAM 02: 望遠カメラの被写体追随（発射台近辺〜上昇中も常に対象を中心にロック）
+            // 🎥 CAM 02: 望遠カメラの被写体追随（フォーカスを常に対象中心にロック）
             cameraPip.lookAt(activeFocusWorld);
             document.getElementById('pip-hud-alt').innerText = `ALT: ${Math.max(0, alt).toFixed(1)} km`;
 
@@ -1570,28 +1581,33 @@ html_template = """
                 engineBounceLight.intensity = 0.0;
             }
 
-            // 5. RCSパルス噴射
-            const pitchRate = Math.abs(pitch - prevPitch);
+            // =====================================================================
+            // 🤖 5. 姿勢制御コンピューター連動 RCSスラスターパルス
+            // =====================================================================
+            const pitchRate = (pitch - prevPitch) / 0.016; // 角速度 (rad/s)
             prevPitch = pitch;
             let rcsFiring = false;
 
             for(let rcs of rcsMountNodes) {
-                const isPulse = (!simCfg.is_preview && simT > 2.0 && (pitchRate > 0.0002 || alt > 35.0) && Math.sin(now * 0.025 + rcs.side) > 0.52);
-                const isS1Active = (stage1Detached && rcs.isS1 && rcs.side === 1);
+                // 機体の傾き誤差やステージ分離後の反転操舵に応答してミリ秒パルス点射
+                const pitchError = Math.sin(pitch);
+                const needsCounterThrust = (rcs.side > 0 && pitchRate > 0.003) || (rcs.side < 0 && pitchRate < -0.003);
+                const isVacuumStationKeeping = (alt > 45.0 && Math.sin(now * 0.035 + rcs.side * 2.0) > 0.72);
+                const isS1Boostback = (stage1Detached && rcs.isS1 && rcs.side === 1);
 
-                if ((isPulse && !rcs.isS1) || isS1Active) {
+                if (!simCfg.is_preview && simT > 0.5 && ((needsCounterThrust || isVacuumStationKeeping) && !rcs.isS1 || isS1Boostback)) {
                     rcsFiring = true;
                     rcs.node.getWorldPosition(tempTipPos);
                     const jetDirX = perpX * rcs.side;
                     const jetDirY = perpY * rcs.side;
                     emitParticle(
-                        tempTipPos.x + jetDirX * 0.4, tempTipPos.y + jetDirY * 0.4, tempTipPos.z,
-                        jetDirX * (2.2 + Math.random()*1.2), jetDirY * (2.2 + Math.random()*1.2), (Math.random()-0.5)*0.4,
-                        0.45, 3.2, 18, 0.85, 0xf0f9ff, false
+                        tempTipPos.x + jetDirX * 0.35, tempTipPos.y + jetDirY * 0.35, tempTipPos.z,
+                        jetDirX * (3.4 + Math.random()*1.2), jetDirY * (3.4 + Math.random()*1.2), (Math.random()-0.5)*0.3,
+                        0.35, 2.8, 14, 0.88, 0xf0f9ff, false
                     );
                 }
             }
-            document.getElementById('hud-rcs').innerText = rcsFiring ? "EXPANDING JET (GN2)" : "NOMINAL";
+            document.getElementById('hud-rcs').innerText = rcsFiring ? "CLOSED-LOOP FIRING" : "ACTIVE / STANDBY";
             document.getElementById('hud-rcs').style.color = rcsFiring ? "#34d399" : "#38bdf8";
 
             updateDualCameraTracking(simT, elapsedSec, alt, pitch, p0.stage, p0.exploded);
@@ -1607,7 +1623,7 @@ html_template = """
                 if (simT >= -5.0 && !p0.exploded && !simCfg.is_preview) {
                     document.getElementById('hud-deluge').innerText = "WATER DELUGE ACTIVE";
                     document.getElementById('hud-deluge').style.color = "#34d399";
-                    if (delugeGain) delugeGain.gain.setTargetAtTime(0.45, actx.currentTime, 0.2);
+                    if (gasHiss) gasHiss.gain.setTargetAtTime(0.45, actx.currentTime, 0.2);
                     for(let i=0; i<8; i++) {
                         emitParticle(
                             rx + (Math.random()-0.5)*8, 0.8, (Math.random()-0.5)*8,
@@ -1645,9 +1661,9 @@ html_template = """
 
                 if (simT >= 0 && !voicedEvents.has('audio_rumble')) {
                     voicedEvents.add('audio_rumble');
-                    if (rumbleGain) rumbleGain.gain.setTargetAtTime(0.95, actx.currentTime, 0.1);
-                    if (crackleGain) crackleGain.gain.setTargetAtTime(0.55, actx.currentTime, 0.1);
-                    if (delugeGain) delugeGain.gain.setTargetAtTime(0.1, actx.currentTime, 2.0);
+                    if (subRumble) subRumble.gain.setTargetAtTime(0.95, actx.currentTime, 0.15);
+                    if (shockCrackle) shockCrackle.gain.setTargetAtTime(0.68, actx.currentTime, 0.1);
+                    if (gasHiss) gasHiss.gain.setTargetAtTime(0.12, actx.currentTime, 2.0);
                 }
 
                 if (simT < 6.0) {
