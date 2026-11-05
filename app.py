@@ -460,7 +460,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 完全描画テンプレート (非干渉スタジオレイアウト ＆ PBRランドスケープ)
+# 📺 HTML / JS 完全描画テンプレート
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -470,89 +470,95 @@ html_template = """
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #01040d; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; }
         #canvas-main { width: 100%; height: 100%; display: block; }
-        .vignette { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; box-shadow: inset 0 0 140px rgba(0,0,0,0.85); z-index: 5; }
-        .reticle { position: absolute; top: 50%; left: 50%; width: 56px; height: 56px; transform: translate(-50%, -50%); border: 1px solid rgba(56, 189, 248, 0.22); border-radius: 50%; pointer-events: none; }
+        .vignette { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; box-shadow: inset 0 0 160px rgba(0,0,0,0.92); z-index: 5; }
+        .grain { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 6; opacity: 0.04; background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 3px 3px; }
+        .reticle { position: absolute; top: 50%; left: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 50%; pointer-events: none; }
         
         /* 🎥 PiP 右上完全独立配置 (被り防止ベゼル) */
-        .pip-border { position: absolute; top: 58px; right: 24px; width: 330px; height: 200px; border: 2px solid rgba(56, 189, 248, 0.6); border-radius: 6px; pointer-events: auto; cursor: pointer; z-index: 20; box-shadow: 0 10px 30px rgba(0,0,0,0.85); transition: opacity 0.2s; }
-        .pip-tag { position: absolute; top: 66px; right: 175px; font-size: 10px; font-weight: 800; color: #fff; background: rgba(15, 23, 42, 0.88); padding: 3px 8px; border-radius: 3px; letter-spacing: 1px; font-family: monospace; z-index: 25; pointer-events: none; }
-        .pip-alt { position: absolute; top: 228px; right: 32px; font-size: 10px; font-family: monospace; color: #38bdf8; font-weight: 700; background: rgba(15, 23, 42, 0.88); padding: 2px 6px; border-radius: 3px; z-index: 25; pointer-events: none; }
-        .pip-toggle-hint { position: absolute; top: 66px; right: 30px; font-size: 9px; font-family: monospace; color: #94a3b8; background: rgba(15, 23, 42, 0.88); padding: 3px 6px; border-radius: 3px; z-index: 25; pointer-events: none; }
+        .pip-border { position: absolute; top: 54px; right: 20px; width: 280px; height: 165px; border: 1.5px solid rgba(56, 189, 248, 0.55); border-radius: 4px; pointer-events: auto; cursor: pointer; z-index: 20; box-shadow: 0 12px 36px rgba(0,0,0,0.9); backdrop-filter: blur(4px); transition: all 0.2s ease; }
+        .pip-border:hover { border-color: #38bdf8; }
+        .pip-tag { position: absolute; top: 60px; right: 140px; font-size: 9px; font-weight: 800; color: #fff; background: rgba(15, 23, 42, 0.85); padding: 3px 6px; border-radius: 2px; letter-spacing: 1px; font-family: monospace; z-index: 25; pointer-events: none; }
+        .pip-alt { position: absolute; top: 194px; right: 28px; font-size: 10px; font-family: monospace; color: #38bdf8; font-weight: 700; background: rgba(15, 23, 42, 0.85); padding: 2px 6px; border-radius: 2px; z-index: 25; pointer-events: none; }
+        .pip-toggle-hint { position: absolute; top: 60px; right: 26px; font-size: 9px; font-family: monospace; color: #94a3b8; background: rgba(15, 23, 42, 0.85); padding: 3px 6px; border-radius: 2px; z-index: 25; pointer-events: none; }
 
-        /* 🛰️ 軌道HUD 左上配置 (PiPやロケット中央と絶対に被らない完全分離) */
-        .hud-orbit { position: absolute; top: 58px; left: 24px; width: 290px; background: rgba(3, 7, 18, 0.88); backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; padding: 12px; box-sizing: border-box; z-index: 10; color: #fff; }
+        /* 🛰️ 軌道HUD 左上配置 (半透明・最小化可能) */
+        .hud-orbit { position: absolute; top: 54px; left: 20px; width: 260px; background: rgba(3, 7, 18, 0.72); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; padding: 10px 12px; box-sizing: border-box; z-index: 15; color: #fff; transition: opacity 0.2s; }
+        .hud-orbit:hover { background: rgba(3, 7, 18, 0.9); }
         
-        .top-banner { position: absolute; top: 0; left: 0; width: 100%; height: 48px; background: rgba(3, 7, 18, 0.92); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 0 28px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 10; }
-        .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, rgba(1, 3, 8, 0.98) 0%, rgba(2, 6, 14, 0.88) 75%, transparent 100%); padding: 26px 36px 18px 36px; box-sizing: border-box; display: flex; align-items: flex-end; justify-content: space-between; z-index: 10; }
-        .rud-banner { display: none; position: absolute; top: 170px; left: 50%; transform: translateX(-50%); background: rgba(120, 10, 10, 0.94); backdrop-filter: blur(16px); border: 2px solid #ef4444; border-radius: 4px; padding: 18px 32px; z-index: 30; text-align: center; box-shadow: 0 0 60px rgba(239, 68, 68, 0.7); }
+        .top-banner { position: absolute; top: 0; left: 0; width: 100%; height: 44px; background: rgba(2, 6, 16, 0.88); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 10; }
+        .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, rgba(1, 3, 8, 0.95) 0%, rgba(2, 6, 14, 0.75) 75%, transparent 100%); padding: 20px 28px 14px 28px; box-sizing: border-box; display: flex; align-items: flex-end; justify-content: space-between; z-index: 10; pointer-events: none; }
+        .hud-telemetry > * { pointer-events: auto; }
+        .rud-banner { display: none; position: absolute; top: 150px; left: 50%; transform: translateX(-50%); background: rgba(120, 10, 10, 0.94); backdrop-filter: blur(16px); border: 2px solid #ef4444; border-radius: 4px; padding: 16px 28px; z-index: 30; text-align: center; box-shadow: 0 0 60px rgba(239, 68, 68, 0.7); }
     </style>
 </head>
 <body>
     <canvas id="canvas-main"></canvas>
     <div class="vignette"><div class="reticle"></div></div>
+    <div class="grain"></div>
     
-    <!-- 2画面用PiP 右上ベゼル枠 (クリックで表示切替可能) -->
+    <!-- 2画面用PiP 右上ベゼル枠 -->
     <div id="pip-frame" class="pip-border" title="クリックでPiPの表示/非表示を切り替え"></div>
     <div id="pip-tag" class="pip-tag">CAM 02: COASTAL TRACKER</div>
     <div id="pip-hud-alt" class="pip-alt">ALT: 0.0 km</div>
     <div id="pip-hint" class="pip-toggle-hint">[CLICK TO TOGGLE]</div>
 
     <div class="top-banner">
-        <div style="display: flex; align-items: center; gap: 14px;">
-            <span style="display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 12px #ef4444;"></span>
-            <span style="color: #ffffff; font-weight: 800; font-size: 13px; letter-spacing: 2px;">OFFICIAL 4K DUAL WEBCAST</span>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 10px #ef4444;"></span>
+            <span style="color: #ffffff; font-weight: 800; font-size: 12px; letter-spacing: 2px;">OFFICIAL 4K DUAL WEBCAST</span>
             <span style="color: rgba(255,255,255,0.2);">|</span>
             <span id="cam-tag" style="color: #38bdf8; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; font-family: monospace;">CAM 01: PAD 39A HIGH-SPEED TRACKER</span>
         </div>
-        <div style="display: flex; align-items: center; gap: 20px; font-family: monospace; font-size: 11px;">
-            <span style="color: #94a3b8;">RCS FLUID JET: <strong id="hud-rcs" style="color: #38bdf8;">ACTIVE</strong></span>
+        <div style="display: flex; align-items: center; gap: 18px; font-family: monospace; font-size: 11px;">
+            <span style="color: #94a3b8;">ATMOSPHERE: <strong id="hud-regime" style="color: #f8fafc;">TROPOSPHERE</strong></span>
+            <span style="color: #94a3b8;">RCS FLUID JET: <strong id="hud-rcs" style="color: #38bdf8;">STANDBY</strong></span>
             <span style="color: #94a3b8;">WATER DELUGE: <strong id="hud-deluge" style="color: #38bdf8;">STANDBY</strong></span>
             <span id="comm-status" style="color: #10b981;">TELEMETRY: LOCKED</span>
         </div>
     </div>
 
-    <!-- 左上に完全分離された軌道トラジェクトリHUD -->
-    <div class="hud-orbit">
-        <div style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 1.5px; margin-bottom: 6px; display: flex; justify-content: space-between;">
+    <!-- 左上に配置された軌道トラジェクトリHUD -->
+    <div class="hud-orbit" id="hud-orbit-box">
+        <div style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 1.2px; margin-bottom: 4px; display: flex; justify-content: space-between;">
             <span>DOWNRANGE TRAJECTORY</span>
             <span id="hud-downrange" style="color: #38bdf8; font-family: monospace;">0.0 km</span>
         </div>
-        <canvas id="orbit-canvas" width="266" height="70" style="width: 100%; height: 70px; background: #01040d; border-radius: 2px;"></canvas>
-        <div id="event-log" style="margin-top: 8px; font-family: monospace; font-size: 10px; color: #34d399; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 6px;">
+        <canvas id="orbit-canvas" width="236" height="60" style="width: 100%; height: 60px; background: #020617; border-radius: 2px; border: 1px solid rgba(255,255,255,0.06);"></canvas>
+        <div id="event-log" style="margin-top: 6px; font-family: monospace; font-size: 10px; color: #34d399; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
             > VEHICLE COUNTDOWN INITIALIZED
         </div>
     </div>
 
     <div id="rud-banner" class="rud-banner">
-        <div style="color: #fff; font-size: 18px; font-weight: 900; letter-spacing: 2.5px; font-family: monospace;">🚨 RAPID UNSCHEDULED DISASSEMBLY (RUD) 🚨</div>
-        <div id="rud-desc" style="color: #fecaca; font-size: 13px; font-weight: 600; margin-top: 8px; max-width: 540px; line-height: 1.4;"></div>
+        <div style="color: #fff; font-size: 17px; font-weight: 900; letter-spacing: 2.5px; font-family: monospace;">🚨 RAPID UNSCHEDULED DISASSEMBLY (RUD) 🚨</div>
+        <div id="rud-desc" style="color: #fecaca; font-size: 13px; font-weight: 600; margin-top: 6px; max-width: 520px; line-height: 1.4;"></div>
     </div>
 
     <div class="hud-telemetry">
         <div>
-            <div id="tv-status" style="color: #38bdf8; font-size: 11px; font-weight: 700; letter-spacing: 2px; margin-bottom: 2px;">COUNTDOWN SEQUENCE</div>
-            <div id="tv-timer" style="color: #ffffff; font-size: 46px; font-weight: 900; font-family: 'Consolas', monospace; letter-spacing: 2px; text-shadow: 0 0 25px rgba(56, 189, 248, 0.4);">T- 00:10.0</div>
+            <div id="tv-status" style="color: #38bdf8; font-size: 10px; font-weight: 700; letter-spacing: 1.8px; margin-bottom: 2px;">COUNTDOWN SEQUENCE</div>
+            <div id="tv-timer" style="color: #ffffff; font-size: 40px; font-weight: 900; font-family: 'Consolas', monospace; letter-spacing: 2px; text-shadow: 0 0 20px rgba(56, 189, 248, 0.4);">T- 00:10.0</div>
         </div>
-        <div style="display: flex; gap: 36px; border-left: 1px solid rgba(255,255,255,0.15); padding-left: 32px;">
+        <div style="display: flex; gap: 30px; border-left: 1px solid rgba(255,255,255,0.15); padding-left: 26px;">
             <div>
-                <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px;">SPEED / MACH</div>
-                <div style="color: #fff; font-size: 24px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-mach">M 0.00</span> <span style="font-size: 12px; color: #94a3b8;" id="tv-spd">(0 km/h)</span></div>
+                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1.2px;">SPEED / MACH</div>
+                <div style="color: #fff; font-size: 22px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-mach">M 0.00</span> <span style="font-size: 11px; color: #94a3b8;" id="tv-spd">(0 km/h)</span></div>
             </div>
             <div>
-                <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px;">ALTITUDE</div>
-                <div style="color: #fff; font-size: 24px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-alt">0.0</span> <span style="font-size: 12px; color: #94a3b8;">km</span></div>
+                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1.2px;">ALTITUDE</div>
+                <div style="color: #fff; font-size: 22px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-alt">0.0</span> <span style="font-size: 11px; color: #94a3b8;">km</span></div>
             </div>
             <div>
-                <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px;">DYNAMIC PRESSURE</div>
-                <div style="color: #fff; font-size: 24px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-q">0.0</span> <span style="font-size: 12px; color: #94a3b8;">kPa</span></div>
+                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1.2px;">DYNAMIC PRESSURE</div>
+                <div style="color: #fff; font-size: 22px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-q">0.0</span> <span style="font-size: 11px; color: #94a3b8;">kPa</span></div>
             </div>
             <div>
-                <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px;">AXIAL LOAD</div>
-                <div style="color: #fff; font-size: 24px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-g">1.0</span> <span style="font-size: 12px; color: #94a3b8;">G</span></div>
+                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1.2px;">AXIAL LOAD</div>
+                <div style="color: #fff; font-size: 22px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-g">1.0</span> <span style="font-size: 11px; color: #94a3b8;">G</span></div>
             </div>
             <div>
-                <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px;">STAGE CONFIG</div>
-                <div id="tv-stage-badge" style="color: #34d399; font-size: 20px; font-weight: 800; font-family: 'Consolas', monospace;">PAD INTEGRATION</div>
+                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1.2px;">STAGE CONFIG</div>
+                <div id="tv-stage-badge" style="color: #34d399; font-size: 18px; font-weight: 800; font-family: 'Consolas', monospace;">PAD INTEGRATION</div>
             </div>
         </div>
     </div>
@@ -569,6 +575,7 @@ html_template = """
         const rudBanner = document.getElementById('rud-banner');
         const rudDesc = document.getElementById('rud-desc');
         const eventLog = document.getElementById('event-log');
+        const voicedEvents = new Set();
 
         let pipVisible = true;
         const pipFrame = document.getElementById('pip-frame');
@@ -614,36 +621,38 @@ html_template = """
             if (!actx) return;
             const osc = actx.createOscillator();
             const g = actx.createGain();
-            osc.type = 'triangle'; osc.frequency.setValueAtTime(300, actx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(30, actx.currentTime + 0.4);
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(320, actx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(35, actx.currentTime + 0.35);
             g.gain.setValueAtTime(0.7, actx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + 0.4);
-            osc.connect(g); g.connect(actx.destination); osc.start(); osc.stop(actx.currentTime + 0.4);
+            g.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + 0.35);
+            osc.connect(g); g.connect(actx.destination); osc.start(); osc.stop(actx.currentTime + 0.35);
         }
 
         // =========================================================================
-        // 🌍 Three.js シーン ＆ リアル大気霞
+        // 🌍 Three.js シーン ＆ リアル映画調ライティング
         // =========================================================================
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0a1526);
-        scene.fog = new THREE.FogExp2(0x0d1f38, 0.000085);
+        scene.background = new THREE.Color(0x060c18);
+        scene.fog = new THREE.FogExp2(0x0b172a, 0.000075);
 
         const renderer = new THREE.WebGLRenderer({ canvas: canvasMain, antialias: true, powerPreference: "high-performance" });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.35;
+        renderer.toneMappingExposure = 1.45;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         const cameraMain = new THREE.PerspectiveCamera(26, window.innerWidth / window.innerHeight, 0.5, 50000000);
-        const cameraPip = new THREE.PerspectiveCamera(14, 330 / 200, 5.0, 50000000);
+        const cameraPip = new THREE.PerspectiveCamera(14, 280 / 165, 5.0, 50000000);
         cameraPip.position.set(-3800, 180, 5200);
 
-        const sunLight = new THREE.DirectionalLight(0xfff5e6, 4.6);
+        const sunLight = new THREE.DirectionalLight(0xfffaed, 5.2);
         sunLight.position.set(4500, 8000, 5500);
         scene.add(sunLight);
-        scene.add(new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.85));
+        scene.add(new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.95));
 
-        const engineBounceLight = new THREE.PointLight(simCfg.flame_hex, 0.0, 340, 1.6);
+        const engineBounceLight = new THREE.PointLight(simCfg.flame_hex, 0.0, 400, 1.8);
         scene.add(engineBounceLight);
 
         // 恒星
@@ -658,13 +667,14 @@ html_template = """
             starPos[i+2] = rad * Math.cos(ph);
         }
         starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-        scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ size: 1.6, color: 0xe2e8f0, transparent: true, opacity: 0.15 })));
+        const starMat = new THREE.PointsMaterial({ size: 1.6, color: 0xe2e8f0, transparent: true, opacity: 0.15 });
+        scene.add(new THREE.Points(starGeo, starMat));
 
         // 地球
         const R_EARTH = 6371.0;
         const earthMesh = new THREE.Mesh(
             new THREE.SphereGeometry(R_EARTH, 64, 48),
-            new THREE.MeshStandardMaterial({ color: 0x0f3854, roughness: 0.7 })
+            new THREE.MeshStandardMaterial({ color: 0x0f3854, roughness: 0.75 })
         );
         earthMesh.position.set(0, -R_EARTH, 0);
         scene.add(earthMesh);
@@ -695,10 +705,7 @@ html_template = """
         tctx.bezierCurveTo(490, 260, 410, 650, 340, 1024);
         tctx.lineTo(0, 1024); tctx.closePath(); tctx.fill();
 
-        tctx.strokeStyle = '#9ca3af'; tctx.lineWidth = 18;
-        tctx.beginPath(); tctx.moveTo(80, 512); tctx.lineTo(460, 512); tctx.stroke();
-
-        tctx.strokeStyle = '#374151'; tctx.lineWidth = 8;
+        tctx.strokeStyle = '#9ca3af'; tctx.lineWidth = 16;
         tctx.beginPath(); tctx.moveTo(80, 512); tctx.lineTo(460, 512); tctx.stroke();
 
         const terrainTex = new THREE.CanvasTexture(terrainCvs);
@@ -711,11 +718,7 @@ html_template = """
         landscapeGroup.add(terrainMesh);
 
         const oceanMat = new THREE.MeshStandardMaterial({
-            color: 0x0a3f63,
-            roughness: 0.18,
-            metalness: 0.82,
-            transparent: true,
-            opacity: 0.92
+            color: 0x0a3f63, roughness: 0.18, metalness: 0.85, transparent: true, opacity: 0.92
         });
         const oceanMesh = new THREE.Mesh(new THREE.PlaneGeometry(32000, 32000), oceanMat);
         oceanMesh.rotation.x = -Math.PI / 2;
@@ -725,36 +728,37 @@ html_template = """
         // 遠景：NASA VAB
         const vabGroup = new THREE.Group();
         vabGroup.position.set(-4200, 0, -1800);
-        const vabMain = new THREE.Mesh(new THREE.BoxGeometry(160, 150, 180), new THREE.MeshStandardMaterial({ color: 0xdbeafe, roughness: 0.4 }));
+        const vabMain = new THREE.Mesh(new THREE.BoxGeometry(160, 150, 180), new THREE.MeshStandardMaterial({ color: 0xdbeafe, roughness: 0.45 }));
         vabMain.position.y = 75;
         vabGroup.add(vabMain);
-        const flag = new THREE.Mesh(new THREE.BoxGeometry(6, 60, 40), new THREE.MeshBasicMaterial({ color: 0xdc2626 }));
-        flag.position.set(82, 80, 0);
-        vabGroup.add(flag);
         landscapeGroup.add(vabGroup);
 
         for(let g=0; g<3; g++) {
             const sphereTank = new THREE.Mesh(
                 new THREE.SphereGeometry(24, 24, 16),
-                new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.7, roughness: 0.3 })
+                new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.8, roughness: 0.25 })
             );
             sphereTank.position.set(-1800 - g * 120, 24, -900 + g * 80);
             landscapeGroup.add(sphereTank);
         }
 
         // =========================================================================
-        // 🏗️ 発射施設
+        // 🏗️ 発射施設 (重構造マウント・トラス・フレーム)
         // =========================================================================
         const pad = new THREE.Group();
         scene.add(pad);
-        const darkSteelMat = new THREE.MeshStandardMaterial({ color: 0x1e242b, metalness: 0.85, roughness: 0.35 });
-        const concreteMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 });
+        const darkSteelMat = new THREE.MeshStandardMaterial({ color: 0x1f242d, metalness: 0.88, roughness: 0.32 });
+        const concreteMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.92 });
         const hazardMat = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.45, metalness: 0.35 });
-        const pipeMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.9, roughness: 0.22 });
+        const pipeMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.92, roughness: 0.2 });
         const goldFoilMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.96, roughness: 0.16 });
 
         const groundPlate = new THREE.Mesh(new THREE.CylinderGeometry(85, 95, 1.4, 32), concreteMat);
         groundPlate.position.y = -0.7; pad.add(groundPlate);
+
+        // 排気フレームデフレクター
+        const trench = new THREE.Mesh(new THREE.BoxGeometry(14, 6, 24), darkSteelMat);
+        trench.position.set(0, 0, 0); pad.add(trench);
 
         const olmRing = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.6, 1.8, 32), darkSteelMat);
         olmRing.position.y = 5.2; pad.add(olmRing);
@@ -768,7 +772,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🎨 自律PBRテクスチャ (溶接ビード・TPS耐熱シールド)
+        // 🎨 自律PBRテクスチャ (溶接ビード・ストリンガー・TPS耐熱シールド)
         // =========================================================================
         function createMaterialSkin(matId, hasHeatshield) {
             const w = 512, h = 1024;
@@ -780,12 +784,12 @@ html_template = """
             bctx.fillStyle = '#808080'; bctx.fillRect(0, 0, w, h);
 
             if (matId === 'ss') {
-                dctx.fillStyle = '#cbd5e1'; dctx.fillRect(0, 0, w, h);
-                for(let y = 0; y < h; y += 48) {
+                dctx.fillStyle = '#d1d5db'; dctx.fillRect(0, 0, w, h);
+                for(let y = 0; y < h; y += 44) {
                     const s = (Math.random() - 0.5) * 16;
-                    dctx.fillStyle = `rgb(${203+s}, ${213+s}, ${225+s})`;
-                    dctx.fillRect(0, y, w, 46);
-                    dctx.fillStyle = 'rgba(80, 60, 40, 0.35)'; dctx.fillRect(0, y, w, 2);
+                    dctx.fillStyle = `rgb(${210+s}, ${218+s}, ${228+s})`;
+                    dctx.fillRect(0, y, w, 42);
+                    dctx.fillStyle = 'rgba(70, 50, 30, 0.35)'; dctx.fillRect(0, y, w, 2);
                     bctx.fillStyle = '#303030'; bctx.fillRect(0, y, w, 3);
                 }
             } else if (matId === 'al') {
@@ -801,28 +805,28 @@ html_template = """
                     }
                 }
             } else if (matId === 'cf') {
-                dctx.fillStyle = '#141619'; dctx.fillRect(0, 0, w, h);
-                dctx.fillStyle = '#27272a';
+                dctx.fillStyle = '#111317'; dctx.fillRect(0, 0, w, h);
+                dctx.fillStyle = '#1e2229';
                 for(let y = 0; y < h; y += 8) {
                     for(let x = 0; x < w; x += 8) {
                         if ((x+y)%16 === 0) dctx.fillRect(x, y, 4, 4);
                     }
                 }
             } else {
-                dctx.fillStyle = '#52525b'; dctx.fillRect(0, 0, w, h);
+                dctx.fillStyle = '#4b5563'; dctx.fillRect(0, 0, w, h);
             }
 
-            for(let x = 0; x < w; x += 64) {
+            for(let x = 0; x < w; x += 32) {
                 bctx.fillStyle = '#555555'; bctx.fillRect(x, 0, 2, h);
-                dctx.fillStyle = 'rgba(0,0,0,0.15)'; dctx.fillRect(x, 0, 2, h);
+                dctx.fillStyle = 'rgba(0,0,0,0.12)'; dctx.fillRect(x, 0, 2, h);
             }
 
             if (hasHeatshield) {
-                dctx.fillStyle = '#0f1115'; dctx.fillRect(0, 0, w * 0.48, h);
+                dctx.fillStyle = '#0d0f12'; dctx.fillRect(0, 0, w * 0.48, h);
                 bctx.strokeStyle = '#18181b'; bctx.lineWidth = 2;
-                for(let ty = 0; ty < h; ty += 16) {
-                    for(let tx = 0; tx < w * 0.48; tx += 16) {
-                        bctx.strokeRect(tx + (ty%32===0?0:8), ty, 15, 15);
+                for(let ty = 0; ty < h; ty += 14) {
+                    for(let tx = 0; tx < w * 0.48; tx += 14) {
+                        bctx.strokeRect(tx + (ty%28===0?0:7), ty, 13, 13);
                     }
                 }
             }
@@ -911,7 +915,7 @@ html_template = """
         const s2NozzleTips = [];
         const boosterNozzleTips = [];
 
-        const inconelNozzleMat = new THREE.MeshStandardMaterial({ color: 0x3f3f46, metalness: 0.95, roughness: 0.22, side: THREE.DoubleSide });
+        const inconelNozzleMat = new THREE.MeshStandardMaterial({ color: 0x374151, metalness: 0.95, roughness: 0.22, side: THREE.DoubleSide });
 
         function buildDetailedEngineCluster(parent, count, radius, basePosY, epsScale, cycId, tipArray, jetLen) {
             const group = new THREE.Group();
@@ -977,13 +981,13 @@ html_template = """
 
         const s1Mat = new THREE.MeshStandardMaterial({
             map: s1Maps.map, bumpMap: s1Maps.bumpMap, bumpScale: 0.04,
-            metalness: (simCfg.s1_mat === 'ss') ? 0.92 : 0.25,
-            roughness: (simCfg.s1_mat === 'ss') ? 0.16 : 0.42
+            metalness: (simCfg.s1_mat === 'ss') ? 0.94 : 0.25,
+            roughness: (simCfg.s1_mat === 'ss') ? 0.14 : 0.42
         });
         const s2Mat = new THREE.MeshStandardMaterial({
             map: s2Maps.map, bumpMap: s2Maps.bumpMap, bumpScale: 0.045,
-            metalness: (simCfg.s2_mat === 'ss') ? 0.88 : 0.28,
-            roughness: (simCfg.s2_mat === 'ss') ? 0.18 : 0.45
+            metalness: (simCfg.s2_mat === 'ss') ? 0.90 : 0.28,
+            roughness: (simCfg.s2_mat === 'ss') ? 0.16 : 0.45
         });
 
         const s1Len = simCfg.s1_len;
@@ -1008,7 +1012,7 @@ html_template = """
         const skirtRing = new THREE.Mesh(new THREE.CylinderGeometry(1.18, 1.22, 1.8, 64), darkSteelMat);
         skirtRing.position.y = 0.9; s1Group.add(skirtRing);
 
-        // インターステージ・オープンラティス（内部の第2段ノズルが透けて見えるトラス構造）
+        // インターステージ・オープンラティス
         const interstage = new THREE.Group();
         interstage.position.y = s1Len + interLen / 2;
         s1Group.add(interstage);
@@ -1216,14 +1220,14 @@ html_template = """
         }
 
         function drawOrbitMap(altKm, dRangeKm, exploded) {
-            octx.clearRect(0, 0, 266, 70);
-            octx.beginPath(); octx.arc(133, 190, 150, Math.PI, 0); octx.strokeStyle = '#1e293b'; octx.lineWidth = 3; octx.stroke();
-            const px = 15 + Math.min(236, (dRangeKm / 1200.0) * 236);
-            const py = 60 - Math.min(50, (altKm / 200.0) * 50);
-            octx.beginPath(); octx.moveTo(15, 60); octx.quadraticCurveTo(px * 0.5, 60, px, py);
-            octx.strokeStyle = exploded ? '#ef4444' : '#38bdf8'; octx.lineWidth = 2; octx.stroke();
+            octx.clearRect(0, 0, 236, 60);
+            octx.beginPath(); octx.arc(118, 160, 130, Math.PI, 0); octx.strokeStyle = '#1e293b'; octx.lineWidth = 2.5; octx.stroke();
+            const px = 12 + Math.min(212, (dRangeKm / 1200.0) * 212);
+            const py = 52 - Math.min(44, (altKm / 200.0) * 44);
+            octx.beginPath(); octx.moveTo(12, 52); octx.quadraticCurveTo(px * 0.5, 52, px, py);
+            octx.strokeStyle = exploded ? '#ef4444' : '#38bdf8'; octx.lineWidth = 1.8; octx.stroke();
             octx.fillStyle = exploded ? '#dc2626' : '#38bdf8';
-            octx.beginPath(); octx.arc(px, py, 4, 0, Math.PI * 2); octx.fill();
+            octx.beginPath(); octx.arc(px, py, 3.5, 0, Math.PI * 2); octx.fill();
         }
 
         // =========================================================================
@@ -1243,7 +1247,7 @@ html_template = """
                 rocket.localToWorld(activeFocusWorld);
             }
 
-            pipCamera.lookAt(activeFocusWorld);
+            cameraPip.lookAt(activeFocusWorld);
             document.getElementById('pip-hud-alt').innerText = `ALT: ${Math.max(0, alt).toFixed(1)} km`;
 
             if (simCfg.is_preview) {
@@ -1585,6 +1589,11 @@ html_template = """
                 document.getElementById('tv-stage-badge').innerText = p0.stage === 1 ? (p0.strapon ? "STAGE 1 + BOOSTERS" : "STAGE 1 CORE ONLY") : "STAGE 2 ORBITAL";
             }
 
+            if (p0.exploded) {
+                rudBanner.style.display = 'block';
+                rudDesc.innerText = failMessage || "機体過負荷による空中分解";
+            }
+
             // 🎥 2画面ビューポート分割レンダリング
             const w = window.innerWidth;
             const h = window.innerHeight;
@@ -1598,10 +1607,10 @@ html_template = """
             renderer.render(scene, cameraMain);
 
             if (pipVisible) {
-                const pipW = 330;
-                const pipH = 200;
-                const pipX = w - pipW - 24;
-                const pipY = h - pipH - 58;
+                const pipW = 280;
+                const pipH = 165;
+                const pipX = w - pipW - 20;
+                const pipY = h - pipH - 54;
 
                 renderer.setScissorTest(true);
                 renderer.setScissor(pipX, pipY, pipW, pipH);
