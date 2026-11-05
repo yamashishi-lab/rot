@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 st.title("🚀 Orbital Architect Ultra")
-st.caption("※ 4K実写級：IFT-5タワーキャッチ地上完全追尾・実機同等パルスRCS・軌道マップ完全修正版")
+st.caption("※ 4K実写級：IFT-5タワーキャッチ地上完全追尾・リアル霧状パルスRCS・水蒸気雲完全復元版")
 
 # =========================================================================
 # 🔬 推進剤・材料・空力パーツ・ブースターデータベース
@@ -114,7 +114,7 @@ with tab3:
         angle_of_attack = st.slider("固定取り付け迎角 AoA (deg)", -3.0, 12.0, 0.5, step=0.5)
     with c2:
         rcs_deadband = st.slider("4象限RCS デッドバンド感度 (deg)", 0.2, 5.0, 0.8, step=0.1)
-        st.caption("※ 物理連動：姿勢制御トルク発生時のみ霧状コーンが一瞬パルス噴射されます。")
+        st.caption("※ 物理連動：姿勢修正が必要な瞬間だけ冷ガス窒素が一瞬霧状にパルス噴射されます。")
 
 with tab4:
     c1, c2, c3 = st.columns(3)
@@ -563,16 +563,19 @@ html_template = """
         .pip-alt { position: absolute; bottom: 6px; right: 8px; font-size: 10px; font-family: monospace; color: #38bdf8; font-weight: 700; background: rgba(15, 23, 42, 0.92); padding: 2px 6px; border-radius: 2px; z-index: 65; pointer-events: none; }
         .pip-toggle-hint { position: absolute; top: 6px; right: 8px; font-size: 9px; font-family: monospace; color: #94a3b8; background: rgba(15, 23, 42, 0.92); padding: 3px 6px; border-radius: 2px; z-index: 65; pointer-events: none; }
 
-        /* 🗺️ 軌道マップ (絶対に見切れない独立カード配置) */
+        /* 🗺️ 軌道マップ (見切れ完全根絶・独立固定) */
         .hud-orbit { position: absolute; top: 54px; left: 20px; width: 304px; background: rgba(3, 7, 18, 0.88); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 4px; padding: 10px 12px; z-index: 50; color: #fff; box-shadow: 0 8px 32px rgba(0,0,0,0.85); }
         #orbit-canvas { width: 280px; height: 60px; background: #020617; border-radius: 2px; border: 1px solid rgba(255,255,255,0.12); display: block; margin-top: 4px; }
 
         .top-banner { position: absolute; top: 0; left: 0; width: 100%; min-height: 44px; background: rgba(2, 6, 16, 0.94); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 4px 18px; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 20; flex-wrap: wrap; gap: 8px; }
         
-        /* 📊 フロート式テレメトリカード (下部メインカメラのグラフィックスを絶対に遮蔽しない) */
-        .hud-telemetry { position: absolute; bottom: 16px; left: 20px; right: 20px; display: flex; align-items: center; justify-content: space-between; z-index: 20; pointer-events: none; }
-        .telemetry-card { pointer-events: auto; background: rgba(2, 6, 16, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.14); border-radius: 6px; padding: 10px 18px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); display: flex; gap: 20px; align-items: center; }
-        .timer-card { pointer-events: auto; background: rgba(2, 6, 16, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.14); border-radius: 6px; padding: 8px 18px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        /* 📊 フロート式テレメトリバー（下部メインカメラを覆い隠さず見切れないレスポンシブ配置） */
+        .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; height: 82px; background: linear-gradient(to top, rgba(1, 3, 8, 0.95) 0%, rgba(2, 6, 14, 0.75) 80%, transparent 100%); padding: 10px 24px 8px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 20; pointer-events: none; }
+        .hud-telemetry > * { pointer-events: auto; }
+        .telemetry-row { display: flex; gap: clamp(14px, 2.2vw, 28px); align-items: center; flex-wrap: nowrap; overflow-x: auto; }
+        .telemetry-item { flex-shrink: 0; }
+        .telemetry-label { font-size: 9px; color: #94a3b8; letter-spacing: 1px; }
+        .telemetry-val { color: #fff; font-size: clamp(13px, 1.6vw, 17px); font-weight: 800; font-family: 'Consolas', monospace; }
 
         .rud-banner { display: none; position: absolute; top: 150px; left: 50%; transform: translateX(-50%); background: rgba(120, 10, 10, 0.94); backdrop-filter: blur(16px); border: 2px solid #ef4444; border-radius: 4px; padding: 16px 28px; z-index: 70; text-align: center; box-shadow: 0 0 60px rgba(239, 68, 68, 0.7); }
     </style>
@@ -624,31 +627,31 @@ html_template = """
         <div id="rud-desc" style="color: #fecaca; font-size: 13px; font-weight: 600; margin-top: 6px; max-width: 520px; line-height: 1.4;"></div>
     </div>
 
-    <!-- 📊 フロート式テレメトリ -->
+    <!-- 📊 フロート式テレメトリバー -->
     <div class="hud-telemetry">
-        <div class="timer-card">
-            <div id="tv-status" style="color: #38bdf8; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; margin-bottom: 2px;">COUNTDOWN SEQUENCE</div>
-            <div id="tv-timer" style="color: #ffffff; font-size: clamp(22px, 3.0vw, 32px); font-weight: 900; font-family: 'Consolas', monospace; letter-spacing: 2px; text-shadow: 0 0 20px rgba(56, 189, 248, 0.4);">T- 00:10.0</div>
+        <div style="flex-shrink: 0;">
+            <div id="tv-status" style="color: #38bdf8; font-size: 9px; font-weight: 700; letter-spacing: 1.5px; margin-bottom: 2px;">COUNTDOWN SEQUENCE</div>
+            <div id="tv-timer" style="color: #ffffff; font-size: clamp(22px, 2.8vw, 30px); font-weight: 900; font-family: 'Consolas', monospace; letter-spacing: 2px; text-shadow: 0 0 20px rgba(56, 189, 248, 0.4);">T- 00:10.0</div>
         </div>
-        <div class="telemetry-card">
-            <div>
-                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1px;">SPEED / MACH</div>
-                <div style="color: #fff; font-size: clamp(13px, 1.6vw, 17px); font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-mach">M 0.00</span> <span style="font-size: 10px; color: #94a3b8;" id="tv-spd">(0 km/h)</span></div>
+        <div class="telemetry-row">
+            <div class="telemetry-item">
+                <div class="telemetry-label">SPEED / MACH</div>
+                <div class="telemetry-val"><span id="tv-mach">M 0.00</span> <span style="font-size: 10px; color: #94a3b8;" id="tv-spd">(0 km/h)</span></div>
             </div>
-            <div>
-                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1px;">ALTITUDE</div>
-                <div style="color: #fff; font-size: clamp(13px, 1.6vw, 17px); font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-alt">0.0</span> <span style="font-size: 10px; color: #94a3b8;">km</span></div>
+            <div class="telemetry-item">
+                <div class="telemetry-label">ALTITUDE</div>
+                <div class="telemetry-val"><span id="tv-alt">0.0</span> <span style="font-size: 10px; color: #94a3b8;">km</span></div>
             </div>
-            <div>
-                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1px;">DYNAMIC PRESSURE</div>
-                <div style="color: #fff; font-size: clamp(13px, 1.6vw, 17px); font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-q">0.0</span> <span style="font-size: 10px; color: #94a3b8;">kPa</span></div>
+            <div class="telemetry-item">
+                <div class="telemetry-label">DYNAMIC PRESSURE</div>
+                <div class="telemetry-val"><span id="tv-q">0.0</span> <span style="font-size: 10px; color: #94a3b8;">kPa</span></div>
             </div>
-            <div>
-                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1px;">AXIAL LOAD</div>
-                <div style="color: #fff; font-size: clamp(13px, 1.6vw, 17px); font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-g">1.0</span> <span style="font-size: 10px; color: #94a3b8;">G</span></div>
+            <div class="telemetry-item">
+                <div class="telemetry-label">AXIAL LOAD</div>
+                <div class="telemetry-val"><span id="tv-g">1.0</span> <span style="font-size: 10px; color: #94a3b8;">G</span></div>
             </div>
-            <div>
-                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1px;">STAGE CONFIG</div>
+            <div class="telemetry-item">
+                <div class="telemetry-label">STAGE CONFIG</div>
                 <div id="tv-stage-badge" style="color: #34d399; font-size: clamp(11px, 1.4vw, 14px); font-weight: 800; font-family: 'Consolas', monospace; white-space: nowrap;">PAD READY</div>
             </div>
         </div>
@@ -724,7 +727,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🔊 音響合成エンジン (重低音・衝撃波クラックル・重厚爆縮分離音)
+        // 🔊 音響合成エンジン
         // =========================================================================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let actx = null, subRumble = null, shockCrackle = null, gasHiss = null;
@@ -819,7 +822,6 @@ html_template = """
         rendererPip.toneMappingExposure = 1.45;
 
         const cameraMain = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 1.0, 2000000);
-        // CAM 02 独立カメラ
         const cameraPip = new THREE.PerspectiveCamera(12.0, 340 / 195, 1.0, 2000000);
 
         const sunLight = new THREE.DirectionalLight(0xfffaed, 5.5);
@@ -836,7 +838,7 @@ html_template = """
         const engineBounceLight = new THREE.PointLight(simCfg.flame_hex, 0.0, 750, 2.0);
         scene.add(engineBounceLight);
 
-        // スカイドーム
+        // 🌌 スカイドーム
         const skyVertex = `
             varying vec3 vWorldPosition;
             void main() {
@@ -1341,7 +1343,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🛰️ 【完全実装】一瞬だけ霧状に出る冷ガス窒素(GN2)パルスRCS (残像ゼロ)
+        // 🛰️ 【完全実装】霧状パルスRCS (残像なく瞬時に霧散する冷ガス窒素)
         // =========================================================================
         const rcsNozzles = [];
         const rcsDirs = [
@@ -1351,9 +1353,9 @@ html_template = """
             { id: "-Yaw",   dx:  0, dy:  0, dz: -1, rotX: -Math.PI / 2 }
         ];
 
-        // 鋭角な霧状コーンジオメトリ
-        const rcsConeGeo = new THREE.ConeGeometry(0.32, 2.0, 16, 1, true);
-        rcsConeGeo.translate(0, 1.0, 0);
+        // 霧状コーンジオメトリ
+        const rcsConeGeo = new THREE.ConeGeometry(0.38, 2.2, 16, 1, true);
+        rcsConeGeo.translate(0, 1.1, 0);
 
         function createRcsJetUnit(parent, posX, posY, posZ, dir, isS1) {
             const mount = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.35, 0.2), darkSteelMat);
@@ -1381,8 +1383,19 @@ html_template = """
         }
 
         // =========================================================================
-        // ✨ 点火スパーク
+        // 💨 【完全復活】大容量パーティクルプール (発射台水蒸気雲・白煙・火花シャワー)
         // =========================================================================
+        function createCloudTexture() {
+            const c = document.createElement('canvas'); c.width = 128; c.height = 128;
+            const ctx = c.getContext('2d');
+            const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 64);
+            g.addColorStop(0, 'rgba(255,255,255,0.9)');
+            g.addColorStop(0.35, 'rgba(235,245,255,0.5)');
+            g.addColorStop(0.75, 'rgba(180,200,220,0.18)');
+            g.addColorStop(1, 'rgba(160,180,200,0)');
+            ctx.fillStyle = g; ctx.fillRect(0,0,128,128);
+            return new THREE.CanvasTexture(c);
+        }
         function createSparkTexture() {
             const c = document.createElement('canvas'); c.width = 32; c.height = 32;
             const ctx = c.getContext('2d');
@@ -1393,7 +1406,29 @@ html_template = """
             ctx.fillStyle = g; ctx.fillRect(0,0,32,32);
             return new THREE.CanvasTexture(c);
         }
+
+        const cloudTex = createCloudTexture();
         const sparkTex = createSparkTexture();
+
+        const P_MAX = 800;
+        const pool = [];
+        const pGroup = new THREE.Group(); scene.add(pGroup);
+        for(let i=0; i<P_MAX; i++) {
+            const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0, depthWrite: false }));
+            sp.visible = false; pGroup.add(sp);
+            pool.push({ sp, active: false, vx: 0, vy: 0, vz: 0, age: 0, maxAge: 1, s0: 1, s1: 5, o: 0.8 });
+        }
+        let pIdx = 0;
+        function emitParticle(x, y, z, vx, vy, vz, s0, s1, life, opacity, hexColor, additive) {
+            const p = pool[pIdx]; pIdx = (pIdx + 1) % P_MAX;
+            p.active = true; p.sp.visible = true;
+            p.sp.position.set(x, y, z);
+            p.vx = vx; p.vy = vy; p.vz = vz;
+            p.age = 0; p.maxAge = life; p.s0 = s0; p.s1 = s1; p.o = opacity;
+            p.sp.material.color.setHex(hexColor);
+            p.sp.material.blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
+        }
+
         const SPARK_MAX = 350;
         const sparkPool = [];
         const sparkGroup = new THREE.Group(); scene.add(sparkGroup);
@@ -1417,7 +1452,7 @@ html_template = """
         const tempTipPos = new THREE.Vector3();
 
         // =========================================================================
-        // 📊 【完全改修】軌道マップ再描画 (絶対に見切れない完全バッファ制御)
+        // 📊 【完全改修】軌道マップ再描画 (見切れを完全解消)
         // =========================================================================
         function drawOrbitMap(altKm, dRangeKm, exploded) {
             if (!orbitCvs || !octx) return;
@@ -1428,18 +1463,18 @@ html_template = """
 
             // 地球地平線アーク
             octx.beginPath();
-            octx.arc(140, 150, 120, Math.PI, 0);
+            octx.arc(140, 145, 115, Math.PI, 0);
             octx.strokeStyle = '#1e293b';
             octx.lineWidth = 1.5;
             octx.stroke();
 
-            // 境界内クリップ
+            // 弾道/軌道曲線
             const px = 15 + Math.min(250, Math.max(0, (dRangeKm / 1200.0) * 250));
-            const py = 50 - Math.min(42, Math.max(0, (altKm / 200.0) * 42));
+            const py = 48 - Math.min(38, Math.max(0, (altKm / 200.0) * 38));
 
             octx.beginPath();
-            octx.moveTo(15, 50);
-            octx.quadraticCurveTo(px * 0.45, 50 - (50 - py) * 0.25, px, py);
+            octx.moveTo(15, 48);
+            octx.quadraticCurveTo(px * 0.45, 48 - (48 - py) * 0.25, px, py);
             octx.strokeStyle = exploded ? '#ef4444' : '#38bdf8';
             octx.lineWidth = 2.0;
             octx.stroke();
@@ -1465,12 +1500,11 @@ html_template = """
 
         function renderPipTracker(simT, bActive, bY, bCaught, stage) {
             if (simCfg.spacex_return && bActive) {
-                // ブースターの重心ワールド座標を取得
+                // ブースターの重心ワールド座標を厳密取得
                 s1Group.getWorldPosition(boosterWorldPos);
                 boosterWorldPos.y += s1Len * 0.45;
 
                 if (bCaught) {
-                    // タワー直近地上カメラ（キャッチ完了）
                     cameraPip.fov = 26.0;
                     cameraPip.position.set(38.0, 24.0, 48.0);
                     cameraPip.lookAt(0, 40.0, 0);
@@ -1478,7 +1512,6 @@ html_template = """
                     document.getElementById('pip-tag').innerText = "CAM 02: TOWER CATCH CONFIRMED (IFT-5)";
                     document.getElementById('pip-hud-alt').innerText = "CAUGHT BY CHOPSTICKS";
                 } else if (bY < 3500) {
-                    // 最終着陸バーン：地上からタワーとブースターを同時視野で追尾
                     cameraPip.fov = 18.0;
                     cameraPip.position.set(65.0, 8.0, 115.0);
                     cameraPip.lookAt(boosterWorldPos.x * 0.4, Math.max(18.0, boosterWorldPos.y * 0.7), 0);
@@ -1486,8 +1519,7 @@ html_template = """
                     document.getElementById('pip-tag').innerText = "CAM 02: GROUND OPTICAL (LANDING BURN)";
                     document.getElementById('pip-hud-alt').innerText = `BOOSTER: ${(bY / 1000.0).toFixed(2)} km`;
                 } else {
-                    // 高空降下中：地上光学追尾ステーションから雲間を抜けてくる機体を精密見上げ追尾
-                    cameraPip.fov = 4.0; // 超望遠
+                    cameraPip.fov = 4.0;
                     cameraPip.position.copy(groundTrackerPos);
                     cameraPip.lookAt(boosterWorldPos);
                     cameraPip.updateProjectionMatrix();
@@ -1495,7 +1527,6 @@ html_template = """
                     document.getElementById('pip-hud-alt').innerText = `BOOSTER: ${(bY / 1000.0).toFixed(1)} km`;
                 }
             } else {
-                // 通常時：海岸からの望遠追従
                 cameraPip.fov = 6.0;
                 cameraPip.position.set(-1400, Math.max(85, activeFocusWorld.y * 0.15 + 40), 1800);
                 cameraPip.lookAt(activeFocusWorld);
@@ -1646,7 +1677,7 @@ html_template = """
                 }
             }
 
-            // 4. メイン火炎
+            // 4. メイン火炎・火花・【完全復活】発射時水蒸気雲
             if (p0.thrust && !p0.exploded && !simCfg.is_preview) {
                 const vacFactor = Math.min(1.0, alt / 65.0);
                 plumeShaderMat.uniforms.uVacFactor.value = vacFactor;
@@ -1677,6 +1708,16 @@ html_template = """
                             (Math.random() < 0.4) ? 0xffffff : curSparkHex
                         );
                     }
+
+                    // 💨 【完全復活】地面激突時の水蒸気白煙爆散エミッター
+                    if (ry < 18.0 && Math.random() < 0.75) {
+                        const spreadSide = (Math.random() - 0.5) * 2.0;
+                        emitParticle(
+                            tempTipPos.x + spreadSide * 2.8, 1.2, (Math.random()-0.5)*4.5,
+                            spreadSide * (4.2 + Math.random()*3.5), 0.2 + Math.random()*0.6, (Math.random()-0.5)*2.8,
+                            4.2, 28.0, 55, 0.9, 0xf1f5f9, false
+                        );
+                    }
                 }
                 engineBounceLight.intensity = Math.max(0.0, 6.5 - alt * 0.35);
                 engineBounceLight.position.set(rx, ry + 3.0, 4.0);
@@ -1695,7 +1736,6 @@ html_template = """
             prevPitch = pitch;
             prevSimT = simT;
 
-            // 姿勢修正角速度が閾値を超えた瞬間だけ0.08秒パルス
             const pulseActive = (Math.abs(pitchRate) > 0.015) && (now % 320 < 90);
             const boosterPulseActive = stage1Detached && p0.b_active && !p0.b_caught && (Math.abs(bPitch - Math.PI) > 0.05) && (now % 250 < 80);
 
@@ -1778,15 +1818,24 @@ html_template = """
             // 軌道マップ再描画
             drawOrbitMap(alt, dRangeKm, p0.exploded);
 
-            // カウントダウン・音響
+            // カウントダウン・【完全復活】注水水蒸気
             if (simT < 0.0) {
                 const sec = Math.ceil(Math.abs(simT));
                 document.getElementById('tv-timer').innerText = simCfg.is_preview ? "PAD INSPECTION" : `T- 00:0${sec}.0`;
+
+                emitParticle(rx + 1.25, ry + 6.0 + s1Len * 0.85, 0, 0.25, 0.04, 0, 0.9, 4.2, 45, 0.35, 0xffffff, false);
 
                 if (simT >= -5.0 && !p0.exploded && !simCfg.is_preview) {
                     document.getElementById('hud-deluge').innerText = "WATER DELUGE ACTIVE";
                     document.getElementById('hud-deluge').style.color = "#34d399";
                     if (gasHiss && actx) gasHiss.gain.setTargetAtTime(0.55, actx.currentTime, 0.2);
+                    for(let i=0; i<8; i++) {
+                        emitParticle(
+                            rx + (Math.random()-0.5)*8, 1.2, (Math.random()-0.5)*8,
+                            (Math.random()-0.5)*1.4, 0.2 + Math.random()*0.4, (Math.random()-0.5)*1.4,
+                            4.5, 24.0, 55, 0.85, 0xf0f9ff, false
+                        );
+                    }
                 }
 
                 if (simT >= -simCfg.ignition_lead && !p0.exploded && !simCfg.is_preview) {
@@ -1802,6 +1851,14 @@ html_template = """
 
                 if (simT >= -3.0 && !p0.exploded && !simCfg.is_preview) {
                     camShake = 0.35;
+                    for(let i=0; i<10; i++) {
+                        const side = (i%2 === 0) ? 1 : -1;
+                        emitParticle(
+                            rx + (Math.random()-0.5)*6, 1.5, (Math.random()-0.5)*6,
+                            side * (1.6 + Math.random()*2.8), 0.2 + Math.random()*0.5, (Math.random()-0.5)*1.2,
+                            6.0, 38.0, 80, 0.92, 0xf8fafc, false
+                        );
+                    }
                 }
             } else if (!p0.exploded) {
                 const m = Math.floor(simT / 60); const s = simT % 60;
@@ -1814,13 +1871,34 @@ html_template = """
                     if (gasHiss) gasHiss.gain.setTargetAtTime(0.18 * atm, actx.currentTime, 1.0);
                 }
 
-                if (simT < 6.0) camShake = 0.45;
+                if (simT < 6.0) {
+                    camShake = 0.45;
+                    for(let i=0; i<6; i++) {
+                        emitParticle(
+                            rx + (Math.random()-0.5)*9, 2.2, (Math.random()-0.5)*9,
+                            (Math.random()-0.5)*2.0, 0.25 + Math.random()*0.4, (Math.random()-0.5)*2.0,
+                            7.0, 42.0, 75, 0.8, 0xf1f5f9, false
+                        );
+                    }
+                }
             } else {
                 if (actx) {
                     if (subRumble) subRumble.gain.setTargetAtTime(0.001, actx.currentTime, 0.1);
                     if (shockCrackle) shockCrackle.gain.setTargetAtTime(0.001, actx.currentTime, 0.1);
                     if (gasHiss) gasHiss.gain.setTargetAtTime(0.001, actx.currentTime, 0.1);
                 }
+            }
+
+            // パーティクル更新ループ
+            for(let i=0; i<P_MAX; i++) {
+                const p = pool[i]; if (!p.active) continue;
+                p.age++;
+                if (p.age >= p.maxAge) { p.active = false; p.sp.visible = false; continue; }
+                p.sp.position.x += p.vx; p.sp.position.y += p.vy; p.sp.position.z += p.vz;
+                const pr = p.age / p.maxAge;
+                const curScale = p.s0 + (p.s1 - p.s0) * Math.pow(pr, 0.7);
+                p.sp.scale.set(curScale, curScale, 1);
+                p.sp.material.opacity = p.o * (1.0 - pr * pr);
             }
 
             for(let i=0; i<SPARK_MAX; i++) {
@@ -1853,7 +1931,7 @@ html_template = """
             // メインカメラ描画
             rendererMain.render(scene, cameraMain);
 
-            // CAM 02 描画（完全独立パイプライン）
+            // CAM 02 描画
             if (pipVisible) {
                 renderPipTracker(simT, p0.b_active, bY, p0.b_caught, p0.stage);
             }
