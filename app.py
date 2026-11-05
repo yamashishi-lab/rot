@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 st.title("🚀 Orbital Architect Extreme - 4K実写級航空宇宙シミュレーター")
-st.caption("※ 完全復元仕様：実時間同期リアル物理・ケープカナベラル広域PBRランドスケープ・2画面独立シネマ中継")
+st.caption("※ 完全復元仕様：実音声合成実況・エンドレス軌道航行・ケープカナベラルPad 39A実写級ランドスケープ")
 
 # =========================================================================
 # 🔬 推進剤・材料・空力パーツ・ブースターデータベース
@@ -211,7 +211,7 @@ m3.metric("構造限界動圧 / 耐G", f"{s1_spec['max_q']:.1f} kPa", f"耐G: {s
 m4.metric("ブースター追加推力", f"+{strapon_spec['thrust_add']:.0f} kN", f"基数: {strapon_spec['count']} 基")
 
 # =========================================================================
-# 💥 物理シミュレーション (停止バグ解消・長距離周回軌道サポート)
+# 💥 物理シミュレーション (途中で止まらないエンドレス軌道ループ対応)
 # =========================================================================
 def run_simulation(preview_only=False):
     if preview_only:
@@ -252,7 +252,7 @@ def run_simulation(preview_only=False):
     maxq_passed = False
     supersonic_called = False
 
-    for step in range(2400):
+    for step in range(3000):
         t = float(step * dt)
         alt = float(y)
         alt_km = float(alt / 1000.0)
@@ -400,10 +400,11 @@ def run_simulation(preview_only=False):
             "thrust": bool(thrust > 0), "pitch": visual_pitch, "mach": mach, "event": cur_event
         })
 
+        # 軌道投入到達判定
         if alt_km >= 160.0 and vx >= 7780.0 and abs(vy) < 400.0:
             cur_event = "ORBIT"
-            # 軌道投入後もシミュレーションを継続させて映像が止まるのを防止
-            for orbit_step in range(400):
+            # 映像が途中で止まらないよう、余裕を持って長時間の軌道慣性航行データを追加
+            for orbit_step in range(1200):
                 t_orb = t + (orbit_step + 1) * dt
                 x_orb = x + vx * (orbit_step + 1) * dt
                 history.append({
@@ -465,7 +466,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 完全描画テンプレート (停止バグ解消＆広域実写ランドスケープ)
+# 📺 HTML / JS 完全描画テンプレート
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -478,19 +479,26 @@ html_template = """
         .vignette { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; box-shadow: inset 0 0 160px rgba(0,0,0,0.88); z-index: 5; }
         .grain { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 6; opacity: 0.035; background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 3px 3px; }
         
+        /* 🔊 音声起動オーバーレイ（ブラウザの自動再生ブロック解除用） */
+        .audio-start-btn { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 80; background: #ef4444; color: #fff; border: 2px solid #fff; border-radius: 20px; padding: 6px 18px; font-weight: 800; font-size: 11px; letter-spacing: 1.5px; cursor: pointer; box-shadow: 0 0 25px rgba(239, 68, 68, 0.8); animation: pulseBtn 1.8s infinite; }
+        @keyframes pulseBtn { 0% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.05); } 100% { transform: translateX(-50%) scale(1); } }
+
         /* 🎥 PiP 右上完全独立配置 (被り防止ベゼル ＆ 独立Canvas) */
-        .pip-container { position: absolute; top: 58px; right: 24px; width: 340px; height: 195px; border: 2px solid rgba(56, 189, 248, 0.85); border-radius: 4px; z-index: 60; box-shadow: 0 14px 45px rgba(0,0,0,0.98); background: #01040a; overflow: hidden; cursor: pointer; }
+        .pip-container { position: absolute; top: 52px; right: 20px; width: 340px; height: 195px; border: 2px solid rgba(56, 189, 248, 0.85); border-radius: 4px; z-index: 60; box-shadow: 0 14px 45px rgba(0,0,0,0.98); background: #01040a; overflow: hidden; cursor: pointer; }
         #canvas-pip { width: 100%; height: 100%; display: block; }
         .pip-tag { position: absolute; top: 6px; left: 8px; font-size: 9px; font-weight: 800; color: #fff; background: rgba(15, 23, 42, 0.92); padding: 3px 6px; border-radius: 2px; letter-spacing: 1px; font-family: monospace; z-index: 65; pointer-events: none; border-left: 2px solid #38bdf8; }
         .pip-alt { position: absolute; bottom: 6px; right: 8px; font-size: 10px; font-family: monospace; color: #38bdf8; font-weight: 700; background: rgba(15, 23, 42, 0.92); padding: 2px 6px; border-radius: 2px; z-index: 65; pointer-events: none; }
         .pip-toggle-hint { position: absolute; top: 6px; right: 8px; font-size: 9px; font-family: monospace; color: #94a3b8; background: rgba(15, 23, 42, 0.92); padding: 3px 6px; border-radius: 2px; z-index: 65; pointer-events: none; }
 
-        /* 🛰️ 軌道HUD 左上配置 (完全ボックスサイジングで見切れ防止) */
-        .hud-orbit { position: absolute; top: 58px; left: 24px; width: 310px; max-width: 85vw; background: rgba(3, 7, 18, 0.78); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 4px; padding: 12px; box-sizing: border-box; z-index: 25; color: #fff; }
-        .hud-orbit:hover { background: rgba(3, 7, 18, 0.92); }
+        /* 🛰️ 軌道HUD 左上配置 (完全レスポンシブ見切れ防止仕様) */
+        .hud-orbit { position: absolute; top: 52px; left: 20px; width: 300px; max-width: calc(100vw - 390px); background: rgba(3, 7, 18, 0.82); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 4px; padding: 10px 12px; box-sizing: border-box; z-index: 25; color: #fff; }
+        .hud-orbit:hover { background: rgba(3, 7, 18, 0.94); }
         
-        .top-banner { position: absolute; top: 0; left: 0; width: 100%; height: 44px; background: rgba(2, 6, 16, 0.92); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 20; }
-        .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; max-width: 100vw; background: linear-gradient(to top, rgba(1, 3, 8, 0.98) 0%, rgba(2, 6, 14, 0.85) 75%, transparent 100%); padding: 18px 28px 12px 28px; box-sizing: border-box; display: flex; align-items: flex-end; justify-content: space-between; z-index: 20; pointer-events: none; }
+        /* 🔝 トップバナー (見切れ撲滅) */
+        .top-banner { position: absolute; top: 0; left: 0; width: 100%; min-height: 44px; background: rgba(2, 6, 16, 0.94); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 4px 18px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 20; flex-wrap: wrap; gap: 8px; }
+        
+        /* 📊 ボトムテレメトリ (見切れ撲滅) */
+        .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, rgba(1, 3, 8, 0.98) 0%, rgba(2, 6, 14, 0.88) 75%, transparent 100%); padding: 14px 20px 10px 20px; box-sizing: border-box; display: flex; align-items: flex-end; justify-content: space-between; z-index: 20; pointer-events: none; flex-wrap: wrap; gap: 14px; }
         .hud-telemetry > * { pointer-events: auto; }
         .rud-banner { display: none; position: absolute; top: 150px; left: 50%; transform: translateX(-50%); background: rgba(120, 10, 10, 0.94); backdrop-filter: blur(16px); border: 2px solid #ef4444; border-radius: 4px; padding: 16px 28px; z-index: 70; text-align: center; box-shadow: 0 0 60px rgba(239, 68, 68, 0.7); }
     </style>
@@ -500,6 +508,9 @@ html_template = """
     <div class="vignette"></div>
     <div class="grain"></div>
     
+    <!-- 🔊 音声起動トリガーボタン -->
+    <button id="btn-audio-init" class="audio-start-btn">🔊 CLICK TO ACTIVATE FLIGHT AUDIO</button>
+
     <!-- 2画面用PiP 右上ベゼル枠 (CAM 02: 独立描画Canvas) -->
     <div id="pip-box" class="pip-container" title="クリックでPiPの表示/非表示を切り替え">
         <canvas id="canvas-pip"></canvas>
@@ -508,32 +519,33 @@ html_template = """
         <div id="pip-hint" class="pip-toggle-hint">[CLICK TO TOGGLE]</div>
     </div>
 
+    <!-- 🔝 見切れないレスポンシブトップバナー -->
     <div class="top-banner">
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <span style="display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 10px #ef4444;"></span>
-            <span style="color: #ffffff; font-weight: 800; font-size: 12px; letter-spacing: 2px;">LIVE 4K BROADCAST FEED</span>
+        <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex-shrink: 1;">
+            <span style="display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 10px #ef4444; flex-shrink: 0;"></span>
+            <span style="color: #ffffff; font-weight: 800; font-size: clamp(10px, 1.2vw, 12px); letter-spacing: 1.5px; white-space: nowrap;">4K WEBCAST</span>
             <span style="color: rgba(255,255,255,0.2);">|</span>
-            <span id="cam-tag" style="color: #38bdf8; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; font-family: monospace;">CAM 01: CINEMATIC WIDE CHASE</span>
+            <span id="cam-tag" style="color: #38bdf8; font-size: clamp(9px, 1.1vw, 11px); font-weight: 700; letter-spacing: 1px; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">CAM 01: CINEMATIC WIDE CHASE</span>
         </div>
-        <div style="display: flex; align-items: center; gap: 18px; font-family: monospace; font-size: 11px;">
-            <span style="color: #94a3b8;">ATMOSPHERE: <strong id="hud-regime" style="color: #f8fafc;">TROPOSPHERE</strong></span>
-            <span style="color: #94a3b8;">RCS JET: <strong id="hud-rcs" style="color: #38bdf8;">ACTIVE</strong></span>
-            <span style="color: #94a3b8;">WATER DELUGE: <strong id="hud-deluge" style="color: #38bdf8;">STANDBY</strong></span>
-            <span id="comm-status" style="color: #10b981;">TELEMETRY: LOCKED</span>
+        <div style="display: flex; align-items: center; gap: 14px; font-family: monospace; font-size: clamp(9px, 1.1vw, 11px); flex-wrap: wrap;">
+            <span style="color: #94a3b8; white-space: nowrap;">ATMOS: <strong id="hud-regime" style="color: #f8fafc;">TROPOSPHERE</strong></span>
+            <span style="color: #94a3b8; white-space: nowrap;">RCS: <strong id="hud-rcs" style="color: #38bdf8;">ACTIVE</strong></span>
+            <span style="color: #94a3b8; white-space: nowrap;">WATER: <strong id="hud-deluge" style="color: #38bdf8;">STANDBY</strong></span>
+            <span id="comm-status" style="color: #10b981; white-space: nowrap;">LOCKED</span>
         </div>
     </div>
 
-    <!-- 左上に配置された軌道トラジェクトリHUD ＆ 実況コールアウト (見切れ防止仕様) -->
+    <!-- 🛰️ 見切れない軌道トラジェクトリHUD ＆ 実況コールアウト -->
     <div class="hud-orbit" id="hud-orbit-box">
-        <div style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 1.2px; margin-bottom: 6px; display: flex; justify-content: space-between;">
+        <div style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 1.2px; margin-bottom: 4px; display: flex; justify-content: space-between;">
             <span>DOWNRANGE TRAJECTORY</span>
             <span id="hud-downrange" style="color: #38bdf8; font-family: monospace;">0.0 km</span>
         </div>
-        <canvas id="orbit-canvas" width="284" height="60" style="width: 100%; height: 60px; background: #020617; border-radius: 2px; border: 1px solid rgba(255,255,255,0.08);"></canvas>
-        <div id="event-log" style="margin-top: 8px; font-family: monospace; font-size: 10.5px; font-weight: 700; color: #34d399; border-top: 1px solid rgba(255,255,255,0.12); padding-top: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
+        <canvas id="orbit-canvas" width="276" height="54" style="width: 100%; height: 54px; background: #020617; border-radius: 2px; border: 1px solid rgba(255,255,255,0.08);"></canvas>
+        <div id="event-log" style="margin-top: 6px; font-family: monospace; font-size: 10.5px; font-weight: 800; color: #34d399; border-top: 1px solid rgba(255,255,255,0.12); padding-top: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
             > [LD] GO FOR TERMINAL COUNTDOWN
         </div>
-        <div id="sub-callout" style="font-family: monospace; font-size: 9.5px; color: #93c5fd; margin-top: 3px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
+        <div id="sub-callout" style="font-family: monospace; font-size: 9.5px; color: #93c5fd; margin-top: 2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
             > Propellant tanks pressurized for flight
         </div>
     </div>
@@ -543,31 +555,32 @@ html_template = """
         <div id="rud-desc" style="color: #fecaca; font-size: 13px; font-weight: 600; margin-top: 6px; max-width: 520px; line-height: 1.4;"></div>
     </div>
 
+    <!-- 📊 見切れないボトムテレメトリドック -->
     <div class="hud-telemetry">
-        <div>
-            <div id="tv-status" style="color: #38bdf8; font-size: 10px; font-weight: 700; letter-spacing: 1.8px; margin-bottom: 2px;">COUNTDOWN SEQUENCE</div>
-            <div id="tv-timer" style="color: #ffffff; font-size: 38px; font-weight: 900; font-family: 'Consolas', monospace; letter-spacing: 2px; text-shadow: 0 0 20px rgba(56, 189, 248, 0.4);">T- 00:10.0</div>
+        <div style="flex-shrink: 0;">
+            <div id="tv-status" style="color: #38bdf8; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; margin-bottom: 2px;">COUNTDOWN SEQUENCE</div>
+            <div id="tv-timer" style="color: #ffffff; font-size: clamp(26px, 3.5vw, 36px); font-weight: 900; font-family: 'Consolas', monospace; letter-spacing: 2px; text-shadow: 0 0 20px rgba(56, 189, 248, 0.4);">T- 00:10.0</div>
         </div>
-        <div style="display: flex; gap: 24px; border-left: 1px solid rgba(255,255,255,0.15); padding-left: 20px; overflow-x: auto;">
+        <div style="display: flex; gap: clamp(12px, 2vw, 24px); border-left: 1px solid rgba(255,255,255,0.15); padding-left: 14px; flex-wrap: wrap;">
             <div>
-                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1.2px;">SPEED / MACH</div>
-                <div style="color: #fff; font-size: 20px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-mach">M 0.00</span> <span style="font-size: 11px; color: #94a3b8;" id="tv-spd">(0 km/h)</span></div>
+                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1px;">SPEED / MACH</div>
+                <div style="color: #fff; font-size: clamp(15px, 2vw, 19px); font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-mach">M 0.00</span> <span style="font-size: 10px; color: #94a3b8;" id="tv-spd">(0 km/h)</span></div>
             </div>
             <div>
-                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1.2px;">ALTITUDE</div>
-                <div style="color: #fff; font-size: 20px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-alt">0.0</span> <span style="font-size: 11px; color: #94a3b8;">km</span></div>
+                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1px;">ALTITUDE</div>
+                <div style="color: #fff; font-size: clamp(15px, 2vw, 19px); font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-alt">0.0</span> <span style="font-size: 10px; color: #94a3b8;">km</span></div>
             </div>
             <div>
-                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1.2px;">DYNAMIC PRESSURE</div>
-                <div style="color: #fff; font-size: 20px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-q">0.0</span> <span style="font-size: 11px; color: #94a3b8;">kPa</span></div>
+                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1px;">DYNAMIC PRESSURE</div>
+                <div style="color: #fff; font-size: clamp(15px, 2vw, 19px); font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-q">0.0</span> <span style="font-size: 10px; color: #94a3b8;">kPa</span></div>
             </div>
             <div>
-                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1.2px;">AXIAL LOAD</div>
-                <div style="color: #fff; font-size: 20px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-g">1.0</span> <span style="font-size: 11px; color: #94a3b8;">G</span></div>
+                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1px;">AXIAL LOAD</div>
+                <div style="color: #fff; font-size: clamp(15px, 2vw, 19px); font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-g">1.0</span> <span style="font-size: 10px; color: #94a3b8;">G</span></div>
             </div>
             <div>
-                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1.2px;">STAGE CONFIG</div>
-                <div id="tv-stage-badge" style="color: #34d399; font-size: 16px; font-weight: 800; font-family: 'Consolas', monospace; white-space: nowrap;">PAD READY</div>
+                <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1px;">STAGE CONFIG</div>
+                <div id="tv-stage-badge" style="color: #34d399; font-size: clamp(13px, 1.8vw, 16px); font-weight: 800; font-family: 'Consolas', monospace; white-space: nowrap;">PAD READY</div>
             </div>
         </div>
     </div>
@@ -586,6 +599,7 @@ html_template = """
         const rudDesc = document.getElementById('rud-desc');
         const eventLog = document.getElementById('event-log');
         const subCallout = document.getElementById('sub-callout');
+        const btnAudio = document.getElementById('btn-audio-init');
 
         let pipVisible = true;
         const pipBox = document.getElementById('pip-box');
@@ -600,12 +614,28 @@ html_template = """
         });
 
         // =========================================================================
-        // 🔊 実録級・重低音ランブル＆パイロテクニクス爆薬音響合成
+        // 🎙️ 確実に耳で聞こえる音声合成（SpeechSynthesis）実況エンジン
+        // =========================================================================
+        let voiceActive = false;
+        function speakCallout(text) {
+            if (!voiceActive || !('speechSynthesis' in window)) return;
+            try {
+                window.speechSynthesis.cancel(); // 連続キューの遅延を防ぎ即座に発話
+                const u = new SpeechSynthesisUtterance(text);
+                u.rate = 1.15; // 緊迫感のある管制通信速度
+                u.pitch = 0.95;
+                u.volume = 1.0;
+                u.lang = 'en-US';
+                window.speechSynthesis.speak(u);
+            } catch(e) {}
+        }
+
+        // =========================================================================
+        // 🔊 実録級・重低音ランブル＆パイロ爆薬音響合成 (Web Audio API)
         // =========================================================================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let actx = null, subRumble = null, shockCrackle = null, gasHiss = null;
         function initAudio() {
-            if (simCfg.is_preview) return;
             if (!actx) {
                 actx = new AudioCtx();
                 const buf = actx.createBuffer(1, actx.sampleRate * 3, actx.sampleRate);
@@ -631,7 +661,12 @@ html_template = """
                 hSrc.start(0);
             }
             if (actx && actx.state === 'suspended') actx.resume();
+            voiceActive = true;
+            btnAudio.style.display = 'none';
         }
+
+        btnAudio.addEventListener('click', initAudio);
+        window.addEventListener('click', () => { if (!actx) initAudio(); }, { once: true });
 
         // 💥 実録パイロ爆薬分離音
         function playPyro() {
@@ -750,7 +785,6 @@ html_template = """
         cctx.bezierCurveTo(1000, 550, 850, 1250, 720, 2048);
         cctx.lineTo(0, 2048); cctx.closePath(); cctx.fill();
 
-        // 2条の砂利クローラーウェイ（VABから発射台への重運搬路）
         cctx.strokeStyle = '#9ca3af'; cctx.lineWidth = 14;
         cctx.beginPath(); cctx.moveTo(180, 1014); cctx.lineTo(950, 1014); cctx.stroke();
         cctx.beginPath(); cctx.moveTo(180, 1034); cctx.lineTo(950, 1034); cctx.stroke();
@@ -773,7 +807,6 @@ html_template = """
         oceanMesh.position.set(16000, -1.0, 0);
         landscapeGroup.add(oceanMesh);
 
-        // 遠景：連なる山並み・稜線
         const mountainMat = new THREE.MeshStandardMaterial({ color: 0x172533, roughness: 0.95 });
         for(let m=0; m<12; m++) {
             const mMesh = new THREE.Mesh(
@@ -795,7 +828,6 @@ html_template = """
         vabGroup.add(vabMain);
         landscapeGroup.add(vabGroup);
 
-        // Pad 39B (隣接発射台の遠景再現)
         const padBGroup = new THREE.Group();
         padBGroup.position.set(-2600, 0, 4200);
         const padBMount = new THREE.Mesh(new THREE.CylinderGeometry(80, 95, 2.0, 32), new THREE.MeshStandardMaterial({ color: 0x3d4552, roughness: 0.94 }));
@@ -1318,11 +1350,11 @@ html_template = """
         }
 
         function drawOrbitMap(altKm, dRangeKm, exploded) {
-            octx.clearRect(0, 0, 284, 60);
-            octx.beginPath(); octx.arc(142, 160, 135, Math.PI, 0); octx.strokeStyle = '#1e293b'; octx.lineWidth = 2.5; octx.stroke();
-            const px = 14 + Math.min(256, (dRangeKm / 1200.0) * 256);
-            const py = 52 - Math.min(44, (altKm / 200.0) * 44);
-            octx.beginPath(); octx.moveTo(14, 52); octx.quadraticCurveTo(px * 0.5, 52, px, py);
+            octx.clearRect(0, 0, 276, 54);
+            octx.beginPath(); octx.arc(138, 145, 125, Math.PI, 0); octx.strokeStyle = '#1e293b'; octx.lineWidth = 2.5; octx.stroke();
+            const px = 14 + Math.min(248, (dRangeKm / 1200.0) * 248);
+            const py = 46 - Math.min(38, (altKm / 200.0) * 38);
+            octx.beginPath(); octx.moveTo(14, 46); octx.quadraticCurveTo(px * 0.5, 46, px, py);
             octx.strokeStyle = exploded ? '#ef4444' : '#38bdf8'; octx.lineWidth = 1.8; octx.stroke();
             octx.fillStyle = exploded ? '#dc2626' : '#38bdf8';
             octx.beginPath(); octx.arc(px, py, 3.5, 0, Math.PI * 2); octx.fill();
@@ -1389,33 +1421,35 @@ html_template = """
         }
 
         // =========================================================================
-        // 🎙️ 確実なコールアウト・イベント・ディスパッチャー
+        // 🎙️ 確実に聞こえるフライト実況コールアウトキュー
         // =========================================================================
         const calloutQueue = [
-            { t: -10.0, log: "> [FIDO] T-10s: TERMINAL COUNTDOWN INITIATED", sub: "> Flight computers aligned, vehicle on internal batteries" },
-            { t: -5.0,  log: "> [PAD] T-5s: SOUND SUPPRESSION WATER DELUGE ACTIVE", sub: "> 300,000 GPM water flowing into flame trench" },
-            { t: -3.8,  log: "> [ENG] T-3.8s: MAIN ENGINE START SEQUENCE", sub: "> Turbopumps spinning up, chamber pressure rising" },
-            { t: 0.0,   log: "> [COMM] T+0s: LIFTOFF! WE HAVE A LIFTOFF!", sub: "> Tower cleared, roll and pitch program nominal" },
-            { t: 10.0,  log: "> [NAV] GRAVITY TURN: PITCH OVER PROGRAM", sub: "> Trajectory shaping downrange toward low earth orbit" },
-            { t: 42.0,  log: "> [FDIR] TRANSONIC REGIME: MACH 1.0 PASSED", sub: "> Vehicle is supersonic; aerodynamic shock damping active" },
-            { t: 68.0,  log: "> [FDIR] MAX-Q: MAXIMUM DYNAMIC PRESSURE", sub: "> Engines throttled down for structural loading relief" },
-            { t: 135.0, log: "> [TEL] BECO: BOOSTER ENGINE CUTOFF", sub: "> Korolev Cross separation nominal; core continuing flight" },
-            { t: 162.0, log: "> [PROP] MECO & HOT-STAGING SEPARATION", sub: "> Stage 2 engine ignition verified, payload fairing primed" },
-            { t: 195.0, log: "> [AVIO] FAIRING JETTISON CONFIRMED", sub: "> Spacecraft exposed to vacuum of space" },
-            { t: 520.0, log: "> [ORB] SECO: SECOND STAGE ENGINE CUTOFF", sub: "> Insertion complete; stable low earth orbit achieved" }
+            { t: -10.0, log: "> [FIDO] T-10s: TERMINAL COUNTDOWN INITIATED", sub: "> Flight computers aligned, vehicle on internal batteries", voice: "Ten, nine, eight, seven, six" },
+            { t: -5.0,  log: "> [PAD] T-5s: SOUND SUPPRESSION WATER DELUGE ACTIVE", sub: "> 300,000 GPM water flowing into flame trench", voice: "Water deluge system activated" },
+            { t: -3.8,  log: "> [ENG] T-3.8s: MAIN ENGINE START SEQUENCE", sub: "> Turbopumps spinning up, chamber pressure rising", voice: "Engine ignition start" },
+            { t: 0.0,   log: "> [COMM] T+0s: LIFTOFF! WE HAVE A LIFTOFF!", sub: "> Tower cleared, roll and pitch program nominal", voice: "Liftoff! We have a liftoff of Orbital Architect!" },
+            { t: 10.0,  log: "> [NAV] GRAVITY TURN: PITCH OVER PROGRAM", sub: "> Trajectory shaping downrange toward low earth orbit", voice: "Pitch over initiated, roll program nominal" },
+            { t: 40.0,  log: "> [FDIR] TRANSONIC REGIME: MACH 1.0 PASSED", sub: "> Vehicle is supersonic; aerodynamic shock damping active", voice: "Vehicle is supersonic, passing Mach one" },
+            { t: 65.0,  log: "> [FDIR] MAX-Q: MAXIMUM DYNAMIC PRESSURE", sub: "> Engines throttled down for structural loading relief", voice: "Vehicle has passed Max-Q, maximum dynamic pressure" },
+            { t: 135.0, log: "> [TEL] BECO: BOOSTER ENGINE CUTOFF", sub: "> Korolev Cross separation nominal; core continuing flight", voice: "Booster cutoff, and booster separation confirmed" },
+            { t: 162.0, log: "> [PROP] MECO & HOT-STAGING SEPARATION", sub: "> Stage 2 engine ignition verified, payload fairing primed", voice: "Main engine cutoff, stage separation, second stage ignition" },
+            { t: 195.0, log: "> [AVIO] FAIRING JETTISON CONFIRMED", sub: "> Spacecraft exposed to vacuum of space", voice: "Payload fairing separation confirmed" },
+            { t: 520.0, log: "> [ORB] SECO: SECOND STAGE ENGINE CUTOFF", sub: "> Insertion complete; stable low earth orbit achieved", voice: "Second stage cutoff. Orbital insertion confirmed!" }
         ];
 
         let calloutIdx = 0;
         function updateFlightCallouts(simT) {
             while (calloutIdx < calloutQueue.length && simT >= calloutQueue[calloutIdx].t) {
-                eventLog.innerText = calloutQueue[calloutIdx].log;
-                subCallout.innerText = calloutQueue[calloutIdx].sub;
+                const item = calloutQueue[calloutIdx];
+                eventLog.innerText = item.log;
+                subCallout.innerText = item.sub;
+                speakCallout(item.voice);
                 calloutIdx++;
             }
         }
 
         // =========================================================================
-        // ⏱️ アニメーション・メインループ (停止バグ解消＆実時間同期)
+        // ⏱️ アニメーション・メインループ (停止バグ完全解消)
         // =========================================================================
         const tStart = performance.now();
         let boosterDetached = false;
@@ -1427,7 +1461,6 @@ html_template = """
 
         function animate(now) {
             requestAnimationFrame(animate);
-            initAudio();
 
             const elapsedSec = (now - tStart) / 1000.0;
             const simT = simCfg.is_preview ? -10.0 : (-10.0 + elapsedSec);
@@ -1438,21 +1471,30 @@ html_template = """
                 updateFlightCallouts(simT);
             }
 
-            // データ補間（配列外参照バグを完全に修正し、末尾到達時もスムーズに周回軌道上を継続飛行）
+            // データ補間（配列超過時も最終ステップの速度・高度で周回航行を継続しフリーズを阻止）
             let idx = 0;
             while (idx < simData.length - 1 && simData[idx + 1].t <= simT) idx++;
             const nIdx = Math.min(idx + 1, simData.length - 1);
             const p0 = simData[idx], p1 = simData[nIdx];
             const a = (p1.t > p0.t) ? Math.max(0, Math.min(1, (simT - p0.t) / (p1.t - p0.t))) : 0;
 
-            const rx = (p0.x + (p1.x - p0.x) * a) * 0.1;
-            const ry = (p0.y + (p1.y - p0.y) * a) * 0.1;
-            const alt = p0.alt + (p1.alt - p0.alt) * a;
-            const vel = p0.v + (p1.v - p0.v) * a;
-            const q = p0.q + (p1.q - p0.q) * a;
-            const pitch = p0.pitch + (p1.pitch - p0.pitch) * a;
-            const mach = p0.mach + (p1.mach - p0.mach) * a;
-            const accG = p0.g + (p1.g - p0.g) * a;
+            let rx = (p0.x + (p1.x - p0.x) * a) * 0.1;
+            let ry = (p0.y + (p1.y - p0.y) * a) * 0.1;
+            let alt = p0.alt + (p1.alt - p0.alt) * a;
+            let vel = p0.v + (p1.v - p0.v) * a;
+            let q = p0.q + (p1.q - p0.q) * a;
+            let pitch = p0.pitch + (p1.pitch - p0.pitch) * a;
+            let mach = p0.mach + (p1.mach - p0.mach) * a;
+            let accG = p0.g + (p1.g - p0.g) * a;
+
+            // シミュレーション末尾に到達した場合は、軌道速度（7.8km/s）で宇宙空間を継続飛行
+            if (simT > simData[simData.length - 1].t) {
+                const overT = simT - simData[simData.length - 1].t;
+                rx += vel * overT * 0.1;
+                q = 0.0;
+                accG = 0.0;
+            }
+
             const dRangeKm = (rx * 10.0) / 1000.0;
 
             rocket.position.set(rx, ry + 6.0, 0);
@@ -1656,7 +1698,7 @@ html_template = """
                 if (simT >= -5.0 && !p0.exploded && !simCfg.is_preview) {
                     document.getElementById('hud-deluge').innerText = "WATER DELUGE ACTIVE";
                     document.getElementById('hud-deluge').style.color = "#34d399";
-                    if (gasHiss) gasHiss.gain.setTargetAtTime(0.45, actx.currentTime, 0.2);
+                    if (gasHiss && actx) gasHiss.gain.setTargetAtTime(0.45, actx.currentTime, 0.2);
                     for(let i=0; i<8; i++) {
                         emitParticle(
                             rx + (Math.random()-0.5)*8, 0.8, (Math.random()-0.5)*8,
@@ -1692,8 +1734,7 @@ html_template = """
                 const m = Math.floor(simT / 60); const s = simT % 60;
                 document.getElementById('tv-timer').innerText = `T+ ${String(m).padStart(2,'0')}:${s.toFixed(1).padStart(4,'0')}`;
 
-                if (simT >= 0 && !voicedEvents.has('audio_rumble')) {
-                    voicedEvents.add('audio_rumble');
+                if (actx) {
                     if (subRumble) subRumble.gain.setTargetAtTime(0.95, actx.currentTime, 0.15);
                     if (shockCrackle) shockCrackle.gain.setTargetAtTime(0.68, actx.currentTime, 0.1);
                     if (gasHiss) gasHiss.gain.setTargetAtTime(0.12, actx.currentTime, 2.0);
