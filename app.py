@@ -3,82 +3,85 @@ import numpy as np
 import json
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Orbital Architect Pro: 狂気の物理演算＆打ち上げ生中継", layout="wide")
+st.set_page_config(
+    page_title="Orbital Architect Pro: 狂気の物理演算＆打ち上げ生中継", 
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-st.title("🚀 Orbital Architect Pro - 超精密・航空宇宙破壊力学シミュレーター")
-st.markdown("航空宇宙管制センター公式4Kライブ中継。実写ブレンド光学パイプライン、完全自動ロストゼロ・ディレクターカメラ、1:1 リアルタイム軌道力学計算。")
+st.title("🚀 Orbital Architect Pro - 極限リアルタイム航空宇宙シミュレーター")
+st.markdown("航空宇宙局公式4K HDRライブ中継システム。大気散乱光学パイプライン、実写ブレンド超望遠トラッカー、厳密重力ターン＆流体破壊力学計算。")
 
 # =========================================================================
-# 🔬 推進剤・材料・空力パーツ データベース（実在 ＋ 狂気のジョーク枠）
+# 🔬 推進剤・材料・空力パーツ データベース
 # =========================================================================
 PROPELLANTS = {
     "超高密度メタロックス (CH4 / LOX) [王道FFSC]": {
-        "base_isp_sl": 335, "base_isp_vac": 375, "base_thrust": 2700, "density": 0.83, 
-        "flame_color": "0x38bdf8", "risk": 0.0, "type": "methalox"
+        "base_isp_sl": 335, "base_isp_vac": 380, "base_thrust": 2750, "density": 0.83, 
+        "flame_color": "#38bdf8", "core_color": "#ffffff", "risk": 0.0, "type": "methalox"
     },
-    "高精製ケロシン (RP-1 / LOX) [大気圏ヘビーリフト]": {
-        "base_isp_sl": 290, "base_isp_vac": 320, "base_thrust": 1200, "density": 1.02, 
-        "flame_color": "0xfb923c", "risk": 0.0, "type": "rp1"
+    "高精製ケロシン (RP-1 / LOX) [ヘビーリフト]": {
+        "base_isp_sl": 295, "base_isp_vac": 325, "base_thrust": 1300, "density": 1.02, 
+        "flame_color": "#f97316", "core_color": "#ffedd5", "risk": 0.0, "type": "rp1"
     },
-    "超極低温ハイドロロックス (LH2 / LOX) [究極真空燃焼]": {
-        "base_isp_sl": 372, "base_isp_vac": 460, "base_thrust": 1380, "density": 0.32, 
-        "flame_color": "0xf87171", "risk": 0.02, "type": "hydro"
+    "超極低温ハイドロロックス (LH2 / LOX) [究極真空比推力]": {
+        "base_isp_sl": 375, "base_isp_vac": 465, "base_thrust": 1400, "density": 0.32, 
+        "flame_color": "#ec4899", "core_color": "#ffffff", "risk": 0.02, "type": "hydro"
     },
-    "【狂気】赤煙硝酸 ＋ ジメチルヒドラジン [猛毒・即自発火]": {
-        "base_isp_sl": 285, "base_isp_vac": 315, "base_thrust": 1900, "density": 1.25, 
-        "flame_color": "0xc026d3", "risk": 0.05, "type": "hypergolic"
+    "【猛毒】赤煙硝酸 ＋ UDMH [即自発火ハイパーゴリック]": {
+        "base_isp_sl": 285, "base_isp_vac": 318, "base_thrust": 1950, "density": 1.25, 
+        "flame_color": "#c026d3", "core_color": "#fdf4ff", "risk": 0.05, "type": "hypergolic"
     },
     "【オカルト】怪しい常温核融合エナジードリンク水": {
-        "base_isp_sl": 420, "base_isp_vac": 520, "base_thrust": 3400, "density": 0.65, 
-        "flame_color": "0x22c55e", "risk": 0.25, "type": "energy"
+        "base_isp_sl": 430, "base_isp_vac": 530, "base_thrust": 3500, "density": 0.65, 
+        "flame_color": "#10b981", "core_color": "#d1fae5", "risk": 0.25, "type": "energy"
     },
     "【禁忌】ダークマター濃縮スラリー [不安定特異点]": {
-        "base_isp_sl": 850, "base_isp_vac": 1200, "base_thrust": 6500, "density": 1.85, 
-        "flame_color": "0xa855f7", "risk": 0.50, "type": "darkmatter"
+        "base_isp_sl": 880, "base_isp_vac": 1250, "base_thrust": 6800, "density": 1.85, 
+        "flame_color": "#8b5cf6", "core_color": "#ede9fe", "risk": 0.50, "type": "darkmatter"
     }
 }
 
 PUMP_CYCLES = {
-    "フルフローステージド燃焼 (FFSC) [極限高圧・高効率]": {"isp_mod": 1.06, "thrust_mod": 1.40, "mass_mod": 1.25, "max_pressure_limit": 360},
-    "二段燃焼サイクル (SC) [高出力・実証信頼性]": {"isp_mod": 1.02, "thrust_mod": 1.15, "mass_mod": 1.18, "max_pressure_limit": 280},
-    "ガス発生器サイクル (GG) [堅牢・軽量設計]": {"isp_mod": 0.96, "thrust_mod": 0.95, "mass_mod": 0.85, "max_pressure_limit": 180},
+    "フルフローステージド燃焼 (FFSC) [極限高圧]": {"isp_mod": 1.06, "thrust_mod": 1.40, "mass_mod": 1.25, "max_pressure_limit": 360},
+    "二段燃焼サイクル (SC) [高出力信頼性]": {"isp_mod": 1.02, "thrust_mod": 1.15, "mass_mod": 1.18, "max_pressure_limit": 285},
+    "ガス発生器サイクル (GG) [軽量堅牢]": {"isp_mod": 0.96, "thrust_mod": 0.95, "mass_mod": 0.85, "max_pressure_limit": 185},
     "【手動】人力足漕ぎペダル式タービン [超軽量・推力激減]": {"isp_mod": 0.30, "thrust_mod": 0.15, "mass_mod": 0.20, "max_pressure_limit": 80}
 }
 
 MATERIALS = {
-    "Austenitic 300系 圧延鏡面ステンレス [極低温・耐熱複合]": {"base_dry_ratio": 0.070, "max_q_base": 120.0, "max_g_base": 12.0, "mat_id": "ss"},
-    "航空宇宙用 Al-Li アルミリチウム合金 [軽量断熱白塗装]": {"base_dry_ratio": 0.055, "max_q_base": 65.0, "max_g_base": 7.5, "mat_id": "al"},
-    "高弾性炭素繊維複合材 (CFRP) [超軽量マットブラック]": {"base_dry_ratio": 0.038, "max_q_base": 50.0, "max_g_base": 6.0, "mat_id": "cf"},
-    "【節約】家庭用極薄アルミホイル [超軽量・耐久皆無]": {"base_dry_ratio": 0.015, "max_q_base": 8.0, "max_g_base": 2.0, "mat_id": "foil"},
-    "【DIY】防腐処理済み米松ツーバイフォー材 [超重量]": {"base_dry_ratio": 0.160, "max_q_base": 40.0, "max_g_base": 4.5, "mat_id": "wood"}
+    "Austenitic 300系 圧延鏡面ステンレス [極低温・耐熱]": {"base_dry_ratio": 0.068, "max_q_base": 125.0, "max_g_base": 12.0, "mat_id": "ss"},
+    "航空宇宙用 Al-Li アルミリチウム合金 [高比強度白塗装]": {"base_dry_ratio": 0.052, "max_q_base": 70.0, "max_g_base": 8.0, "mat_id": "al"},
+    "高弾性炭素繊維複合材 (CFRP) [マットブラック]": {"base_dry_ratio": 0.038, "max_q_base": 55.0, "max_g_base": 6.5, "mat_id": "cf"},
+    "【節約】家庭用極薄アルミホイル [耐久皆無]": {"base_dry_ratio": 0.015, "max_q_base": 8.0, "max_g_base": 2.0, "mat_id": "foil"},
+    "【DIY】防腐処理済み米松ツーバイフォー材 [超重量]": {"base_dry_ratio": 0.165, "max_q_base": 40.0, "max_g_base": 4.5, "mat_id": "wood"}
 }
 
-# 翼・空力アドオン
 AERO_WINGS = {
     "なし (純粋な弾道弾体・グリッドフィンのみ)": {"lift_coeff": 0.0, "drag_penalty": 1.0, "mass": 0.0, "flutter_mach": 99.0, "wing_id": "none"},
-    "ジャンボ旅客機の主翼 (B747流用・巨大アスペクト比)": {"lift_coeff": 2.2, "drag_penalty": 3.4, "mass": 18.0, "flutter_mach": 0.88, "wing_id": "airliner"},
-    "超音速デルタ翼 (コンコルド風・高速揚力型)": {"lift_coeff": 0.8, "drag_penalty": 1.6, "mass": 8.5, "flutter_mach": 2.8, "wing_id": "delta"},
-    "ダンボール製ハンドメイド補助翼 (セロテープ固定)": {"lift_coeff": 0.3, "drag_penalty": 1.4, "mass": 0.2, "flutter_mach": 0.45, "wing_id": "cardboard"}
+    "ジャンボ旅客機の主翼 (B747流用・巨大アスペクト比)": {"lift_coeff": 2.4, "drag_penalty": 3.6, "mass": 19.5, "flutter_mach": 0.88, "wing_id": "airliner"},
+    "超音速デルタ翼 (コンコルド風・高速揚力型)": {"lift_coeff": 0.85, "drag_penalty": 1.5, "mass": 8.8, "flutter_mach": 2.85, "wing_id": "delta"},
+    "ダンボール製ハンドメイド補助翼 (セロテープ留め)": {"lift_coeff": 0.35, "drag_penalty": 1.35, "mass": 0.25, "flutter_mach": 0.42, "wing_id": "cardboard"}
 }
 
 FAIRINGS = {
-    "低抵抗バイコニカル複合材カウル (耐熱2,600K)": {"mass": 2.2, "cd": 0.20, "heat_limit": 2600, "shape_id": "biconic"},
-    "高音速オジーブ・クラムシェル (耐熱1,900K)": {"mass": 1.8, "cd": 0.28, "heat_limit": 1900, "shape_id": "ogive"},
-    "極超音速ペネトレーターニードル (超低ドラッグ)": {"mass": 1.4, "cd": 0.18, "heat_limit": 1500, "shape_id": "needle"},
-    "【即席】巨大タコさんウインナー型ノーズコーン": {"mass": 4.5, "cd": 0.95, "heat_limit": 550, "shape_id": "octopus"}
+    "低抵抗バイコニカル複合材カウル (耐熱2,600K)": {"mass": 2.2, "cd": 0.18, "heat_limit": 2600, "shape_id": "biconic"},
+    "高音速オジーブ・クラムシェル (耐熱1,900K)": {"mass": 1.8, "cd": 0.25, "heat_limit": 1900, "shape_id": "ogive"},
+    "極超音速ペネトレーターニードル (超低ドラッグ)": {"mass": 1.4, "cd": 0.15, "heat_limit": 1500, "shape_id": "needle"},
+    "【即席】巨大タコさんウインナー型ノーズコーン": {"mass": 4.8, "cd": 0.98, "heat_limit": 550, "shape_id": "octopus"}
 }
 
 PRESSURIZATION = {
-    "自己加圧方式 (Autogenous / 排熱自己加圧)": {"mass_penalty": 0.002, "g_bonus": 0.95},
-    "高圧He COPV複合材ボトル加圧": {"mass_penalty": 0.008, "g_bonus": 1.18},
-    "自転車用手動空気入れ (気合いでポンピング)": {"mass_penalty": 0.001, "g_bonus": 0.40}
+    "自己加圧方式 (Autogenous / 高効率)": {"mass_penalty": 0.002, "g_bonus": 0.95},
+    "高圧He COPV複合材ボトル加圧 (高圧安定)": {"mass_penalty": 0.008, "g_bonus": 1.20},
+    "自転車用手動空気入れ (気合いポンピング)": {"mass_penalty": 0.001, "g_bonus": 0.40}
 }
 
 # =========================================================================
 # 🎛️ パラメータ設定タブ
 # =========================================================================
 tab1, tab2, tab3, tab4 = st.tabs([
-    "🔥 第1段 (ブースター系)", 
+    "🔥 第1段 (ブースター)", 
     "🛩️ 空力・主翼・怪しいアドオン", 
     "🛰️ 第2段 (オービター) & 先端部", 
     "📐 軌道投入ガイダンス & スロットル"
@@ -93,24 +96,24 @@ with tab1:
         s1_eng_count = st.slider("メインエンジン群 基数", 1, 42, 9)
     with c2:
         st.markdown("#### 燃焼室 & ノズル")
-        s1_pc = st.slider("燃焼室圧力 Pc (bar)", 30, 420, 290, step=10, help="限界を超えるとターボポンプが爆発します")
+        s1_pc = st.slider("燃焼室圧力 Pc (bar)", 30, 420, 280, step=10, help="限界を超えるとターボポンプが爆発します")
         s1_eps = st.slider("海面膨張比 (ε)", 8, 70, 24, step=1)
         s1_tvc = st.slider("TVC ジンバル最大角 (deg)", 1, 20, 8)
     with c3:
         st.markdown("#### タンク構造・加圧")
-        s1_fuel = st.slider("第1段 推進剤充填量 (トン)", 50.0, 4000.0, 850.0, step=50.0)
+        s1_fuel = st.slider("第1段 推進剤充填量 (トン)", 50.0, 4500.0, 950.0, step=50.0)
         s1_mat = st.selectbox("第1段 構造素材", list(MATERIALS.keys()), index=0)
         s1_thick = st.slider("外殻等価板厚 (mm)", 0.5, 12.0, 3.8, step=0.1)
         s1_press = st.selectbox("タンク加圧方式", list(PRESSURIZATION.keys()), index=0)
 
 with tab2:
-    st.markdown("#### 🚀 空力実験アドオン（ロケットに飛行機の羽根をつけたらどうなるか？）")
+    st.markdown("#### 🚀 空力アドオン実験（ロケットに巨大な翼を付けたらどうなるか？）")
     c1, c2 = st.columns(2)
     with c1:
         wing_type = st.selectbox("機体外部 主翼アドオン", list(AERO_WINGS.keys()), index=0)
-        angle_of_attack = st.slider("主翼 固定取り付け角迎角 AoA (deg)", -5.0, 15.0, 2.0, step=0.5)
+        angle_of_attack = st.slider("主翼 固定取り付け角迎角 AoA (deg)", -5.0, 15.0, 1.5, step=0.5)
     with c2:
-        st.info("💡 **航空宇宙力学メモ**: 垂直上昇するロケットに大きな主翼をつけると、水平方向の揚力と激しい空力トリムモーメントが発生し、音速手前でフラッター（自励振動）破壊するか、水平へ激突旋回して空中分解します。")
+        st.info("💡 **航空宇宙力学の教訓**: 垂直上昇する大型ロケットに大面積の主翼を取り付けると、急激な動圧上昇に伴って巨大な揚力モーメントが発生し、重心と空力中心の不一致により機体が即座に制御不能へ陥るか、音速手前の激しいフラッター現象によって空中分解します。")
 
 with tab3:
     c1, c2, c3 = st.columns(3)
@@ -123,25 +126,25 @@ with tab3:
         s2_eps = st.slider("第2段 真空膨張比 (ε)", 30, 280, 130, step=5)
     with c2:
         st.markdown("#### 第2段 構造・タンク")
-        s2_fuel = st.slider("第2段 推進剤充填量 (トン)", 10.0, 1200.0, 280.0, step=10.0)
+        s2_fuel = st.slider("第2段 推進剤充填量 (トン)", 10.0, 1500.0, 320.0, step=10.0)
         s2_mat = st.selectbox("第2段 構造素材", list(MATERIALS.keys()), index=0)
         s2_thick = st.slider("第2段 壁厚 (mm)", 0.5, 8.0, 2.8, step=0.1)
     with c3:
         st.markdown("#### 先端部 & ペイロード")
         fairing_type = st.selectbox("先端空力カウル / フェアリング", list(FAIRINGS.keys()), index=0)
         fairing_sep_alt = st.slider("フェアリング分離高度 (km)", 30.0, 160.0, 85.0, step=5.0)
-        payload_mass = st.slider("投入衛星ペイロード質量 (トン)", 0.1, 150.0, 12.0, step=1.0)
+        payload_mass = st.slider("投入衛星ペイロード質量 (トン)", 0.1, 150.0, 15.0, step=1.0)
 
 with tab4:
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("#### 重力ターン 軌道投入プロファイル")
-        turn_start_alt = st.slider("ピッチオーバー開始高度 (km)", 0.2, 20.0, 1.5, step=0.1)
-        turn_end_alt = st.slider("水平重力ターン完了高度 (km)", 40.0, 250.0, 110.0, step=5.0)
-        turn_exponent = st.slider("ターン曲率プロファイル指数", 0.3, 2.0, 0.68, step=0.02)
+        turn_start_alt = st.slider("ピッチオーバー開始高度 (km)", 0.2, 20.0, 1.8, step=0.1)
+        turn_end_alt = st.slider("水平重力ターン完了高度 (km)", 40.0, 250.0, 115.0, step=5.0)
+        turn_exponent = st.slider("ターン曲率プロファイル指数", 0.3, 2.0, 0.65, step=0.02)
     with c2:
         st.markdown("#### フライトスロットル & 加速度リミッター")
-        throttle_maxq = st.slider("Max-Q 領域 推力抑制 (%)", 20, 100, 78)
+        throttle_maxq = st.slider("Max-Q 領域 推力抑制 (%)", 20, 100, 75)
         max_g_limit_cut = st.slider("最大加速度リミッター (G)", 2.0, 14.0, 5.5, step=0.2)
 
 # =========================================================================
@@ -185,6 +188,7 @@ def calc_stage_specs(prop_key, cycle_key, pc, eps, eng_count, fuel_mass, mat_key
         "cd_mod": density_penalty,
         "mat_id": mat["mat_id"],
         "flame_color": prop["flame_color"],
+        "core_color": prop["core_color"],
         "eng_count": eng_count,
         "fuel_risk": prop["risk"],
         "prop_type": prop["type"]
@@ -207,12 +211,12 @@ total_dv = dv_s1 + dv_s2
 st.markdown("---")
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("総離床重量 / 離床TWR", f"{total_s1_wet:.1f} t", f"TWR: {twr_init:.2f} ({'離床可能' if twr_init >= 1.05 else '推力不足！墜落確定'})")
-m2.metric("総計算速度増分 (ΔV)", f"{total_dv:.0f} m/s", f"必要約9,200m/s")
-m3.metric("限界動圧 Max-Q / 耐G", f"{s1_spec['max_q']:.1f} kPa", f"耐G: {s1_spec['max_g']:.1f} G")
-m4.metric("主翼アドオン重量 / 抗力係数", f"+{wing_spec['mass']:.1f} t", f"抗力 ×{wing_spec['drag_penalty']:.1f}")
+m2.metric("総計算速度増分 (ΔV)", f"{total_dv:.0f} m/s", "必要: 約9,200 m/s")
+m3.metric("構造限界動圧 / 耐G", f"{s1_spec['max_q']:.1f} kPa", f"耐G: {s1_spec['max_g']:.1f} G")
+m4.metric("主翼アドオン重量 / 抗力倍率", f"+{wing_spec['mass']:.1f} t", f"抗力 ×{wing_spec['drag_penalty']:.1f}")
 
 # =========================================================================
-# 💥 物理シミュレーション & リアル破壊・爆発判定エンジン
+# 💥 物理シミュレーション & リアル破壊力学エンジン
 # =========================================================================
 def run_simulation():
     dt = 0.5
@@ -228,9 +232,8 @@ def run_simulation():
 
     history = []
     fail_reason = None
-    explosion_type = "NONE"
 
-    # カウントダウン（T-10s）
+    # カウントダウンシミュレーション (T-10s)
     for cd_step in range(20):
         t_cd = -10.0 + cd_step * 0.5
         pre_ignition = bool(t_cd >= -3.0)
@@ -243,9 +246,9 @@ def run_simulation():
     maxq_passed = False
     supersonic_called = False
 
-    # 1. 発射直前チェック（燃焼室過圧による発射台爆破）
+    # 1. 燃焼室過圧（発射台爆発）
     if s1_spec["pc"] > s1_spec["pc_limit"]:
-        fail_reason = f"ターボポンプ破裂（点火直後爆発）: 燃焼室圧 {s1_spec['pc']} bar が許容限界 {s1_spec['pc_limit']} bar を大幅に超過。"
+        fail_reason = f"ターボポンプ破裂（発射台爆発）: 燃焼室圧 {s1_spec['pc']} bar が許容限界 {s1_spec['pc_limit']} bar を大幅に超過。"
         history.append({
             "t": 0.1, "x": 0.0, "y": 0.0, "alt": 0.0, "v": 0.0, "q": 0.0, "g": 0.0,
             "stage": 1, "fairing": True, "wings": wings_attached, "exploded": True,
@@ -253,9 +256,9 @@ def run_simulation():
         })
         return history, fail_reason
 
-    # 2. 燃料固有リスク（オカルト・ダークマター暴走）
+    # 2. 燃料固有リスク（特異点崩壊）
     if s1_spec["fuel_risk"] > 0.3 and np.random.rand() < s1_spec["fuel_risk"]:
-        fail_reason = "特異点崩壊: ダークマター濃縮スラリーが超臨界に達し、発射台ごと事象の地平面へ消失。"
+        fail_reason = "特異点崩壊: ダークマター濃縮スラリーが臨界に達し、発射台ごと事象の地平線へ消失。"
         history.append({
             "t": 0.2, "x": 0.0, "y": 0.0, "alt": 0.0, "v": 0.0, "q": 0.0, "g": 0.0,
             "stage": 1, "fairing": True, "wings": wings_attached, "exploded": True,
@@ -263,17 +266,17 @@ def run_simulation():
         })
         return history, fail_reason
 
-    for step in range(1400):
+    for step in range(1500):
         t = float(step * dt)
         alt = float(y)
         alt_km = float(alt / 1000.0)
         v = float(np.sqrt(vx**2 + vy**2))
         mach = v / 340.0
 
-        rho = float(1.225 * np.exp(-alt / 7400.0)) if alt < 130000 else 0.0
+        rho = float(1.225 * np.exp(-alt / 7400.0)) if alt < 140000 else 0.0
         q = float(0.5 * rho * (v**2) / 1000.0)
 
-        # 重力ターン基本角
+        # 重力ターン基本幾何学角
         if alt_km < turn_start_alt:
             target_pitch_deg = 90.0
         elif alt_km < turn_end_alt:
@@ -282,17 +285,15 @@ def run_simulation():
         else:
             target_pitch_deg = 0.0
 
-        # 主翼による空力モーメント・揚力異常計算
+        # 主翼による異常空力モーメント・揚力
         extra_pitch_deflection = 0.0
         wing_lift_force = 0.0
-        if wings_attached and alt_km < 40.0 and rho > 0.005:
-            # 主翼の揚力 L = 0.5 * rho * v^2 * S * Cl
-            wing_lift_force = 0.5 * rho * (v**2) * (wing_spec["lift_coeff"] * 18.0) * np.sin(np.radians(angle_of_attack))
-            # 迎角による激しいピッチアップ/ピッチダウン・モーメント
-            extra_pitch_deflection = (wing_lift_force / 10000.0) * (mach ** 1.3)
+        if wings_attached and alt_km < 45.0 and rho > 0.004:
+            wing_lift_force = 0.5 * rho * (v**2) * (wing_spec["lift_coeff"] * 22.0) * np.sin(np.radians(angle_of_attack))
+            extra_pitch_deflection = (wing_lift_force / 9000.0) * (mach ** 1.35)
             target_pitch_deg -= extra_pitch_deflection
 
-        pitch_deg = max(-45.0, min(90.0, target_pitch_deg))
+        pitch_deg = max(-50.0, min(90.0, target_pitch_deg))
         pitch_rad = float(np.radians(pitch_deg))
         visual_pitch = float(np.radians(90.0 - pitch_deg))
 
@@ -311,7 +312,7 @@ def run_simulation():
         f_mass = (fair_spec["mass"] * 1000.0) if fairing_attached else 0.0
         w_mass = (wing_spec["mass"] * 1000.0) if wings_attached else 0.0
 
-        # 推進力計算
+        # 推力演算
         if stage == 1:
             if fuel_rem <= 0:
                 stage = 2
@@ -357,7 +358,6 @@ def run_simulation():
         drag_x = -drag_force * (vx / v) if v > 0 else 0.0
         drag_y = -drag_force * (vy / v) if v > 0 else 0.0
 
-        # 主翼揚力ベクトル（進行方向に垂直）
         lift_x = -wing_lift_force * dir_y
         lift_y = wing_lift_force * dir_x
 
@@ -368,10 +368,9 @@ def run_simulation():
         fx = thrust * dir_x + drag_x + lift_x
         fy = thrust * dir_y + drag_y + lift_y + grav_y
 
-        # 離床TWR不足による発射台激突チェック
         if alt <= 0.0 and fy <= 0.0:
             if t > 1.0:
-                fail_reason = "離床推力不足 (TWR < 1.0): 機体が自重を持ち上げられず、発射台上で轟沈・大爆発。"
+                fail_reason = "離床推力不足 (TWR < 1.0): 自重を持ち上げられず発射台上で轟沈・大爆発。"
                 history.append({
                     "t": t, "x": 0.0, "y": 0.0, "alt": 0.0, "v": 0.0, "q": 0.0, "g": 1.0,
                     "stage": 1, "fairing": True, "wings": wings_attached, "exploded": True,
@@ -385,14 +384,11 @@ def run_simulation():
             ay = fy / cur_mass
             acc_g = float(np.sqrt((thrust * dir_x + drag_x + lift_x)**2 + (thrust * dir_y + drag_y + lift_y)**2) / (cur_mass * g0))
 
-        # -------------------------------------------------------------
-        # 💥 リアル物理破壊（フラッター・動圧超過・ピッチ反転・過大G）
-        # -------------------------------------------------------------
         cur_spec = s1_spec if stage == 1 else s2_spec
 
-        # 破壊1: 主翼フラッター（自励振動）による空中もぎ取り
-        if wings_attached and mach > wing_spec["flutter_mach"] and rho > 0.05:
-            fail_reason = f"主翼遷音速フラッター破壊: マッハ {mach:.2f} の超音速衝撃波で主翼が激震・根元からもぎ取られ燃料タンクに直撃。"
+        # 破壊判定1: 主翼遷音速フラッター
+        if wings_attached and mach > wing_spec["flutter_mach"] and rho > 0.04:
+            fail_reason = f"主翼遷音速フラッター破壊: マッハ {mach:.2f} の衝撃波干渉で主翼が激震・根元からもぎ取られ燃料タンクを直撃破壊。"
             history.append({
                 "t": t, "x": float(x), "y": float(y), "alt": alt_km, "v": v, "q": q, "g": acc_g,
                 "stage": int(stage), "fairing": fairing_attached, "wings": False, "exploded": True,
@@ -400,9 +396,9 @@ def run_simulation():
             })
             break
 
-        # 破壊2: 主翼の巨大揚力による過大空力モーメント・ピッチ反転（コブラ旋回空中分解）
-        if abs(extra_pitch_deflection) > 35.0 and q > 20.0:
-            fail_reason = f"空力トリム破綻（ピッチ反転）: 主翼の過大揚力により機体が90度横滑りし、横方向の動圧 {q:.1f} kPa で機体真っ二つ。"
+        # 破壊判定2: 過大揚力モーメント・ピッチ反転（コブラ旋回空中分解）
+        if abs(extra_pitch_deflection) > 30.0 and q > 18.0:
+            fail_reason = f"空力トリム破綻（ピッチ反転）: 主翼の巨大揚力により機体が90度横滑りし、横動圧 {q:.1f} kPa で機体真っ二つ。"
             history.append({
                 "t": t, "x": float(x), "y": float(y), "alt": alt_km, "v": v, "q": q, "g": acc_g,
                 "stage": int(stage), "fairing": fairing_attached, "wings": wings_attached, "exploded": True,
@@ -410,7 +406,7 @@ def run_simulation():
             })
             break
 
-        # 破壊3: Max-Q 動圧超過破壊（構造崩壊）
+        # 破壊判定3: Max-Q 動圧超過破壊
         if q > cur_spec["max_q"]:
             fail_reason = f"Max-Q 構造圧壊: 動圧 {q:.1f} kPa が外殻等価強度 ({cur_spec['max_q']:.1f} kPa) を突破してタンク座屈破壊。"
             history.append({
@@ -420,7 +416,7 @@ def run_simulation():
             })
             break
 
-        # 破壊4: 最大耐G超過（ペイロード圧砕・エンジンマウント破壊）
+        # 破壊判定4: 耐G超過
         if acc_g > cur_spec["max_g"]:
             fail_reason = f"過大加速度圧砕: 加速度 {acc_g:.1f} G が許容限界 ({cur_spec['max_g']:.1f} G) を超過し推進剤隔壁が圧壊。"
             history.append({
@@ -442,7 +438,7 @@ def run_simulation():
             "pitch": visual_pitch, "event": cur_event
         })
 
-        # 軌道投入成功条件 (高度160km以上、水平速度 7,780m/s以上)
+        # 低軌道(LEO)投入成功判定
         if alt_km >= 160.0 and vx >= 7780.0 and abs(vy) < 400.0:
             history.append({
                 "t": t + dt, "x": x, "y": y, "alt": alt_km, "v": v, "q": q, "g": 0.0,
@@ -453,16 +449,21 @@ def run_simulation():
             break
 
     if not fail_reason and history[-1]["event"] != "ORBIT":
-        fail_reason = f"軌道速度未達（燃料切れ弾道落下）。最高到達高度: {alt_km:.1f} km, 水平速度: {vx:.0f} m/s (必要: 7,780 m/s)"
+        fail_reason = f"軌道速度未達（燃料切れ弾道落下）。最高到達高度: {alt_km:.1f} km, 水平速度: {vx:.0f} m/s (軌道投入必要速度: 7,780 m/s)"
 
     return history, fail_reason
 
 st.markdown("<div id='launch-viewport'></div>", unsafe_allow_html=True)
 
 # =========================================================================
-# 📺 4K Webcast 放送レンダラー (Three.js ＋ リアル爆発エフェクト)
+# 📺 4K Webcast 放送レンダラー (実写散乱光・超望遠シネマティックアングル)
 # =========================================================================
-if st.button("🔴 AETHEL-9 物理破壊・軌道投入ミッション生中継を開始", use_container_width=True, type="primary"):
+simulation_executed = False
+traj_data = None
+error_msg = None
+
+if st.button("🔴 AETHEL-9 超高精細実写中継＆軌道投入シミュレーション開始", use_container_width=True, type="primary"):
+    simulation_executed = True
     traj_data, error_msg = run_simulation()
 
     rocket_visual_cfg = {
@@ -471,75 +472,79 @@ if st.button("🔴 AETHEL-9 物理破壊・軌道投入ミッション生中継�
         "s1_eng": int(s1_eng_count),
         "s2_eng": int(s2_eng_count),
         "s1_flame": s1_spec["flame_color"],
+        "s1_core": s1_spec["core_color"],
         "s2_flame": s2_spec["flame_color"],
+        "s2_core": s2_spec["core_color"],
         "fairing_shape": fair_spec["shape_id"],
         "wing_id": wing_spec["wing_id"]
     }
 
     traj_json = json.dumps(traj_data, default=lambda o: float(o) if isinstance(o, (np.floating, np.integer)) else str(o))
     cfg_json = json.dumps(rocket_visual_cfg)
+    fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
     html_code = f"""
-    <div id="broadcast-frame" style="position: relative; width: 100%; height: 860px; background: #010408; border-radius: 6px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none;">
+    <div id="broadcast-frame" style="position: relative; width: 100%; height: 880px; background: #000205; border-radius: 8px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none;">
         <script>
             window.parent.document.getElementById('launch-viewport').scrollIntoView({{ behavior: 'smooth', block: 'start' }});
         </script>
 
-        <!-- 3D Canvas -->
+        <!-- 3D WebGL Canvas -->
         <div id="canvas-container" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0;"></div>
 
-        <!-- 実写レンズ効果 (ビネット・大気光学グレイン) -->
-        <div style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; background: radial-gradient(circle at center, transparent 38%, rgba(2, 6, 12, 0.8) 100%); mix-blend-mode: multiply; z-index: 2;"></div>
+        <!-- 実写映画シネマティック光学フィルター (周辺光量落ち・アナモルフィック・フレアグレイン) -->
+        <div style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 2, 8, 0.75) 100%); mix-blend-mode: multiply; z-index: 2;"></div>
+        <div style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.015), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.015)); background-size: 100% 3px, 6px 100%; z-index: 3;"></div>
 
         <!-- 放送中継トップバナー -->
-        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 46px; background: rgba(6, 10, 18, 0.88); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 10;">
+        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 48px; background: rgba(3, 7, 18, 0.82); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 0 28px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.07); z-index: 10;">
             <div style="display: flex; align-items: center; gap: 14px;">
-                <span id="live-indicator" style="display: inline-block; width: 9px; height: 9px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 10px #ef4444; animation: liveBlink 1.4s infinite alternate;"></span>
-                <span style="color: #fff; font-weight: 800; font-size: 13px; letter-spacing: 2px;">MISSION LIVE</span>
-                <span style="color: rgba(255,255,255,0.25);">|</span>
-                <span id="cam-tag" style="color: #38bdf8; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; font-family: monospace;">TRACKER: PAD ULTRA TELEPHOTO</span>
+                <span id="live-indicator" style="display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 12px #ef4444; animation: livePulse 1.4s infinite alternate;"></span>
+                <span style="color: #ffffff; font-weight: 800; font-size: 13px; letter-spacing: 2px;">LIVE WEBCAST</span>
+                <span style="color: rgba(255,255,255,0.2);">|</span>
+                <span id="cam-tag" style="color: #38bdf8; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; font-family: monospace;">TRACKER: PAD ULTRA-TELEPHOTO (600mm)</span>
             </div>
-            <div style="display: flex; align-items: center; gap: 16px; font-family: monospace; font-size: 11px;">
-                <span style="color: #94a3b8;">ATMOSPHERE: <strong id="hud-regime" style="color: #f8fafc;">TROPOSPHERE</strong></span>
-                <span style="color: #10b981;">TELEMETRY LINK: NOMINAL</span>
+            <div style="display: flex; align-items: center; gap: 20px; font-family: monospace; font-size: 11px;">
+                <span style="color: #94a3b8;">ATMOSPHERE: <strong id="hud-regime" style="color: #f8fafc;">SEA LEVEL</strong></span>
+                <span style="color: #10b981;">TELEMETRY: ULTRA-HD LOCK</span>
             </div>
         </div>
 
         <style>
-            @keyframes liveBlink {{ from {{ opacity: 0.3; }} to {{ opacity: 1.0; }} }}
+            @keyframes livePulse {{ from {{ opacity: 0.35; }} to {{ opacity: 1.0; }} }}
         </style>
 
         <!-- 🛰️ フライトプロファイル HUD (地球断面・現在地) -->
-        <div style="position: absolute; top: 56px; right: 20px; width: 260px; background: rgba(5, 9, 15, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; padding: 12px; z-index: 10; color: #fff;">
-            <div style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 1px; margin-bottom: 6px; display: flex; justify-content: space-between;">
+        <div style="position: absolute; top: 60px; right: 24px; width: 280px; background: rgba(3, 7, 18, 0.85); backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; padding: 14px; z-index: 10; color: #fff;">
+            <div style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 1.5px; margin-bottom: 8px; display: flex; justify-content: space-between;">
                 <span>DOWNRANGE PROFILE</span>
-                <span id="hud-downrange" style="color: #38bdf8;">0.0 km</span>
+                <span id="hud-downrange" style="color: #38bdf8; font-family: monospace;">0.0 km</span>
             </div>
-            <canvas id="orbit-canvas" width="240" height="85" style="width: 100%; height: 85px; background: #020611; border-radius: 2px;"></canvas>
-            <div style="display: flex; justify-content: space-between; font-size: 9px; color: #64748b; margin-top: 4px; font-family: monospace;">
-                <span>PAD LC-1</span>
+            <canvas id="orbit-canvas" width="250" height="90" style="width: 100%; height: 90px; background: #01040d; border-radius: 2px;"></canvas>
+            <div style="display: flex; justify-content: space-between; font-size: 9px; color: #64748b; margin-top: 6px; font-family: monospace;">
+                <span>LC-1</span>
                 <span>MAX-Q</span>
-                <span>STAGE SEP</span>
+                <span>STAGE-1 SEP</span>
                 <span>ORBIT</span>
             </div>
         </div>
 
-        <!-- 破壊・爆発警報アラート (RUD時のみポップアップ) -->
-        <div id="rud-banner" style="display: none; position: absolute; top: 180px; left: 50%; transform: translateX(-50%); background: rgba(185, 28, 28, 0.92); backdrop-filter: blur(14px); border: 2px solid #ef4444; border-radius: 4px; padding: 16px 28px; z-index: 25; text-align: center; box-shadow: 0 0 40px rgba(239, 68, 68, 0.5);">
-            <div style="color: #fef2f2; font-size: 18px; font-weight: 900; letter-spacing: 2px; font-family: monospace;">🚨 CATASTROPHIC VEHICLE ANOMALY (RUD) 🚨</div>
-            <div id="rud-desc" style="color: #fca5a5; font-size: 13px; font-weight: 600; margin-top: 6px; max-width: 500px;"></div>
+        <!-- 破壊・空中分解アラート (RUD時のみポップアップ) -->
+        <div id="rud-banner" style="display: none; position: absolute; top: 180px; left: 50%; transform: translateX(-50%); background: rgba(153, 27, 27, 0.95); backdrop-filter: blur(16px); border: 2px solid #ef4444; border-radius: 4px; padding: 18px 32px; z-index: 25; text-align: center; box-shadow: 0 0 50px rgba(239, 68, 68, 0.6);">
+            <div style="color: #fff; font-size: 18px; font-weight: 900; letter-spacing: 2.5px; font-family: monospace;">🚨 CATASTROPHIC VEHICLE ANOMALY (RUD) 🚨</div>
+            <div id="rud-desc" style="color: #fecaca; font-size: 13px; font-weight: 600; margin-top: 8px; max-width: 520px; line-height: 1.4;"></div>
         </div>
 
-        <!-- テレメトリー HUD -->
-        <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, rgba(2, 5, 9, 0.96) 0%, rgba(3, 7, 14, 0.85) 75%, transparent 100%); padding: 24px 32px 18px 32px; box-sizing: border-box; display: flex; align-items: flex-end; justify-content: space-between; z-index: 10;">
+        <!-- 放送テレメトリー HUD -->
+        <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, rgba(1, 3, 8, 0.98) 0%, rgba(2, 6, 14, 0.88) 75%, transparent 100%); padding: 28px 36px 20px 36px; box-sizing: border-box; display: flex; align-items: flex-end; justify-content: space-between; z-index: 10;">
             <div>
-                <div id="tv-status" style="color: #38bdf8; font-size: 11px; font-weight: 700; letter-spacing: 2px; margin-bottom: 2px;">COUNTDOWN SEQUENCE ARMED</div>
-                <div id="tv-timer" style="color: #ffffff; font-size: 46px; font-weight: 900; font-family: 'Consolas', monospace; letter-spacing: 1.5px; text-shadow: 0 0 20px rgba(56, 189, 248, 0.35);">T- 00:10.0</div>
+                <div id="tv-status" style="color: #38bdf8; font-size: 11px; font-weight: 700; letter-spacing: 2px; margin-bottom: 2px;">COUNTDOWN SEQUENCE</div>
+                <div id="tv-timer" style="color: #ffffff; font-size: 48px; font-weight: 900; font-family: 'Consolas', monospace; letter-spacing: 2px; text-shadow: 0 0 25px rgba(56, 189, 248, 0.4);">T- 00:10.0</div>
             </div>
 
-            <div style="display: flex; gap: 36px; border-left: 1px solid rgba(255,255,255,0.18); padding-left: 32px;">
+            <div style="display: flex; gap: 40px; border-left: 1px solid rgba(255,255,255,0.15); padding-left: 36px;">
                 <div>
-                    <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px; text-transform: uppercase;">VELOCITY</div>
+                    <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px; text-transform: uppercase;">SPEED</div>
                     <div style="color: #fff; font-size: 26px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-spd">0</span> <span style="font-size: 12px; color: #94a3b8;">km/h</span></div>
                 </div>
                 <div>
@@ -552,12 +557,11 @@ if st.button("🔴 AETHEL-9 物理破壊・軌道投入ミッション生中継�
                 </div>
                 <div>
                     <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px; text-transform: uppercase;">VEHICLE STATUS</div>
-                    <div id="tv-stage-badge" style="color: #34d399; font-size: 19px; font-weight: 800; font-family: 'Consolas', monospace;">STAGE 1 BOOSTER</div>
+                    <div id="tv-stage-badge" style="color: #34d399; font-size: 20px; font-weight: 800; font-family: 'Consolas', monospace;">STAGE 1 BOOSTER</div>
                 </div>
             </div>
         </div>
 
-        <!-- 爆発時フラッシュオーバーレイ -->
         <div id="flash-overlay" style="position: absolute; top:0; left:0; width:100%; height:100%; background:#fff; opacity:0; pointer-events:none; z-index:30; transition:opacity 0.08s;"></div>
     </div>
 
@@ -565,7 +569,7 @@ if st.button("🔴 AETHEL-9 物理破壊・軌道投入ミッション生中継�
     <script>
         const data = {traj_json};
         const cfg = {cfg_json};
-        const failMessage = "{error_msg or ''}";
+        const failMessage = "{fail_msg_clean}";
         const container = document.getElementById('canvas-container');
         const orbitCvs = document.getElementById('orbit-canvas');
         const octx = orbitCvs.getContext('2d');
@@ -573,7 +577,7 @@ if st.button("🔴 AETHEL-9 物理破壊・軌道投入ミッション生中継�
         const rudBanner = document.getElementById('rud-banner');
         const rudDesc = document.getElementById('rud-desc');
 
-        // 音響合成エンジン（低周波ロケット轟音 ＆ 爆発衝撃波）
+        // 音響合成エンジン
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let actx = null, rumbleGain = null, crackleGain = null;
         function initAudio() {{
@@ -584,13 +588,13 @@ if st.button("🔴 AETHEL-9 物理破壊・軌道投入ミッション生中継�
                 for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 
                 const rSrc = actx.createBufferSource(); rSrc.buffer = buf; rSrc.loop = true;
-                const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 135;
+                const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 120;
                 rumbleGain = actx.createGain(); rumbleGain.gain.value = 0;
                 rSrc.connect(lp); lp.connect(rumbleGain); rumbleGain.connect(actx.destination);
                 rSrc.start(0);
 
                 const cSrc = actx.createBufferSource(); cSrc.buffer = buf; cSrc.loop = true;
-                const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1150; bp.Q.value = 3.2;
+                const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 950; bp.Q.value = 2.8;
                 crackleGain = actx.createGain(); crackleGain.gain.value = 0;
                 cSrc.connect(bp); bp.connect(crackleGain); crackleGain.connect(actx.destination);
                 cSrc.start(0);
@@ -603,12 +607,12 @@ if st.button("🔴 AETHEL-9 物理破壊・軌道投入ミッション生中継�
             const osc = actx.createOscillator();
             const g = actx.createGain();
             osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(90, actx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(18, actx.currentTime + 1.2);
-            g.gain.setValueAtTime(0.8, actx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 2.5);
+            osc.frequency.setValueAtTime(80, actx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(15, actx.currentTime + 1.4);
+            g.gain.setValueAtTime(0.9, actx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 2.8);
             osc.connect(g); g.connect(actx.destination);
-            osc.start(); osc.stop(actx.currentTime + 2.5);
+            osc.start(); osc.stop(actx.currentTime + 2.8);
         }}
 
         const voicedEvents = new Set();
@@ -620,178 +624,235 @@ if st.button("🔴 AETHEL-9 物理破壊・軌道投入ミッション生中継�
         }}
 
         // =========================================================================
-        // 🌍 Three.js 実写光学＆地球物理シーン
+        // 🌍 Three.js 実写光学・宇宙・地球レンダラー
         // =========================================================================
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(36, container.clientWidth / container.clientHeight, 0.1, 5000000);
+        const camera = new THREE.PerspectiveCamera(28, container.clientWidth / container.clientHeight, 0.1, 5000000);
         const renderer = new THREE.WebGLRenderer({{ antialias: true, powerPreference: "high-performance" }});
         renderer.setSize(container.clientWidth, container.clientHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.35;
+        renderer.toneMappingExposure = 1.25;
         container.appendChild(renderer.domElement);
 
-        // 地球本体 (半径 6,371 km)
+        // 恒星宇宙背景 (Starfield)
+        const starGeo = new THREE.BufferGeometry();
+        const starCount = 3500;
+        const starPositions = new Float32Array(starCount * 3);
+        const starColors = new Float32Array(starCount * 3);
+        for(let i=0; i<starCount*3; i+=3) {{
+            const rad = 1500000;
+            const u = Math.random();
+            const v = Math.random();
+            const theta = u * 2.0 * Math.PI;
+            const phi = Math.acos(2.0 * v - 1.0);
+            starPositions[i] = rad * Math.sin(phi) * Math.cos(theta);
+            starPositions[i+1] = rad * Math.sin(phi) * Math.sin(theta);
+            starPositions[i+2] = rad * Math.cos(phi);
+            const tint = 0.85 + Math.random() * 0.15;
+            starColors[i] = tint; starColors[i+1] = tint * 0.98; starColors[i+2] = tint * 1.05;
+        }}
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+        const starMat = new THREE.PointsMaterial({{ size: 2.2, vertexColors: true, transparent: true, opacity: 0.95 }});
+        scene.add(new THREE.Points(starGeo, starMat));
+
+        // 地球本体 (6,371 km)
         const R_EARTH = 6371.0;
-        function createCoastTex() {{
-            const c = document.createElement('canvas'); c.width = 2048; c.height = 2048;
+        function generatePhotoEarthTextures() {{
+            const c = document.createElement('canvas'); c.width = 4096; c.height = 2048;
             const ctx = c.getContext('2d');
-            ctx.fillStyle = '#091c34'; ctx.fillRect(0, 0, 2048, 2048);
-            ctx.fillStyle = '#1e382b';
-            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(1300, 0);
-            ctx.bezierCurveTo(950, 700, 1450, 1300, 750, 2048);
-            ctx.lineTo(0, 2048); ctx.closePath(); ctx.fill();
-            ctx.strokeStyle = '#1d6074'; ctx.lineWidth = 45; ctx.stroke();
+            // 深海グラデーション
+            const oceanGrad = ctx.createLinearGradient(0, 0, 0, 2048);
+            oceanGrad.addColorStop(0, '#040d1a'); oceanGrad.addColorStop(0.5, '#071b33'); oceanGrad.addColorStop(1, '#020914');
+            ctx.fillStyle = oceanGrad; ctx.fillRect(0, 0, 4096, 2048);
+
+            // 大陸・沿岸部 (リアルなテクスチャ風プロシージャル描画)
+            ctx.fillStyle = '#1c2e22';
+            ctx.beginPath();
+            ctx.moveTo(0, 400);
+            ctx.bezierCurveTo(900, 300, 1400, 800, 1800, 600);
+            ctx.bezierCurveTo(2300, 400, 2900, 1100, 3400, 800);
+            ctx.bezierCurveTo(3900, 600, 4096, 750, 4096, 1200);
+            ctx.lineTo(4096, 2048); ctx.lineTo(0, 2048); ctx.closePath();
+            ctx.fill();
+
+            // 浅瀬リーフエメラルドグリーン
+            ctx.strokeStyle = '#0d5c75'; ctx.lineWidth = 40; ctx.stroke();
             return new THREE.CanvasTexture(c);
         }}
-        const earthMat = new THREE.MeshStandardMaterial({{ map: createCoastTex(), roughness: 0.6, metalness: 0.1 }});
-        const earthMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH, 128, 96), earthMat);
+
+        const earthTex = generatePhotoEarthTextures();
+        const earthMat = new THREE.MeshStandardMaterial({{
+            map: earthTex,
+            roughness: 0.7,
+            metalness: 0.05
+        }});
+        const earthMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH, 160, 120), earthMat);
         earthMesh.position.set(0, -R_EARTH, 0);
         scene.add(earthMesh);
 
-        // 雲海
-        function createCloudTex() {{
-            const c = document.createElement('canvas'); c.width = 1024; c.height = 1024;
+        // プロシージャル大気散乱光・リムグロー（Rayleigh & Mie Scattering）
+        const atmosphereMat = new THREE.ShaderMaterial({{
+            side: THREE.BackSide,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            vertexShader: `
+                varying vec3 vNormal;
+                varying vec3 vWorldPosition;
+                void main() {{
+                    vNormal = normalize(normalMatrix * normal);
+                    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+                    vWorldPosition = worldPos.xyz;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }}
+            `,
+            fragmentShader: `
+                varying vec3 vNormal;
+                varying vec3 vWorldPosition;
+                void main() {{
+                    vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+                    float rim = max(0.0, dot(viewDir, -vNormal));
+                    float intensity = pow(1.0 - rim, 3.8);
+                    vec3 skyBlue = vec3(0.24, 0.58, 0.98);
+                    vec3 horizonGlow = vec3(0.95, 0.45, 0.18);
+                    vec3 col = mix(skyBlue, horizonGlow, pow(intensity, 2.5));
+                    gl_FragColor = vec4(col, intensity * 0.95);
+                }}
+            `
+        }});
+        const atmosphereMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH + 85.0, 96, 72), atmosphereMat);
+        atmosphereMesh.position.set(0, -R_EARTH, 0);
+        scene.add(atmosphereMesh);
+
+        // 雲海レイヤー
+        function generateCloudMap() {{
+            const c = document.createElement('canvas'); c.width = 2048; c.height = 1024;
             const ctx = c.getContext('2d');
-            for(let i=0; i<350; i++) {{
-                const x = Math.random()*1024, y = Math.random()*1024, r = 20 + Math.random()*60;
+            for(let i=0; i<600; i++) {{
+                const x = Math.random()*2048, y = Math.random()*1024, r = 25 + Math.random()*85;
                 const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-                g.addColorStop(0, 'rgba(255,255,255,0.7)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+                g.addColorStop(0, 'rgba(255,255,255,0.75)'); g.addColorStop(0.5, 'rgba(240,245,255,0.25)'); g.addColorStop(1, 'rgba(255,255,255,0)');
                 ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
             }}
             return new THREE.CanvasTexture(c);
         }}
         const cloudMesh = new THREE.Mesh(
-            new THREE.SphereGeometry(R_EARTH + 4.0, 96, 64),
-            new THREE.MeshBasicMaterial({{ map: createCloudTex(), transparent: true, opacity: 0.5, depthWrite: false }})
+            new THREE.SphereGeometry(R_EARTH + 5.5, 96, 72),
+            new THREE.MeshStandardMaterial({{ map: generateCloudMap(), transparent: true, opacity: 0.65, depthWrite: false }})
         );
         cloudMesh.position.set(0, -R_EARTH, 0);
         scene.add(cloudMesh);
 
-        // 大気スカイドーム
-        const skyGeo = new THREE.SphereGeometry(25000, 32, 32);
-        const skyMat = new THREE.ShaderMaterial({{
-            side: THREE.BackSide,
-            vertexShader: `
-                varying vec3 vWorldPos;
-                void main() {{
-                    vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                }}
-            `,
-            fragmentShader: `
-                varying vec3 vWorldPos;
-                void main() {{
-                    vec3 dir = normalize(vWorldPos);
-                    float h = max(0.0, dir.y);
-                    vec3 space = vec3(0.002, 0.004, 0.012);
-                    vec3 strat = vec3(0.03, 0.12, 0.28);
-                    vec3 horizon = vec3(0.92, 0.52, 0.24);
-                    vec3 c = mix(horizon, strat, smoothstep(0.0, 0.22, h));
-                    c = mix(c, space, smoothstep(0.22, 0.85, h));
-                    gl_FragColor = vec4(c, 1.0);
-                }}
-            `
-        }});
-        scene.add(new THREE.Mesh(skyGeo, skyMat));
-
-        const sun = new THREE.DirectionalLight(0xffeedd, 3.5);
-        sun.position.set(2000, 4500, 2000);
-        scene.add(sun);
-        scene.add(new THREE.AmbientLight(0x223344, 0.75));
+        // 太陽光・環境ライティング
+        const sunLight = new THREE.DirectionalLight(0xfff5e6, 3.8);
+        sunLight.position.set(4000, 6000, 3000);
+        scene.add(sunLight);
+        scene.add(new THREE.AmbientLight(0x1a2b40, 0.85));
 
         // 発射台 LC-1
         const pad = new THREE.Group();
-        const metalMat = new THREE.MeshStandardMaterial({{ color: 0x334155, roughness: 0.35, metalness: 0.9 }});
+        const metalMat = new THREE.MeshStandardMaterial({{ color: 0x242d3d, roughness: 0.35, metalness: 0.85 }});
         const trussMat = new THREE.MeshStandardMaterial({{ color: 0x475569, wireframe: true }});
-        const tower = new THREE.Mesh(new THREE.BoxGeometry(4.5, 38, 4.5), trussMat);
-        tower.position.set(-6, 19, 0); pad.add(tower);
-        const mount = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 4.2, 3.0, 32), metalMat);
-        mount.position.set(0, 1.5, 0); pad.add(mount);
+        const tower = new THREE.Mesh(new THREE.BoxGeometry(4.8, 42, 4.8), trussMat);
+        tower.position.set(-6.5, 21, 0); pad.add(tower);
+        const mount = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 4.8, 3.2, 32), metalMat);
+        mount.position.set(0, 1.6, 0); pad.add(mount);
         scene.add(pad);
 
-        // ロケットグループ
+        // ロケット本体
         const rocket = new THREE.Group();
         scene.add(rocket);
 
-        const s1Mat = new THREE.MeshStandardMaterial({{ color: 0xe2e8f0, roughness: 0.15, metalness: 0.95 }});
-        const s2Mat = new THREE.MeshStandardMaterial({{ color: 0xf8fafc, roughness: 0.25, metalness: 0.85 }});
+        const s1Mat = new THREE.MeshStandardMaterial({{ color: 0xe2e8f0, roughness: 0.22, metalness: 0.92 }});
+        const s2Mat = new THREE.MeshStandardMaterial({{ color: 0xf8fafc, roughness: 0.28, metalness: 0.80 }});
 
-        const s1Len = 14.0;
-        const s1 = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, s1Len, 48), s1Mat);
+        const s1Len = 14.5;
+        const s1 = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, s1Len, 64), s1Mat);
         s1.position.y = s1Len / 2 + 1.8;
         rocket.add(s1);
 
-        const s2Len = 7.0;
-        const s2 = new THREE.Mesh(new THREE.CylinderGeometry(0.98, 0.98, s2Len, 48), s2Mat);
+        const s2Len = 7.5;
+        const s2 = new THREE.Mesh(new THREE.CylinderGeometry(0.98, 0.98, s2Len, 64), s2Mat);
         s2.position.y = s1Len + 1.8 + s2Len / 2;
         rocket.add(s2);
 
-        const nose = new THREE.Mesh(new THREE.ConeGeometry(0.98, 3.2, 48), s2Mat);
-        nose.position.y = s1Len + 1.8 + s2Len + 1.6;
+        const nose = new THREE.Mesh(new THREE.ConeGeometry(0.98, 3.4, 64), s2Mat);
+        nose.position.y = s1Len + 1.8 + s2Len + 1.7;
         rocket.add(nose);
 
-        // 🛩️ 主翼アドオンの3Dモデリング
+        // 主翼 3D モデリング
         const wingsGroup = new THREE.Group();
         rocket.add(wingsGroup);
 
         if (cfg.wing_id === 'airliner') {{
-            // ジャンボジェットの巨大主翼
-            const wingGeo = new THREE.BoxGeometry(16.0, 0.2, 2.5);
-            const wingMat = new THREE.MeshStandardMaterial({{ color: 0xf1f5f9, roughness: 0.4 }});
+            const wingGeo = new THREE.BoxGeometry(17.5, 0.22, 2.8);
+            const wingMat = new THREE.MeshStandardMaterial({{ color: 0xf1f5f9, roughness: 0.45, metalness: 0.2 }});
             const airlinerWings = new THREE.Mesh(wingGeo, wingMat);
             airlinerWings.position.set(0, s1Len * 0.45, 0);
             wingsGroup.add(airlinerWings);
-            // 翼端ウィングレット
-            [-8.0, 8.0].forEach(wx => {{
-                const wlet = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.2, 1.0), wingMat);
-                wlet.position.set(wx, s1Len * 0.45 + 0.6, 0);
+            [-8.75, 8.75].forEach(wx => {{
+                const wlet = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.5, 1.1), wingMat);
+                wlet.position.set(wx, s1Len * 0.45 + 0.75, 0);
                 wingsGroup.add(wlet);
             }});
         }} else if (cfg.wing_id === 'delta') {{
-            // 超音速デルタ翼
             const deltaShape = new THREE.Shape();
-            deltaShape.moveTo(-5.5, 0); deltaShape.lineTo(5.5, 0); deltaShape.lineTo(0, 7.0); deltaShape.closePath();
-            const deltaGeo = new THREE.ExtrudeGeometry(deltaShape, {{ depth: 0.15, bevelEnabled: false }});
-            const deltaMesh = new THREE.Mesh(deltaGeo, new THREE.MeshStandardMaterial({{ color: 0x334155, metalness: 0.8 }}));
+            deltaShape.moveTo(-6.0, 0); deltaShape.lineTo(6.0, 0); deltaShape.lineTo(0, 8.0); deltaShape.closePath();
+            const deltaGeo = new THREE.ExtrudeGeometry(deltaShape, {{ depth: 0.18, bevelEnabled: false }});
+            const deltaMesh = new THREE.Mesh(deltaGeo, new THREE.MeshStandardMaterial({{ color: 0x334155, metalness: 0.85, roughness: 0.25 }}));
             deltaMesh.rotation.x = -Math.PI / 2;
             deltaMesh.position.set(0, s1Len * 0.65, 0);
             wingsGroup.add(deltaMesh);
         }} else if (cfg.wing_id === 'cardboard') {{
-            // ダンボール翼
-            const cbMat = new THREE.MeshStandardMaterial({{ color: 0xd97706, roughness: 0.9 }});
-            const cbWing = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.08, 1.2), cbMat);
+            const cbMat = new THREE.MeshStandardMaterial({{ color: 0xb45309, roughness: 0.95 }});
+            const cbWing = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.08, 1.3), cbMat);
             cbWing.position.set(0, s1Len * 0.5, 0);
             wingsGroup.add(cbWing);
         }}
 
-        // 排気火炎・マッハダイヤモンド
+        // 排気プルーム・Jellyfish真空光彩エフェクト
         const plume = new THREE.Group();
         rocket.add(plume);
 
-        const flameHex = parseInt(cfg.s1_flame);
-        const coreFlame = new THREE.Mesh(new THREE.ConeGeometry(0.65, 8.0, 32), new THREE.MeshBasicMaterial({{ color: 0xffffff, blending: THREE.AdditiveBlending }}));
-        coreFlame.rotation.x = Math.PI; coreFlame.position.y = -4.0; plume.add(coreFlame);
+        const flameHex = parseInt(cfg.s1_flame.replace('#', '0x'));
+        const coreFlame = new THREE.Mesh(
+            new THREE.ConeGeometry(0.7, 9.0, 32),
+            new THREE.MeshBasicMaterial({{ color: 0xffffff, blending: THREE.AdditiveBlending }})
+        );
+        coreFlame.rotation.x = Math.PI; coreFlame.position.y = -4.5; plume.add(coreFlame);
 
-        const outerPlume = new THREE.Mesh(new THREE.ConeGeometry(1.6, 16.0, 32), new THREE.MeshBasicMaterial({{ color: flameHex, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending }}));
-        outerPlume.rotation.x = Math.PI; outerPlume.position.y = -8.0; plume.add(outerPlume);
+        const outerPlume = new THREE.Mesh(
+            new THREE.ConeGeometry(1.8, 18.0, 32),
+            new THREE.MeshBasicMaterial({{ color: flameHex, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }})
+        );
+        outerPlume.rotation.x = Math.PI; outerPlume.position.y = -9.0; plume.add(outerPlume);
+
+        // 成層圏での巨大クラゲ状プルーム (Jellyfish Plume)
+        const jellyfishPlume = new THREE.Mesh(
+            new THREE.SphereGeometry(7.0, 32, 32),
+            new THREE.MeshBasicMaterial({{ color: flameHex, transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, depthWrite: false }})
+        );
+        jellyfishPlume.position.y = -12.0;
+        plume.add(jellyfishPlume);
 
         const shocks = [];
         for (let i = 0; i < 7; i++) {{
             const dia = new THREE.Mesh(new THREE.OctahedronGeometry(0.35 - i * 0.03, 1), new THREE.MeshBasicMaterial({{ color: 0xffffff, blending: THREE.AdditiveBlending }}));
-            dia.scale.set(1.1, 0.35, 1.1); dia.position.y = -1.2 - i * 1.3; plume.add(dia); shocks.push(dia);
+            dia.scale.set(1.1, 0.35, 1.1); dia.position.y = -1.3 - i * 1.4; plume.add(dia); shocks.push(dia);
         }}
 
-        // スモークパーティクル
+        // スモーク・排気雲パーティクル
         function createSmokeTex() {{
             const c = document.createElement('canvas'); c.width = 128; c.height = 128;
             const ctx = c.getContext('2d');
             const g = ctx.createRadialGradient(64,64,4, 64,64,64);
-            g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(0.3, 'rgba(220,225,235,0.5)'); g.addColorStop(1, 'rgba(150,160,175,0)');
+            g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(0.35, 'rgba(215,225,238,0.5)'); g.addColorStop(1, 'rgba(140,150,170,0)');
             ctx.fillStyle = g; ctx.fillRect(0,0,128,128); return new THREE.CanvasTexture(c);
         }}
         const smokeTex = createSmokeTex();
-        const P_MAX = 700;
+        const P_MAX = 800;
         const pool = [];
         const pGroup = new THREE.Group(); scene.add(pGroup);
         for(let i=0; i<P_MAX; i++) {{
@@ -806,76 +867,86 @@ if st.button("🔴 AETHEL-9 物理破壊・軌道投入ミッション生中継�
             p.vx = vx; p.vy = vy; p.vz = vz; p.age = 0; p.maxAge = life; p.s0 = s0; p.s1 = s1; p.o = opacity;
         }}
 
-        // 💥 破片破裂パーティクル（空中分解用）
-        const DEBRIS_MAX = 120;
+        // 破片破裂（空中分解時）
+        const DEBRIS_MAX = 140;
         const debrisPool = [];
         const debrisGroup = new THREE.Group(); scene.add(debrisGroup);
         for(let i=0; i<DEBRIS_MAX; i++) {{
             const deb = new THREE.Mesh(
-                new THREE.BoxGeometry(0.8 + Math.random()*0.8, 0.2 + Math.random()*0.4, 0.4),
-                new THREE.MeshStandardMaterial({{ color: (i%2===0)?0xe2e8f0:0x334155, metalness: 0.9, roughness: 0.3 }})
+                new THREE.BoxGeometry(0.8 + Math.random()*0.9, 0.2 + Math.random()*0.5, 0.4),
+                new THREE.MeshStandardMaterial({{ color: (i%2===0)?0xe2e8f0:0x334155, metalness: 0.9, roughness: 0.25 }})
             );
             deb.visible = false; debrisGroup.add(deb);
             debrisPool.push({{ mesh: deb, active: false, vx: 0, vy: 0, vz: 0, rx: 0, ry: 0, rz: 0 }});
         }}
 
-        function triggerDebrisExplosion(x, y, vBaseX, vBaseY, type) {{
+        function triggerDebrisExplosion(x, y, vBaseX, vBaseY) {{
             for(let i=0; i<DEBRIS_MAX; i++) {{
                 const d = debrisPool[i];
                 d.active = true; d.mesh.visible = true;
                 d.mesh.position.set(x + (Math.random()-0.5)*3, y + (Math.random()-0.5)*8, (Math.random()-0.5)*3);
                 const angle = Math.random() * Math.PI * 2;
-                const spd = 2.0 + Math.random() * 8.0;
+                const spd = 2.5 + Math.random() * 9.0;
                 d.vx = (vBaseX * 0.05) + Math.cos(angle) * spd;
                 d.vy = (vBaseY * 0.05) + Math.sin(angle) * spd;
                 d.vz = (Math.random()-0.5) * spd * 1.5;
-                d.rx = Math.random()*0.3; d.ry = Math.random()*0.3; d.rz = Math.random()*0.3;
+                d.rx = Math.random()*0.35; d.ry = Math.random()*0.35; d.rz = Math.random()*0.35;
             }}
         }}
 
         // HUD 軌道マップ
         function drawOrbitMap(altKm, dRangeKm, exploded) {{
-            octx.clearRect(0, 0, 240, 85);
-            octx.beginPath(); octx.arc(120, 230, 175, Math.PI, 0); octx.strokeStyle = '#334155'; octx.lineWidth = 3; octx.stroke();
-            octx.beginPath(); octx.arc(120, 230, 200, Math.PI, 0); octx.strokeStyle = 'rgba(56, 189, 248, 0.25)'; octx.lineWidth = 1; octx.setLineDash([4, 4]); octx.stroke(); octx.setLineDash([]);
+            octx.clearRect(0, 0, 250, 90);
+            octx.beginPath(); octx.arc(125, 240, 185, Math.PI, 0); octx.strokeStyle = '#1e293b'; octx.lineWidth = 3; octx.stroke();
+            octx.beginPath(); octx.arc(125, 240, 215, Math.PI, 0); octx.strokeStyle = 'rgba(56, 189, 248, 0.25)'; octx.lineWidth = 1; octx.setLineDash([4, 4]); octx.stroke(); octx.setLineDash([]);
 
-            const px = 20 + Math.min(200, (dRangeKm / 1200.0) * 200);
-            const py = 72 - Math.min(62, (altKm / 200.0) * 62);
+            const px = 20 + Math.min(210, (dRangeKm / 1200.0) * 210);
+            const py = 76 - Math.min(65, (altKm / 200.0) * 65);
 
-            octx.beginPath(); octx.moveTo(20, 72); octx.quadraticCurveTo(px * 0.5, 72, px, py);
+            octx.beginPath(); octx.moveTo(20, 76); octx.quadraticCurveTo(px * 0.5, 76, px, py);
             octx.strokeStyle = exploded ? '#ef4444' : '#38bdf8'; octx.lineWidth = 2; octx.stroke();
 
             octx.fillStyle = exploded ? '#dc2626' : '#38bdf8';
             octx.beginPath(); octx.arc(px, py, exploded ? 6 : 4, 0, Math.PI * 2); octx.fill();
         }}
 
-        // カメラワーク
+        // 🎥 実写シネマティック・長焦点超望遠カメラワーク
         const camTarget = new THREE.Vector3(0, 10, 0);
         let camShake = 0.0;
         function updateCam(simT, rx, ry, alt, pitch, exploded) {{
             const upX = Math.sin(pitch), upY = Math.cos(pitch);
 
             if (exploded) {{
-                document.getElementById('cam-tag').innerText = "OPTICAL TRACKER: CATASTROPHIC VEHICLE BREAKUP";
-                camera.position.lerp(new THREE.Vector3(rx + 15, ry + 6, 28), 0.1);
-                camTarget.lerp(new THREE.Vector3(rx, ry, 0), 0.15);
+                document.getElementById('cam-tag').innerText = "OPTICAL TRACKER: VEHICLE BREAKUP TELEPHOTO";
+                camera.position.lerp(new THREE.Vector3(rx + 35, ry + 15, 60), 0.08);
+                camTarget.lerp(new THREE.Vector3(rx, ry, 0), 0.12);
             }} else if (simT < 0.0) {{
                 document.getElementById('cam-tag').innerText = "TRACKER 1: PAD LOW-ANGLE TELEPHOTO";
-                camera.position.set(12.0, 3.5, 26.0); camTarget.set(0, 8.0, 0);
-            }} else if (simT < 4.0) {{
+                camera.position.set(16.0, 4.0, 32.0); camTarget.set(0, 9.0, 0);
+            }} else if (simT < 3.5) {{
                 document.getElementById('cam-tag').innerText = "TOWER TRACKER: LIFTOFF CLEARANCE";
-                camera.position.set(-9.0, 6.0, 22.0); camTarget.set(rx, ry + 8.0, 0);
-            }} else if (alt < 12.0) {{
-                document.getElementById('cam-tag').innerText = "COASTAL OPTICAL TRACKER [FLAME TRACE]";
-                camera.position.lerp(new THREE.Vector3(-45.0, 8.0, 80.0), 0.05); camTarget.lerp(new THREE.Vector3(rx, ry + 6.0, 0), 0.15);
-            }} else if (alt < 65.0) {{
-                document.getElementById('cam-tag').innerText = "ONBOARD CAM 1: FORWARD ENGINE DOWN-LOOK";
-                const ox = -upX * 8.0 + upY * 2.8, oy = -upY * 8.0 - upX * 2.8;
-                camera.position.lerp(new THREE.Vector3(rx + ox, ry + oy, 8.0), 0.2); camTarget.lerp(new THREE.Vector3(rx, ry, 0), 0.2);
+                camera.position.set(-14.0, 8.0, 30.0); camTarget.set(rx, ry + 10.0, 0);
+            }} else if (alt < 15.0) {{
+                // 地上数km離れた長焦点追尾カメラ（雄大な空と引きの構図）
+                document.getElementById('cam-tag').innerText = "COASTAL SUPER-TELEPHOTO TRACKER (800mm)";
+                const camDist = 95.0 + alt * 4.0;
+                camera.position.lerp(new THREE.Vector3(-camDist * 0.65, 12.0 + alt * 0.4, camDist * 0.95), 0.04);
+                camTarget.lerp(new THREE.Vector3(rx, ry + 6.0, 0), 0.12);
+            }} else if (alt < 70.0) {{
+                // 追尾航空機 / 巨大な地球の弧を捉えるシネマティック・ロングショット
+                document.getElementById('cam-tag').innerText = "AIRBORNE CHASE TRACKER (WIDE HORIZON)";
+                const camX = rx - 75.0;
+                const camY = ry - 25.0;
+                const camZ = 120.0 + (alt - 15.0) * 1.5;
+                camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.05);
+                camTarget.lerp(new THREE.Vector3(rx + upX * 12.0, ry + upY * 12.0, 0), 0.1);
             }} else {{
-                document.getElementById('cam-tag').innerText = "ORBITAL TELEMETRY: HIGH ALTITUDE VACUUM CAM";
-                const ox = upX * 16.0 - upY * 8.0, oy = upY * 16.0 + upX * 8.0;
-                camera.position.lerp(new THREE.Vector3(rx + ox, ry + oy, 24.0), 0.12); camTarget.lerp(new THREE.Vector3(rx, ry, 0), 0.15);
+                // 軌道上・漆黒の宇宙空間と地球の円弧ロングショット
+                document.getElementById('cam-tag').innerText = "ORBITAL TELEMETRY: ULTRA-WIDE VACUUM SHOT";
+                const ox = -upX * 120.0 + upY * 45.0;
+                const oy = -upY * 120.0 - upX * 45.0;
+                camera.position.lerp(new THREE.Vector3(rx + ox, ry + oy, 220.0), 0.08);
+                camTarget.lerp(new THREE.Vector3(rx, ry, 0), 0.1);
             }}
 
             if (camShake > 0.002) {{
@@ -887,7 +958,7 @@ if st.button("🔴 AETHEL-9 物理破壊・軌道投入ミッション生中継�
         }}
 
         // =========================================================================
-        // ⏱️ メインループ
+        // ⏱️ アニメーション・メインループ
         // =========================================================================
         let tStart = performance.now();
         let explodedTriggered = false;
@@ -918,46 +989,44 @@ if st.button("🔴 AETHEL-9 物理破壊・軌道投入ミッション生中継�
             updateCam(simT, rx, ry, alt, pitch, p0.exploded);
             drawOrbitMap(alt, dRangeKm, p0.exploded);
 
-            // 💥 爆発発生瞬間のリアル物理演出
+            // 💥 爆発瞬間演出
             if (p0.exploded && !explodedTriggered) {{
                 explodedTriggered = true;
                 rocket.visible = false;
                 plume.visible = false;
-                camShake = 0.85; // 強烈なカメラ振動
+                camShake = 0.95;
                 flashOverlay.style.opacity = '1.0';
                 setTimeout(() => {{ flashOverlay.style.opacity = '0.0'; }}, 80);
 
                 playExplosionSound();
-                triggerDebrisExplosion(rx, ry, p0.v * Math.cos(p0.pitch), p0.v * Math.sin(p0.pitch), p0.explosion_type);
+                triggerDebrisExplosion(rx, ry, p0.v * Math.cos(p0.pitch), p0.v * Math.sin(p0.pitch));
 
-                // 爆破火球スモーク
-                for(let k=0; k<60; k++) {{
-                    const a = Math.random()*Math.PI*2;
-                    emitSmoke(rx, ry, 0, Math.cos(a)*1.2, Math.sin(a)*1.2, (Math.random()-0.5)*1.5, 3.0, 15.0, 60, 0.95);
+                for(let k=0; k<70; k++) {{
+                    const ang = Math.random()*Math.PI*2;
+                    emitSmoke(rx, ry, 0, Math.cos(ang)*1.4, Math.sin(ang)*1.4, (Math.random()-0.5)*1.8, 3.5, 18.0, 65, 0.95);
                 }}
 
                 rudBanner.style.display = 'block';
                 rudDesc.innerText = failMessage;
-                speak("Failure! We have lost telemetry. Major vehicle breakup confirmed.");
+                speak("Failure. Major vehicle breakup confirmed.");
                 document.getElementById('tv-stage-badge').innerText = "VEHICLE DESTROYED";
                 document.getElementById('tv-stage-badge').style.color = "#ef4444";
             }}
 
-            // 破片の慣性運動更新
             if (explodedTriggered) {{
                 for(let i=0; i<DEBRIS_MAX; i++) {{
                     const d = debrisPool[i]; if (!d.active) continue;
                     d.mesh.position.x += d.vx * 0.016;
                     d.mesh.position.y += d.vy * 0.016;
                     d.mesh.position.z += d.vz * 0.016;
-                    d.vy -= 9.8 * 0.016 * 0.1; // 重力落下
+                    d.vy -= 9.8 * 0.016 * 0.1;
                     d.mesh.rotation.x += d.rx; d.mesh.rotation.y += d.ry;
                 }}
             }}
 
-            // 大気層表示
+            // 大気圏高度表示
             let regime = "TROPOSPHERE (対流圏)";
-            if (alt >= 100.0) regime = "THERMOSPHERE (熱圏/宇宙)";
+            if (alt >= 100.0) regime = "THERMOSPHERE / ORBIT (宇宙空間)";
             else if (alt >= 50.0) regime = "MESOSPHERE (中間圏)";
             else if (alt >= 12.0) regime = "STRATOSPHERE (成層圏)";
             document.getElementById('hud-regime').innerText = regime;
@@ -967,11 +1036,11 @@ if st.button("🔴 AETHEL-9 物理破壊・軌道投入ミッション生中継�
                 const sec = Math.ceil(Math.abs(simT));
                 document.getElementById('tv-timer').innerText = `T- 00:0${{sec}}.0`;
                 if (simT >= -3.0 && !p0.exploded) {{
-                    camShake = 0.18;
+                    camShake = 0.16;
                     if (rumbleGain) rumbleGain.gain.setTargetAtTime(0.5, actx.currentTime, 0.1);
                     for(let i=0; i<6; i++) {{
                         const side = (i%2 === 0)? 1 : -1;
-                        emitSmoke(rx + (Math.random()-0.5)*2, 0.6, (Math.random()-0.5)*2, side * (0.3 + Math.random()*0.4), 0.05, 0, 1.5, 7.0, 45, 0.85);
+                        emitSmoke(rx + (Math.random()-0.5)*2, 0.6, (Math.random()-0.5)*2, side * (0.35 + Math.random()*0.4), 0.05, 0, 1.6, 7.5, 45, 0.85);
                     }}
                 }}
             }} else if (!p0.exploded) {{
@@ -979,26 +1048,35 @@ if st.button("🔴 AETHEL-9 物理破壊・軌道投入ミッション生中継�
                 document.getElementById('tv-timer').innerText = `T+ ${{String(m).padStart(2,'0')}}:${{s.toFixed(1).padStart(4,'0')}}`;
                 if (simT >= 0 && !voicedEvents.has('liftoff')) {{
                     voicedEvents.add('liftoff');
-                    speak("Liftoff of the launch vehicle! Tower cleared.");
+                    speak("Liftoff of the launch vehicle.");
                     if (rumbleGain) rumbleGain.gain.setTargetAtTime(0.85, actx.currentTime, 0.1);
-                    if (crackleGain) crackleGain.gain.setTargetAtTime(0.4, actx.currentTime, 0.1);
+                    if (crackleGain) crackleGain.gain.setTargetAtTime(0.42, actx.currentTime, 0.1);
                 }}
             }}
 
-            // 排気火炎・真空膨張
+            // 排気火炎・真空クラゲ膨張
             if (p0.thrust && !p0.exploded) {{
                 plume.visible = true;
-                const vacExp = 1.0 + Math.min(8.5, alt / 12.0);
+                const vacExp = 1.0 + Math.min(10.0, alt / 10.0);
                 const flicker = 0.92 + Math.random() * 0.16;
                 coreFlame.scale.set(1.0, flicker, 1.0);
                 outerPlume.scale.set(vacExp, flicker * (1.0 + vacExp * 0.25), vacExp);
 
+                // 成層圏でのクラゲ状光彩 (Jellyfish Effect)
+                if (alt > 35.0 && alt < 120.0) {{
+                    const jProg = Math.sin(((alt - 35.0) / 85.0) * Math.PI);
+                    jellyfishPlume.material.opacity = jProg * 0.45;
+                    jellyfishPlume.scale.set(vacExp * 2.2, vacExp * 3.5, vacExp * 2.2);
+                }} else {{
+                    jellyfishPlume.material.opacity = 0.0;
+                }}
+
                 const shockVis = Math.max(0.0, 1.0 - alt / 40.0);
                 shocks.forEach(sd => {{ sd.visible = shockVis > 0.05; sd.material.opacity = shockVis; }});
 
-                if (alt < 25.0) {{
+                if (alt < 28.0) {{
                     const ux = Math.sin(pitch), uy = Math.cos(pitch);
-                    emitSmoke(rx, ry + 1.0, 0, -ux * 0.4, -uy * 0.4, 0, 1.2, 8.0, 40, 0.6);
+                    emitSmoke(rx, ry + 1.0, 0, -ux * 0.4, -uy * 0.4, 0, 1.2, 8.5, 42, 0.65);
                 }}
             }} else if (!p0.exploded) {{
                 plume.visible = false;
@@ -1033,9 +1111,15 @@ if st.button("🔴 AETHEL-9 物理破壊・軌道投入ミッション生中継�
         }});
     </script>
     """
-    components.html(html_code, height=880)
+    components.html(html_code, height=900)
 
-if error_msg:
-    st.error(f"⚠️ **フライト解析レポート**: {error_msg}")
-else:
-    st.success("🎉 **ミッション大成功**: 第2段オービターが低軌道（LEO）への投入に完全成功しました！")
+# =========================================================================
+# 📊 フライト解析レポート (初期表示エラーを完全に防止)
+# =========================================================================
+if simulation_executed:
+    st.markdown("---")
+    st.markdown("### 📋 フライトテレメトリ詳細レポート")
+    if error_msg:
+        st.error(f"⚠️ **ミッション失敗 (RUD / 異常事態)**: {error_msg}")
+    else:
+        st.success("🎉 **ミッション完全成功**: 全ステージの燃焼・分離シーケンスが完璧に推移し、第2段オービターが低軌道（LEO）投入に到達しました。")
