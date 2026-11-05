@@ -630,6 +630,30 @@ html_template = """
             } catch(e) {}
         }
 
+        const calloutMilestones = [
+            { t: -10.0, main: "> [LD] TERMINAL COUNTDOWN INITIATED", sub: "> Final telemetry lock confirmed", spoken: "Terminal countdown initiated" },
+            { t: -simCfg.ignition_lead, main: "> [PROP] ENGINE IGNITION SEQUENCE START", sub: "> Turbopumps spin-up in progress", spoken: "Ignition sequence start" },
+            { t: 0.0, main: "> [LIFTOFF] VEHICLE HAS CLEARED PAD 39A", sub: "> Pitch and roll program active", spoken: "Liftoff. Tower cleared" },
+            { t: 15.0, main: "> [GUIDANCE] GRAVITY TURN TRAJECTORY NOMINAL", sub: "> Pitch over maneuver continuing downrange", spoken: "Trajectory nominal" },
+            { t: 45.0, main: "> [AERO] VEHICLE PASSING MACH 1 - SUPERSONIC", sub: "> Transonic buffet levels well within limits", spoken: "Vehicle is supersonic" },
+            { t: 65.0, main: "> [AERO] MAXIMUM DYNAMIC PRESSURE (MAX-Q)", sub: "> Main engine throttle bucket applied", spoken: "Max-Q" },
+            { t: 130.0, main: "> [PROP] BOOSTER MECO & SEPARATION", sub: "> Korolev cross staging sequence complete", spoken: "Booster separation" },
+            { t: 165.0, main: "> [STAGE] FIRST STAGE MECO & HOT STAGING", sub: "> Second stage vacuum ignition confirmed", spoken: "Staging confirmed" },
+            { t: 195.0, main: "> [AERO] PAYLOAD FAIRING JETTISON", sub: "> Exo-atmospheric telemetry optimal", spoken: "Fairing separation" },
+            { t: 480.0, main: "> [ORBIT] SECO - NOMINAL ORBITAL INSERTION", sub: "> Spacecraft cruising in stable Low Earth Orbit", spoken: "Orbital insertion confirmed" }
+        ];
+
+        let calloutTrackIndex = 0;
+        function updateFlightCallouts(simT) {
+            while (calloutTrackIndex < calloutMilestones.length && simT >= calloutMilestones[calloutTrackIndex].t) {
+                const milestone = calloutMilestones[calloutTrackIndex];
+                if (eventLog) eventLog.innerText = milestone.main;
+                if (subCallout) subCallout.innerText = milestone.sub;
+                speakCallout(milestone.spoken);
+                calloutTrackIndex++;
+            }
+        }
+
         // =========================================================================
         // 🔊 実録級・重低音ランブル＆パイロ爆薬音響合成 (Web Audio API)
         // =========================================================================
@@ -1341,7 +1365,7 @@ html_template = """
             const s = sparkPool[sIdx]; sIdx = (sIdx + 1) % SPARK_MAX;
             s.active = true; s.sp.visible = true;
             s.sp.position.set(x, y, z);
-            s.vx = vx; p.vy = vy; s.vz = vz;
+            s.vx = vx; s.vy = vy; s.vz = vz;
             s.age = 0; s.maxAge = life; s.size = size;
             s.sp.scale.set(size, size * 1.8, 1);
             s.sp.material.color.setHex(hexCol);
@@ -1473,6 +1497,10 @@ html_template = """
             rocket.updateMatrixWorld(true);
 
             starMat.opacity = Math.min(0.95, 0.12 + (alt / 45.0) * 0.85);
+
+            // 高度上昇に伴うフォグ減衰（宇宙空間で画面がフォグ色に埋もれて真っ暗になるのを防止）
+            const fogFactor = Math.max(0.0, 1.0 - (alt / 35.0));
+            sceneFog.density = 0.000025 * fogFactor;
 
             const ux = Math.sin(pitch), uy = Math.cos(pitch);
             const perpX = Math.cos(pitch), perpY = -Math.sin(pitch);
