@@ -4,13 +4,13 @@ import json
 import streamlit.components.v1 as components
 
 st.set_page_config(
-    page_title="Orbital Architect Extreme: 極限リアリズム航空宇宙4K中継", 
+    page_title="Orbital Architect Extreme: 4K Photorealistic Webcast", 
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-st.title("🚀 Orbital Architect Extreme - 極限リアリズム航空宇宙シミュレーター")
-st.markdown("超高精細プロシージャル・テクスチャリング、破壊力学デブリ物理、NASA/SpaceX公式Webcast実況追尾仕様。")
+st.title("🚀 Orbital Architect Extreme - 4K実写級航空宇宙シミュレーター")
+st.markdown("PBR金属反射シェーダー、流体ボリューメトリック排気プルーム、Starbase/LC-39A級発射施設、高精細RUD破壊力学エンジン搭載。")
 
 # =========================================================================
 # 🔬 推進剤・材料・空力パーツ・魔改造データベース
@@ -18,27 +18,27 @@ st.markdown("超高精細プロシージャル・テクスチャリング、破�
 PROPELLANTS = {
     "超高密度メタロックス (CH4 / LOX) [王道FFSC]": {
         "base_isp_sl": 335, "base_isp_vac": 380, "base_thrust": 2750, "density": 0.83, 
-        "flame_hex": 0x38bdf8, "outer_hex": 0x0369a1, "risk": 0.0, "type": "methalox"
+        "flame_hex": 0x38bdf8, "outer_hex": 0x0284c7, "risk": 0.0, "type": "methalox"
     },
     "高精製ケロシン (RP-1 / LOX) [ヘビーリフト]": {
         "base_isp_sl": 298, "base_isp_vac": 330, "base_thrust": 1450, "density": 1.02, 
-        "flame_hex": 0xfb923c, "outer_hex": 0x9a3412, "risk": 0.0, "type": "rp1"
+        "flame_hex": 0xffedd5, "outer_hex": 0xea580c, "risk": 0.0, "type": "rp1"
     },
     "超極低温ハイドロロックス (LH2 / LOX) [究極真空比推力]": {
         "base_isp_sl": 380, "base_isp_vac": 470, "base_thrust": 1400, "density": 0.32, 
-        "flame_hex": 0xf472b6, "outer_hex": 0xbe185d, "risk": 0.02, "type": "hydro"
+        "flame_hex": 0xfbcfe8, "outer_hex": 0xdb2777, "risk": 0.02, "type": "hydro"
     },
     "【猛毒】赤煙硝酸 ＋ UDMH [即自発火ハイパーゴリック]": {
         "base_isp_sl": 285, "base_isp_vac": 318, "base_thrust": 1950, "density": 1.25, 
-        "flame_hex": 0xc026d3, "outer_hex": 0x6b21a8, "risk": 0.05, "type": "hypergolic"
+        "flame_hex": 0xf5d0fe, "outer_hex": 0x9333ea, "risk": 0.05, "type": "hypergolic"
     },
     "【核熱】固体コア型原子力熱ロケット (NERVA / H2)": {
         "base_isp_sl": 420, "base_isp_vac": 900, "base_thrust": 2400, "density": 0.28, 
-        "flame_hex": 0x22c55e, "outer_hex": 0x14532d, "risk": 0.15, "type": "nuclear"
+        "flame_hex": 0x86efac, "outer_hex": 0x16a34a, "risk": 0.15, "type": "nuclear"
     },
     "【禁忌】ダークマター濃縮スラリー [不安定特異点]": {
         "base_isp_sl": 880, "base_isp_vac": 1250, "base_thrust": 6800, "density": 1.85, 
-        "flame_hex": 0xa855f7, "outer_hex": 0x581c87, "risk": 0.45, "type": "darkmatter"
+        "flame_hex": 0xe9d5ff, "outer_hex": 0x6b21a8, "risk": 0.45, "type": "darkmatter"
     }
 }
 
@@ -236,7 +236,6 @@ def run_simulation():
     history = []
     fail_reason = None
 
-    # カウントダウン (T-10s)
     for cd_step in range(20):
         t_cd = -10.0 + cd_step * 0.5
         pre_ignition = bool(t_cd >= -3.0)
@@ -250,9 +249,8 @@ def run_simulation():
     maxq_passed = False
     supersonic_called = False
 
-    # 1. 燃焼室過圧判定
     if s1_spec["pc"] > s1_spec["pc_limit"]:
-        fail_reason = f"ターボポンプ破裂: 燃焼室圧 {s1_spec['pc']} bar が構造限界 {s1_spec['pc_limit']} bar を超過。"
+        fail_reason = f"ターボポンプ高圧プリバーナー破裂: 燃焼室圧 {s1_spec['pc']} bar が構造限界 {s1_spec['pc_limit']} bar を超過。"
         history.append({
             "t": 0.1, "x": 0.0, "y": 0.0, "alt": 0.0, "v": 0.0, "q": 0.0, "g": 0.0,
             "stage": 1, "fairing": True, "wings": wings_attached, "strapon": strapon_attached,
@@ -261,9 +259,8 @@ def run_simulation():
         })
         return history, fail_reason
 
-    # 2. 燃料リスク
     if s1_spec["fuel_risk"] > 0.3 and np.random.rand() < s1_spec["fuel_risk"]:
-        fail_reason = "特異点崩壊: ダークマター濃縮スラリーが臨界暴走。発射台ごと事象の地平線へ消失。"
+        fail_reason = "特異点崩壊: ダークマター濃縮スラリーが臨界暴走。発射台ごと事象の地平線へ爆縮。"
         history.append({
             "t": 0.2, "x": 0.0, "y": 0.0, "alt": 0.0, "v": 0.0, "q": 0.0, "g": 0.0,
             "stage": 1, "fairing": True, "wings": wings_attached, "strapon": strapon_attached,
@@ -282,7 +279,6 @@ def run_simulation():
         rho = float(1.225 * np.exp(-alt / 7400.0)) if alt < 140000 else 0.0
         q = float(0.5 * rho * (v**2) / 1000.0)
 
-        # 重力ターン
         if alt_km < turn_start_alt:
             target_pitch_deg = 90.0
         elif alt_km < turn_end_alt:
@@ -318,7 +314,6 @@ def run_simulation():
         w_mass = (wing_spec["mass"] * 1000.0) if wings_attached else 0.0
         strap_m = (strapon_spec["mass_add"] * 1000.0 + fuel_strapon_rem) if strapon_attached else 0.0
 
-        # 推力演算
         if stage == 1:
             if fuel_strapon_rem > 0 and strapon_attached:
                 strap_thrust = strapon_spec["thrust_add"] * 1000.0
@@ -386,7 +381,7 @@ def run_simulation():
 
         if alt <= 0.0 and fy <= 0.0:
             if t > 1.0:
-                fail_reason = "離床推力不足 (TWR < 1.0): 自重を持ち上げられず発射台上で轟沈・大爆発。"
+                fail_reason = "離床推力不足 (TWR < 1.0): 自重を支えきれずオービタルランチマウント上で座屈・大爆発。"
                 history.append({
                     "t": t, "x": 0.0, "y": 0.0, "alt": 0.0, "v": 0.0, "q": 0.0, "g": 1.0,
                     "stage": 1, "fairing": True, "wings": wings_attached, "strapon": strapon_attached,
@@ -403,9 +398,8 @@ def run_simulation():
 
         cur_spec = s1_spec if stage == 1 else s2_spec
 
-        # 破壊力学・構造限界判定
         if wings_attached and mach > wing_spec["flutter_mach"] and rho > 0.04:
-            fail_reason = f"主翼遷音速フラッター崩壊: マッハ {mach:.2f} の超音速衝撃波干渉で主翼がちぎれ、タンク外殻を直撃破壊。"
+            fail_reason = f"主翼遷音速フラッター崩壊: マッハ {mach:.2f} の衝撃波干渉で主翼が破断し、液体酸素タンク外壁を直撃貫通。"
             history.append({
                 "t": t, "x": float(x), "y": float(y), "alt": alt_km, "v": v, "q": q, "g": acc_g,
                 "stage": int(stage), "fairing": fairing_attached, "wings": False, "strapon": strapon_attached,
@@ -415,7 +409,7 @@ def run_simulation():
             break
 
         if abs(extra_pitch_deflection) > 28.0 and q > 18.0:
-            fail_reason = f"空力トリム破綻（ピッチ反転）: 過大な揚力モーメントにより機体が急激に横滑りし、横動圧 {q:.1f} kPa で機体真っ二つ。"
+            fail_reason = f"空力トリム破綻（ピッチ反転）: 過大な揚力モーメントにより機体が横滑りし、動圧 {q:.1f} kPa の剪断応力で空中分解。"
             history.append({
                 "t": t, "x": float(x), "y": float(y), "alt": alt_km, "v": v, "q": q, "g": acc_g,
                 "stage": int(stage), "fairing": fairing_attached, "wings": wings_attached, "strapon": strapon_attached,
@@ -425,7 +419,7 @@ def run_simulation():
             break
 
         if q > cur_spec["max_q"]:
-            fail_reason = f"Max-Q 構造圧壊: 動圧 {q:.1f} kPa が外殻等価強度 ({cur_spec['max_q']:.1f} kPa) を突破。"
+            fail_reason = f"Max-Q 構造圧壊: 空力動圧 {q:.1f} kPa が外殻許容座屈応力 ({cur_spec['max_q']:.1f} kPa) を突破。"
             history.append({
                 "t": t, "x": float(x), "y": float(y), "alt": alt_km, "v": v, "q": q, "g": acc_g,
                 "stage": int(stage), "fairing": fairing_attached, "wings": wings_attached, "strapon": strapon_attached,
@@ -435,7 +429,7 @@ def run_simulation():
             break
 
         if acc_g > cur_spec["max_g"]:
-            fail_reason = f"過大加速度圧砕: 加速度 {acc_g:.1f} G が許容限界 ({cur_spec['max_g']:.1f} G) を超過。"
+            fail_reason = f"過大軸方向G圧砕: 加速度 {acc_g:.1f} G によりドーム隔壁が破断 ({cur_spec['max_g']:.1f} G 限界)。"
             history.append({
                 "t": t, "x": float(x), "y": float(y), "alt": alt_km, "v": v, "q": q, "g": acc_g,
                 "stage": int(stage), "fairing": fairing_attached, "wings": wings_attached, "strapon": strapon_attached,
@@ -466,7 +460,7 @@ def run_simulation():
             break
 
     if not fail_reason and history[-1]["event"] != "ORBIT":
-        fail_reason = f"軌道速度未達（燃料枯渇・弾道落下）。到達高度: {alt_km:.1f} km, 水平速度: {vx:.0f} m/s (軌道基準: 7,780 m/s)"
+        fail_reason = f"軌道速度未達（推進剤枯渇・大気圏再突入落下）。到達高度: {alt_km:.1f} km, 水平速度: {vx:.0f} m/s"
 
     return history, fail_reason
 
@@ -476,7 +470,7 @@ simulation_executed = False
 traj_data = None
 error_msg = None
 
-if st.button("🔴 AETHEL-X 極限実写4K中継 ＆ 軌道投入シミュレーション開始", use_container_width=True, type="primary"):
+if st.button("🔴 4K 光学トラッキング実写中継 ＆ 軌道投入シミュレーション開始", use_container_width=True, type="primary"):
     simulation_executed = True
     traj_data, error_msg = run_simulation()
 
@@ -505,77 +499,74 @@ if st.button("🔴 AETHEL-X 極限実写4K中継 ＆ 軌道投入シミュレー
 
         <div id="canvas-container" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0;"></div>
 
+        <!-- 光学フィルムグレイン＆ビネットオーバーレイ (実写望遠レンズ質感) -->
+        <div style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; box-shadow: inset 0 0 130px rgba(0,0,0,0.85); z-index: 5;"></div>
+
         <!-- 放送中継トップバナー -->
         <div style="position: absolute; top: 0; left: 0; width: 100%; height: 48px; background: rgba(3, 7, 18, 0.88); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 0 28px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 10;">
             <div style="display: flex; align-items: center; gap: 14px;">
                 <span id="live-indicator" style="display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 12px #ef4444; animation: livePulse 1.4s infinite alternate;"></span>
-                <span style="color: #ffffff; font-weight: 800; font-size: 13px; letter-spacing: 2px;">OFFICIAL MISSION WEBCAST</span>
+                <span style="color: #ffffff; font-weight: 800; font-size: 13px; letter-spacing: 2px;">OFFICIAL 4K OPTICAL WEBCAST</span>
                 <span style="color: rgba(255,255,255,0.2);">|</span>
-                <span id="cam-tag" style="color: #38bdf8; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; font-family: monospace;">TRACKER: LC-39A HIGH-SPEED TRACKING TELESCOPE</span>
+                <span id="cam-tag" style="color: #38bdf8; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; font-family: monospace;">OPTICS: LC-39A 2400mm LONG-RANGE TRACKER</span>
             </div>
             <div style="display: flex; align-items: center; gap: 20px; font-family: monospace; font-size: 11px;">
-                <span style="color: #94a3b8;">ATMOSPHERE: <strong id="hud-regime" style="color: #f8fafc;">SEA LEVEL</strong></span>
+                <span style="color: #94a3b8;">REGIME: <strong id="hud-regime" style="color: #f8fafc;">SEA LEVEL</strong></span>
                 <span id="comm-status" style="color: #10b981;">TELEMETRY: NOMINAL</span>
             </div>
         </div>
 
-        <style>
-            @keyframes livePulse {{ from {{ opacity: 0.35; }} to {{ opacity: 1.0; }} }}
-        </style>
+        <style>@keyframes livePulse {{ from {{ opacity: 0.35; }} to {{ opacity: 1.0; }} }}</style>
 
         <!-- 🛰️ 軌道フライト HUD -->
-        <div style="position: absolute; top: 60px; right: 24px; width: 280px; background: rgba(3, 7, 18, 0.88); backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; padding: 14px; z-index: 10; color: #fff;">
+        <div style="position: absolute; top: 60px; right: 24px; width: 280px; background: rgba(3, 7, 18, 0.85); backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; padding: 14px; z-index: 10; color: #fff;">
             <div style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 1.5px; margin-bottom: 8px; display: flex; justify-content: space-between;">
                 <span>DOWNRANGE TRAJECTORY</span>
                 <span id="hud-downrange" style="color: #38bdf8; font-family: monospace;">0.0 km</span>
             </div>
             <canvas id="orbit-canvas" width="250" height="90" style="width: 100%; height: 90px; background: #01040d; border-radius: 2px;"></canvas>
             <div style="display: flex; justify-content: space-between; font-size: 9px; color: #64748b; margin-top: 6px; font-family: monospace;">
-                <span>PAD</span>
-                <span>MAX-Q</span>
-                <span>STAGE SEP</span>
-                <span>ORBIT</span>
+                <span>LAUNCH PAD</span><span>MAX-Q</span><span>MECO</span><span>ORBIT</span>
             </div>
         </div>
 
         <!-- 破壊アラート -->
-        <div id="rud-banner" style="display: none; position: absolute; top: 180px; left: 50%; transform: translateX(-50%); background: rgba(140, 15, 15, 0.95); backdrop-filter: blur(16px); border: 2px solid #ef4444; border-radius: 4px; padding: 18px 32px; z-index: 25; text-align: center; box-shadow: 0 0 50px rgba(239, 68, 68, 0.6);">
-            <div style="color: #fff; font-size: 18px; font-weight: 900; letter-spacing: 2.5px; font-family: monospace;">🚨 CATASTROPHIC VEHICLE BREAKUP (RUD) 🚨</div>
-            <div id="rud-desc" style="color: #fecaca; font-size: 13px; font-weight: 600; margin-top: 8px; max-width: 520px; line-height: 1.4;"></div>
+        <div id="rud-banner" style="display: none; position: absolute; top: 170px; left: 50%; transform: translateX(-50%); background: rgba(120, 10, 10, 0.92); backdrop-filter: blur(16px); border: 2px solid #ef4444; border-radius: 4px; padding: 18px 32px; z-index: 25; text-align: center; box-shadow: 0 0 60px rgba(239, 68, 68, 0.7);">
+            <div style="color: #fff; font-size: 18px; font-weight: 900; letter-spacing: 2.5px; font-family: monospace;">🚨 RAPID UNSCHEDULED DISASSEMBLY (RUD) 🚨</div>
+            <div id="rud-desc" style="color: #fecaca; font-size: 13px; font-weight: 600; margin-top: 8px; max-width: 540px; line-height: 1.4;"></div>
         </div>
 
         <!-- 放送テレメトリー HUD -->
         <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, rgba(1, 3, 8, 0.98) 0%, rgba(2, 6, 14, 0.88) 75%, transparent 100%); padding: 28px 36px 20px 36px; box-sizing: border-box; display: flex; align-items: flex-end; justify-content: space-between; z-index: 10;">
             <div>
-                <div id="tv-status" style="color: #38bdf8; font-size: 11px; font-weight: 700; letter-spacing: 2px; margin-bottom: 2px;">COUNTDOWN SEQUENCE</div>
+                <div id="tv-status" style="color: #38bdf8; font-size: 11px; font-weight: 700; letter-spacing: 2px; margin-bottom: 2px;">MISSION CLOCK</div>
                 <div id="tv-timer" style="color: #ffffff; font-size: 48px; font-weight: 900; font-family: 'Consolas', monospace; letter-spacing: 2px; text-shadow: 0 0 25px rgba(56, 189, 248, 0.4);">T- 00:10.0</div>
             </div>
-
             <div style="display: flex; gap: 40px; border-left: 1px solid rgba(255,255,255,0.15); padding-left: 36px;">
                 <div>
-                    <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px; text-transform: uppercase;">MACH / VELOCITY</div>
+                    <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px;">SPEED / MACH</div>
                     <div style="color: #fff; font-size: 26px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-mach">M 0.00</span> <span style="font-size: 12px; color: #94a3b8;" id="tv-spd">(0 km/h)</span></div>
                 </div>
                 <div>
-                    <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px; text-transform: uppercase;">ALTITUDE</div>
+                    <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px;">ALTITUDE</div>
                     <div style="color: #fff; font-size: 26px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-alt">0.0</span> <span style="font-size: 12px; color: #94a3b8;">km</span></div>
                 </div>
                 <div>
-                    <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px; text-transform: uppercase;">DYNAMIC Q</div>
+                    <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px;">DYNAMIC PRESSURE</div>
                     <div style="color: #fff; font-size: 26px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-q">0.0</span> <span style="font-size: 12px; color: #94a3b8;">kPa</span></div>
                 </div>
                 <div>
-                    <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px; text-transform: uppercase;">ACCELERATION</div>
+                    <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px;">AXIAL LOAD</div>
                     <div style="color: #fff; font-size: 26px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-g">1.0</span> <span style="font-size: 12px; color: #94a3b8;">G</span></div>
                 </div>
                 <div>
-                    <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px; text-transform: uppercase;">STAGE CONFIG</div>
-                    <div id="tv-stage-badge" style="color: #34d399; font-size: 20px; font-weight: 800; font-family: 'Consolas', monospace;">CORE BOOSTER</div>
+                    <div style="font-size: 10px; color: #94a3b8; letter-spacing: 1.2px;">VEHICLE STATE</div>
+                    <div id="tv-stage-badge" style="color: #34d399; font-size: 20px; font-weight: 800; font-family: 'Consolas', monospace;">BOOSTER IG-SEQ</div>
                 </div>
             </div>
         </div>
 
-        <div id="flash-overlay" style="position: absolute; top:0; left:0; width:100%; height:100%; background:#fff; opacity:0; pointer-events:none; z-index:30; transition:opacity 0.08s;"></div>
+        <div id="flash-overlay" style="position: absolute; top:0; left:0; width:100%; height:100%; background:#fff5e6; opacity:0; pointer-events:none; z-index:30; transition:opacity 0.12s;"></div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -590,7 +581,7 @@ if st.button("🔴 AETHEL-X 極限実写4K中継 ＆ 軌道投入シミュレー
         const rudBanner = document.getElementById('rud-banner');
         const rudDesc = document.getElementById('rud-desc');
 
-        // 音響合成エンジン
+        // 音響合成エンジン (重低音クラックルノイズ + 大爆発サブベース)
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let actx = null, rumbleGain = null, crackleGain = null;
         function initAudio() {{
@@ -601,13 +592,13 @@ if st.button("🔴 AETHEL-X 極限実写4K中継 ＆ 軌道投入シミュレー
                 for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 
                 const rSrc = actx.createBufferSource(); rSrc.buffer = buf; rSrc.loop = true;
-                const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 95;
+                const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 85;
                 rumbleGain = actx.createGain(); rumbleGain.gain.value = 0;
                 rSrc.connect(lp); lp.connect(rumbleGain); rumbleGain.connect(actx.destination);
                 rSrc.start(0);
 
                 const cSrc = actx.createBufferSource(); cSrc.buffer = buf; cSrc.loop = true;
-                const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 750; bp.Q.value = 3.0;
+                const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 680; bp.Q.value = 2.8;
                 crackleGain = actx.createGain(); crackleGain.gain.value = 0;
                 cSrc.connect(bp); bp.connect(crackleGain); crackleGain.connect(actx.destination);
                 cSrc.start(0);
@@ -617,438 +608,673 @@ if st.button("🔴 AETHEL-X 極限実写4K中継 ＆ 軌道投入シミュレー
 
         function playExplosionSound() {{
             if (!actx) return;
+            if (rumbleGain) rumbleGain.gain.setTargetAtTime(0.0, actx.currentTime, 0.05);
+            if (crackleGain) crackleGain.gain.setTargetAtTime(0.0, actx.currentTime, 0.05);
+            // 衝撃波ドン音 + 破片轟音
             const osc = actx.createOscillator();
             const g = actx.createGain();
             osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(90, actx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(10, actx.currentTime + 2.5);
-            g.gain.setValueAtTime(1.0, actx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 3.8);
+            osc.frequency.setValueAtTime(110, actx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(12, actx.currentTime + 3.2);
+            g.gain.setValueAtTime(1.2, actx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 4.2);
             osc.connect(g); g.connect(actx.destination);
-            osc.start(); osc.stop(actx.currentTime + 3.8);
+            osc.start(); osc.stop(actx.currentTime + 4.2);
         }}
 
-        // 公式Webcast実況・コメンテーター音声
         const voicedEvents = new Set();
         function announceWebcast(text) {{
             if (!('speechSynthesis' in window)) return;
             const u = new SpeechSynthesisUtterance(text);
-            u.lang = 'en-US';
-            u.rate = 1.08;
-            u.pitch = 0.95;
+            u.lang = 'en-US'; u.rate = 1.06; u.pitch = 0.92;
             window.speechSynthesis.speak(u);
         }}
 
         // =========================================================================
-        // 🌍 Three.js 空間・高精細ライティング・地球構築
+        // 🌍 Three.js シーン & 実写PBR環境マップ構築 (金属鏡面反射の核心)
         // =========================================================================
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(26, container.clientWidth / container.clientHeight, 0.5, 50000000);
+        const camera = new THREE.PerspectiveCamera(24, container.clientWidth / container.clientHeight, 0.5, 50000000);
         const renderer = new THREE.WebGLRenderer({{ antialias: true, powerPreference: "high-performance" }});
         renderer.setSize(container.clientWidth, container.clientHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.25;
+        renderer.toneMappingExposure = 1.15;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
 
-        // 恒星宇宙背景
+        // プロシージャルHDR環境マップ生成（これがないと金属がプラスチックに見える）
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        pmremGenerator.compileEquirectangularShader();
+        const envCanvas = document.createElement('canvas');
+        envCanvas.width = 512; envCanvas.height = 256;
+        const ectx = envCanvas.getContext('2d');
+        const envGrad = ectx.createLinearGradient(0, 0, 0, 256);
+        envGrad.addColorStop(0.0, '#020617');
+        envGrad.addColorStop(0.42, '#1e3a8a');
+        envGrad.addColorStop(0.49, '#bae6fd');
+        envGrad.addColorStop(0.51, '#fde047');
+        envGrad.addColorStop(0.55, '#334155');
+        envGrad.addColorStop(1.0, '#090d16');
+        ectx.fillStyle = envGrad; ectx.fillRect(0, 0, 512, 256);
+        // 太陽ハイライトスポット
+        const sunGrad = ectx.createRadialGradient(380, 115, 2, 380, 115, 45);
+        sunGrad.addColorStop(0, '#ffffff');
+        sunGrad.addColorStop(1, 'rgba(255,255,255,0)');
+        ectx.fillStyle = sunGrad; ectx.fillRect(0, 0, 512, 256);
+
+        const envTex = new THREE.CanvasTexture(envCanvas);
+        envTex.mapping = THREE.EquirectangularReflectionMapping;
+        scene.environment = pmremGenerator.fromEquirectangular(envTex).texture;
+
+        // 太陽光＆点火照り返しライト
+        const sunLight = new THREE.DirectionalLight(0xfff9f0, 3.8);
+        sunLight.position.set(4000, 7500, 5000);
+        sunLight.castShadow = true;
+        scene.add(sunLight);
+        scene.add(new THREE.HemisphereLight(0x7dd3fc, 0x1e293b, 0.65));
+
+        const engineBounceLight = new THREE.PointLight(cfg.flame_hex, 0.0, 220, 1.6);
+        scene.add(engineBounceLight);
+
+        // 恒星フィールド
         const starGeo = new THREE.BufferGeometry();
-        const starCount = 5000;
-        const starPositions = new Float32Array(starCount * 3);
-        const starColors = new Float32Array(starCount * 3);
-        for(let i=0; i<starCount*3; i+=3) {{
-            const rad = 25000000;
+        const starPos = new Float32Array(4500 * 3);
+        for(let i=0; i<4500*3; i+=3) {{
+            const rad = 22000000;
             const u = Math.random(), v = Math.random();
-            const theta = u * 2.0 * Math.PI, phi = Math.acos(2.0 * v - 1.0);
-            starPositions[i] = rad * Math.sin(phi) * Math.cos(theta);
-            starPositions[i+1] = rad * Math.sin(phi) * Math.sin(theta);
-            starPositions[i+2] = rad * Math.cos(phi);
-            const tint = 0.75 + Math.random() * 0.25;
-            starColors[i] = tint; starColors[i+1] = tint * 0.95; starColors[i+2] = tint * 1.1;
+            const th = u * 2.0 * Math.PI, ph = Math.acos(2.0 * v - 1.0);
+            starPos[i] = rad * Math.sin(ph) * Math.cos(th);
+            starPos[i+1] = rad * Math.sin(ph) * Math.sin(th);
+            starPos[i+2] = rad * Math.cos(ph);
         }}
-        starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-        starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
-        const starMat = new THREE.PointsMaterial({{ size: 1.8, vertexColors: true, transparent: true, opacity: 0.9 }});
-        scene.add(new THREE.Points(starGeo, starMat));
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+        const starMat = new THREE.PointsMaterial({{ size: 1.5, color: 0xe2e8f0, transparent: true, opacity: 0.15 }});
+        const stars = new THREE.Points(starGeo, starMat);
+        scene.add(stars);
 
-        // 実写地球テクスチャ
+        // 実写地球テクスチャ＆レイリー大気散乱ドーム
         const texLoader = new THREE.TextureLoader();
-        const earthMapTex = texLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_atmos_2048.jpg');
-        const earthNormalTex = texLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_normal_2048.jpg');
-        const earthSpecTex = texLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_specular_2048.jpg');
-        const earthCloudsTex = texLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_clouds_1024.png');
-
         const R_EARTH = 6371.0;
-        const earthMat = new THREE.MeshStandardMaterial({{
-            map: earthMapTex,
-            normalMap: earthNormalTex,
-            roughnessMap: earthSpecTex,
-            roughness: 0.65,
-            metalness: 0.1
-        }});
-        const earthMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH, 160, 120), earthMat);
+        const earthMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(R_EARTH, 160, 120),
+            new THREE.MeshStandardMaterial({{
+                map: texLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_atmos_2048.jpg'),
+                normalMap: texLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_normal_2048.jpg'),
+                roughness: 0.68, metalness: 0.12
+            }})
+        );
         earthMesh.position.set(0, -R_EARTH, 0);
         earthMesh.rotation.y = -Math.PI * 0.62;
         earthMesh.rotation.x = 0.28;
         scene.add(earthMesh);
 
         const cloudMesh = new THREE.Mesh(
-            new THREE.SphereGeometry(R_EARTH + 4.5, 96, 72),
+            new THREE.SphereGeometry(R_EARTH + 4.2, 96, 72),
             new THREE.MeshStandardMaterial({{
-                map: earthCloudsTex,
-                transparent: true,
-                opacity: 0.72,
-                blending: THREE.NormalBlending,
-                depthWrite: false
+                map: texLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/planets/earth_clouds_1024.png'),
+                transparent: true, opacity: 0.78, depthWrite: false
             }})
         );
         cloudMesh.position.set(0, -R_EARTH, 0);
         cloudMesh.rotation.copy(earthMesh.rotation);
         scene.add(cloudMesh);
 
-        // 大気散乱シェーダー
         const atmoMat = new THREE.ShaderMaterial({{
-            side: THREE.BackSide,
-            transparent: true,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
+            side: THREE.BackSide, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
             vertexShader: `
-                varying vec3 vNormal;
-                varying vec3 vWorldPosition;
+                varying vec3 vNormal; varying vec3 vWorldPos;
                 void main() {{
                     vNormal = normalize(normalMatrix * normal);
-                    vec4 worldPos = modelMatrix * vec4(position, 1.0);
-                    vWorldPosition = worldPos.xyz;
+                    vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
                     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
                 }}
             `,
             fragmentShader: `
-                varying vec3 vNormal;
-                varying vec3 vWorldPosition;
+                varying vec3 vNormal; varying vec3 vWorldPos;
                 void main() {{
-                    vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+                    vec3 viewDir = normalize(cameraPosition - vWorldPos);
                     float rim = max(0.0, dot(viewDir, -vNormal));
-                    float intensity = pow(1.0 - rim, 3.2);
-                    vec3 skyBlue = vec3(0.18, 0.52, 0.98);
-                    vec3 glowColor = vec3(0.95, 0.45, 0.15);
-                    vec3 col = mix(skyBlue, glowColor, pow(intensity, 2.8));
-                    gl_FragColor = vec4(col, intensity * 0.88);
+                    float intensity = pow(1.0 - rim, 2.8);
+                    vec3 col = mix(vec3(0.12, 0.48, 0.96), vec3(0.98, 0.55, 0.22), pow(intensity, 3.0));
+                    gl_FragColor = vec4(col, intensity * 0.92);
                 }}
             `
         }});
-        const atmoMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH + 85.0, 96, 72), atmoMat);
+        const atmoMesh = new THREE.Mesh(new THREE.SphereGeometry(R_EARTH + 95.0, 96, 72), atmoMat);
         atmoMesh.position.set(0, -R_EARTH, 0);
         scene.add(atmoMesh);
 
-        // ライティング
-        const sunLight = new THREE.DirectionalLight(0xfff8ee, 4.2);
-        sunLight.position.set(8000, 12000, 6000);
-        scene.add(sunLight);
-        scene.add(new THREE.AmbientLight(0x0a192f, 0.7));
-
-        // 🏗️ 詳細発射台＆サービスマスト
+        // =========================================================================
+        // 🏗️ 超精密 Starbase / LC-39A 発射複合施設 (OLM・メカジラ・配管・避雷針塔)
+        // =========================================================================
         const pad = new THREE.Group();
-        const padBaseMat = new THREE.MeshStandardMaterial({{ color: 0x1e293b, roughness: 0.6, metalness: 0.7 }});
-        const towerTrussMat = new THREE.MeshStandardMaterial({{ color: 0x475569, metalness: 0.8, roughness: 0.4 }});
-
-        const tower = new THREE.Mesh(new THREE.BoxGeometry(6.0, 56, 6.0), new THREE.MeshStandardMaterial({{ color: 0x334155, wireframe: true }}));
-        tower.position.set(-9.5, 28, 0); pad.add(tower);
-
-        const launchMount = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 6.8, 4.0, 32), padBaseMat);
-        launchMount.position.set(0, 2.0, 0); pad.add(launchMount);
-
-        const trench = new THREE.Mesh(new THREE.BoxGeometry(22.0, 2.5, 9.0), new THREE.MeshStandardMaterial({{ color: 0x090d16, roughness: 0.95 }}));
-        trench.position.set(6.0, 0.8, 0); pad.add(trench);
         scene.add(pad);
 
-        // =========================================================================
-        // 🚀 ロケット本体 ハイディテール・プロシージャルモデリング
-        // =========================================================================
-        function createRocketSkinTexture(matId) {{
-            const c = document.createElement('canvas'); c.width = 512; c.height = 1024;
-            const ctx = c.getContext('2d');
-            
-            // ベース色設定
-            if (matId === 'ss') ctx.fillStyle = '#b0b8c4';
-            else if (matId === 'cf') ctx.fillStyle = '#1c1f24';
-            else if (matId === 'inconel') ctx.fillStyle = '#7a756f';
-            else ctx.fillStyle = '#e8edf2';
-            ctx.fillRect(0, 0, 512, 1024);
+        const darkSteelMat = new THREE.MeshStandardMaterial({{ color: 0x1e242b, metalness: 0.85, roughness: 0.35 }});
+        const concreteMat = new THREE.MeshStandardMaterial({{ color: 0x374151, roughness: 0.9, metalness: 0.05 }});
+        const pipeMat = new THREE.MeshStandardMaterial({{ color: 0xcbd5e1, metalness: 0.9, roughness: 0.25 }});
+        const hazardMat = new THREE.MeshStandardMaterial({{ color: 0xeab308, roughness: 0.5, metalness: 0.3 }});
 
-            // リベット・溶接ビードライン
-            ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 2;
-            for(let y = 60; y < 1024; y += 90) {{
-                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
+        // 1. 広大コンクリートパッド面 & フレイムトレンチ導水路
+        const groundPlate = new THREE.Mesh(new THREE.CylinderGeometry(85, 95, 1.2, 64), concreteMat);
+        groundPlate.position.y = -0.6; pad.add(groundPlate);
+
+        const flameDeflector = new THREE.Mesh(new THREE.ConeGeometry(8.5, 5.5, 4), new THREE.MeshStandardMaterial({{ color: 0x111827, roughness: 0.8 }}));
+        flameDeflector.position.set(0, 1.2, 0); flameDeflector.rotation.y = Math.PI / 4; pad.add(flameDeflector);
+
+        // 2. 20本脚 オービタル・ランチ・マウント (OLM)
+        const olmRing = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.5, 1.8, 32), darkSteelMat);
+        olmRing.position.y = 5.2; pad.add(olmRing);
+        for(let i=0; i<12; i++) {{
+            const ang = (i / 12) * Math.PI * 2;
+            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.38, 5.2, 12), darkSteelMat);
+            leg.position.set(Math.cos(ang)*2.8, 2.6, Math.sin(ang)*2.8);
+            pad.add(leg);
+        }}
+
+        // 3. 146m級 インテグレーションタワー (Mechazilla トラス構造)
+        const towerX = -8.5;
+        const towerHeight = 44.0;
+        for(let cx of [-2.2, 2.2]) {{
+            for(let cz of [-2.2, 2.2]) {{
+                const col = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, towerHeight, 12), darkSteelMat);
+                col.position.set(towerX + cx, towerHeight/2, cz);
+                pad.add(col);
+            }}
+        }}
+        // トラス斜材クロスブレース段重ね
+        for(let h = 2; h < towerHeight; h += 3.8) {{
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.25, 4.6), darkSteelMat);
+            frame.position.set(towerX, h, 0); pad.add(frame);
+            const diag = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 6.2, 8), darkSteelMat);
+            diag.position.set(towerX, h + 1.9, 2.2); diag.rotation.z = 0.82; pad.add(diag);
+            const diag2 = diag.clone(); diag2.rotation.z = -0.82; diag2.position.z = -2.2; pad.add(diag2);
+        }}
+
+        // 4. チョップスティック (キャッチアーム) ＆ クイックディスコネクト (QD) アンビリカルアーム
+        for(let zSide of [-1.4, 1.4]) {{
+            const chopstick = new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.55, 0.45), darkSteelMat);
+            chopstick.position.set(towerX + 5.2, 28.5, zSide);
+            pad.add(chopstick);
+        }}
+        const qdArm = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 6.8, 12), pipeMat);
+        qdArm.rotation.z = Math.PI / 2; qdArm.position.set(towerX + 4.2, 16.5, 0); pad.add(qdArm);
+
+        // 5. 極低温LOX/CH4 タンクファーム ＆ 4基の避雷針マスト
+        for(let tIdx = 0; tIdx < 4; tIdx++) {{
+            const cryoTank = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 11.0, 32), pipeMat);
+            cryoTank.position.set(-28 - tIdx * 6.5, 5.5, -18); pad.add(cryoTank);
+            const dome = new THREE.Mesh(new THREE.SphereGeometry(2.2, 32, 16), pipeMat);
+            dome.position.set(-28 - tIdx * 6.5, 11.0, -18); pad.add(dome);
+        }}
+        for(let mAng of [0.6, 2.4, 3.9, 5.5]) {{
+            const lMast = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.45, 52.0, 8), hazardMat);
+            lMast.position.set(Math.cos(mAng)*42, 26.0, Math.sin(mAng)*42); pad.add(lMast);
+        }}
+
+        // =========================================================================
+        // 🚀 超高精細・実機ディテールロケット構築 (リベット・TPS耐熱タイル・配管・Raptorベル)
+        // =========================================================================
+        function createHighDetailRocketTextures(matId, hasHeatshield) {{
+            const w = 1024, h = 2048;
+            const diffCvs = document.createElement('canvas'); diffCvs.width = w; diffCvs.height = h;
+            const dctx = diffCvs.getContext('2d');
+            const bumpCvs = document.createElement('canvas'); bumpCvs.width = w; bumpCvs.height = h;
+            const bctx = bumpCvs.getContext('2d');
+
+            // ベースカラー
+            if (matId === 'ss') dctx.fillStyle = '#cbd5e1';
+            else if (matId === 'cf') dctx.fillStyle = '#18181b';
+            else if (matId === 'inconel') dctx.fillStyle = '#64748b';
+            else if (matId === 'wood') dctx.fillStyle = '#92400e';
+            else dctx.fillStyle = '#f8fafc';
+            dctx.fillRect(0, 0, w, h);
+
+            bctx.fillStyle = '#808080'; bctx.fillRect(0, 0, w, h);
+
+            // 溶接リングシーム & アルミリチウムパネルの微妙な個体差トーン
+            for(let y = 0; y < h; y += 64) {{
+                const shade = (Math.random() - 0.5) * 14;
+                dctx.fillStyle = `rgba(${{shade>0?255:0}}, ${{shade>0?255:0}}, ${{shade>0?255:0}}, ${{Math.abs(shade)/255}})`;
+                dctx.fillRect(0, y, w, 62);
+                // 溶接ビード凹み
+                bctx.fillStyle = '#404040'; bctx.fillRect(0, y, w, 3);
+                bctx.fillStyle = '#b0b0b0'; bctx.fillRect(0, y+3, w, 2);
+                dctx.fillStyle = 'rgba(0,0,0,0.32)'; dctx.fillRect(0, y, w, 2);
             }}
 
-            // 垂直ストリンガー補強リブ
-            ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1;
-            for(let x = 32; x < 512; x += 64) {{
-                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 1024); ctx.stroke();
+            // 縦方向ストリンガー & リベット列
+            for(let x = 0; x < w; x += 64) {{
+                bctx.fillStyle = '#606060'; bctx.fillRect(x, 0, 2, h);
+                dctx.fillStyle = 'rgba(0,0,0,0.12)'; dctx.fillRect(x, 0, 2, h);
             }}
 
-            // USA / 国旗 / レースウェイマーク
-            ctx.fillStyle = 'rgba(0,0,0,0.45)';
-            ctx.fillRect(230, 200, 52, 600);
-            return new THREE.CanvasTexture(c);
+            // 第2段片側 六角形セラミック耐熱タイル (Starship風ブラックTPSシールド)
+            if (hasHeatshield) {{
+                dctx.fillStyle = '#111317';
+                dctx.fillRect(0, 0, w * 0.48, h);
+                bctx.strokeStyle = '#202020'; bctx.lineWidth = 2;
+                for(let ty = 0; ty < h; ty += 16) {{
+                    for(let tx = 0; tx < w * 0.48; tx += 16) {{
+                        bctx.strokeRect(tx + (ty%32===0?0:8), ty, 15, 15);
+                    }}
+                }}
+            }}
+
+            // 下部エンジンスートの煤汚れグラデーション
+            const sootGrad = dctx.createLinearGradient(0, h * 0.75, 0, h);
+            sootGrad.addColorStop(0, 'rgba(15, 18, 22, 0)');
+            sootGrad.addColorStop(1, 'rgba(10, 12, 16, 0.72)');
+            dctx.fillStyle = sootGrad; dctx.fillRect(0, h * 0.75, w, h * 0.25);
+
+            return {{
+                map: new THREE.CanvasTexture(diffCvs),
+                bumpMap: new THREE.CanvasTexture(bumpCvs)
+            }};
         }}
 
         const rocket = new THREE.Group();
+        rocket.position.y = 6.0;
         scene.add(rocket);
 
-        const s1Tex = createRocketSkinTexture(cfg.s1_mat);
-        const s2Tex = createRocketSkinTexture(cfg.s2_mat);
+        const s1Maps = createHighDetailRocketTextures(cfg.s1_mat, false);
+        const s2Maps = createHighDetailRocketTextures(cfg.s2_mat, true);
 
         const s1Mat = new THREE.MeshStandardMaterial({{
-            map: s1Tex, roughness: (cfg.s1_mat === 'ss') ? 0.22 : 0.45,
-            metalness: (cfg.s1_mat === 'ss') ? 0.92 : 0.35
+            map: s1Maps.map, bumpMap: s1Maps.bumpMap, bumpScale: 0.035,
+            metalness: (cfg.s1_mat === 'ss' || cfg.s1_mat === 'inconel') ? 0.92 : 0.28,
+            roughness: (cfg.s1_mat === 'ss') ? 0.18 : 0.42
         }});
         const s2Mat = new THREE.MeshStandardMaterial({{
-            map: s2Tex, roughness: (cfg.s2_mat === 'ss') ? 0.22 : 0.45,
-            metalness: (cfg.s2_mat === 'ss') ? 0.92 : 0.35
+            map: s2Maps.map, bumpMap: s2Maps.bumpMap, bumpScale: 0.04,
+            metalness: (cfg.s2_mat === 'ss' || cfg.s2_mat === 'inconel') ? 0.88 : 0.30,
+            roughness: (cfg.s2_mat === 'ss') ? 0.20 : 0.45
         }});
 
-        // 第1段メイン胴体
-        const s1Len = 16.5;
-        const s1Body = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, s1Len, 64), s1Mat);
-        s1Body.position.y = s1Len / 2 + 2.0;
-        rocket.add(s1Body);
+        // 1. 第1段コア胴体 + チャイン（空力フェアリングカバー）+ 外部LOXフィードライン配管
+        const s1Len = 18.0;
+        const s1Body = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.12, s1Len, 64), s1Mat);
+        s1Body.position.y = s1Len / 2; rocket.add(s1Body);
 
-        // 外部ケーブルトレイ（レースウェイ）
-        const raceway = new THREE.Mesh(new THREE.BoxGeometry(0.12, s1Len * 0.9, 0.2), new THREE.MeshStandardMaterial({{ color: 0x1e293b, metalness: 0.8 }}));
-        raceway.position.set(1.06, s1Len / 2 + 2.0, 0);
-        rocket.add(raceway);
+        // 外部レースウェイ＆極低温フィードパイプ＆COPV高圧ヘリウムボトル群
+        for(let side of [-1, 1]) {{
+            const chine = new THREE.Mesh(new THREE.BoxGeometry(0.24, s1Len * 0.94, 0.32), s1Mat);
+            chine.position.set(side * 1.12, s1Len * 0.48, 0); rocket.add(chine);
 
-        // インターステージ・オープンラティス（トラス結合部）
-        const interstageLen = 2.4;
-        const interstage = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, interstageLen, 32, 1, true), new THREE.MeshStandardMaterial({{ color: 0x1f2937, wireframe: true }}));
-        interstage.position.y = s1Len + 2.0 + interstageLen / 2;
+            const loxPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, s1Len * 0.88, 16), pipeMat);
+            loxPipe.position.set(0, s1Len * 0.46, side * 1.14); rocket.add(loxPipe);
+        }}
+
+        // エンジンセクション保護スカートリング & RCSコールドガススラスターポッド
+        const skirtRing = new THREE.Mesh(new THREE.CylinderGeometry(1.18, 1.22, 1.8, 64), darkSteelMat);
+        skirtRing.position.y = 0.9; rocket.add(skirtRing);
+
+        // 2. ホットステージング・ベント付きインターステージ (精密メッシュスリット構造)
+        const interLen = 2.2;
+        const interstage = new THREE.Group();
+        interstage.position.y = s1Len + interLen / 2;
         rocket.add(interstage);
+        const interRingTop = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.12, 0.35, 64), darkSteelMat);
+        interRingTop.position.y = interLen/2 - 0.17; interstage.add(interRingTop);
+        const interRingBot = interRingTop.clone(); interRingBot.position.y = -interLen/2 + 0.17; interstage.add(interRingBot);
+        for(let i=0; i<24; i++) {{
+            const a = (i / 24) * Math.PI * 2;
+            const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, interLen, 8), darkSteelMat);
+            strut.position.set(Math.cos(a)*1.1, 0, Math.sin(a)*1.1);
+            strut.rotation.z = (i%2 === 0) ? 0.18 : -0.18;
+            interstage.add(strut);
+        }}
 
-        // 第2段胴体
-        const s2Len = 8.5;
-        const s2Body = new THREE.Mesh(new THREE.CylinderGeometry(1.02, 1.02, s2Len, 64), s2Mat);
-        s2Body.position.y = s1Len + 2.0 + interstageLen + s2Len / 2;
-        rocket.add(s2Body);
+        // 3. 第2段オービター胴体
+        const s2Len = 9.0;
+        const s2BaseY = s1Len + interLen;
+        const s2Body = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.12, s2Len, 64), s2Mat);
+        s2Body.position.y = s2BaseY + s2Len / 2; rocket.add(s2Body);
 
-        // 先端部 / フェアリング / カプセル
-        const noseY = s1Len + 2.0 + interstageLen + s2Len;
+        // 4. 旋盤加工(LatheGeometry)による流線型タンジェント・オジーブ・ノーズコーン
+        const noseY = s2BaseY + s2Len;
         const fairingGroup = new THREE.Group();
         fairingGroup.position.y = noseY;
         rocket.add(fairingGroup);
 
+        const ogivePts = [];
+        const noseH = 5.4;
+        for(let i=0; i<=30; i++) {{
+            const t = i / 30;
+            const y = t * noseH;
+            const r = 1.12 * Math.pow(1.0 - Math.pow(t, 1.65), 0.72);
+            ogivePts.push(new THREE.Vector2(Math.max(0.01, r), y));
+        }}
+        const ogiveGeo = new THREE.LatheGeometry(ogivePts, 64);
+
         if (cfg.fairing_shape === 'abort_tower') {{
-            // アポロ型カプセル ＋ レスキューアボートタワー
-            const capsule = new THREE.Mesh(new THREE.ConeGeometry(1.02, 2.2, 32), s2Mat);
-            capsule.position.y = 1.1; fairingGroup.add(capsule);
-            const towerMast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 3.8, 16), new THREE.MeshStandardMaterial({{ color: 0xffffff, metalness: 0.8 }}));
-            towerMast.position.y = 3.6; fairingGroup.add(towerMast);
-            const abortMotor = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.2, 16), new THREE.MeshStandardMaterial({{ color: 0xef4444 }}));
-            abortMotor.position.y = 5.2; fairingGroup.add(abortMotor);
-        }} else if (cfg.fairing_shape === 'skeleton') {{
-            // 骨格露出ケージ
-            const cage = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.02, 4.0, 16, 2, true), new THREE.MeshStandardMaterial({{ color: 0x38bdf8, wireframe: true }}));
-            cage.position.y = 2.0; fairingGroup.add(cage);
-            const satBody = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.8, 0.9), new THREE.MeshStandardMaterial({{ color: 0xd97706, metalness: 0.9, roughness: 0.2 }}));
-            satBody.position.y = 2.0; fairingGroup.add(satBody);
+            const capsule = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 1.12, 2.4, 48), s2Mat);
+            capsule.position.y = 1.2; fairingGroup.add(capsule);
+            const lesTower = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.22, 4.2, 24), new THREE.MeshStandardMaterial({{ color: 0xf8fafc, metalness: 0.5 }}));
+            lesTower.position.y = 4.2; fairingGroup.add(lesTower);
+            for(let k=0; k<4; k++) {{
+                const a = (k/4)*Math.PI*2;
+                const thr = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.7, 16), hazardMat);
+                thr.position.set(Math.cos(a)*0.22, 5.2, Math.sin(a)*0.22); thr.rotation.z = Math.cos(a)*0.4;
+                fairingGroup.add(thr);
+            }}
         }} else {{
-            // バイコニカル超低抵抗オジーブカウル
-            const ogive = new THREE.Mesh(new THREE.ConeGeometry(1.02, 4.2, 64), s2Mat);
-            ogive.position.y = 2.1; fairingGroup.add(ogive);
+            const noseMesh = new THREE.Mesh(ogiveGeo, s2Mat);
+            fairingGroup.add(noseMesh);
+            // 前方フラップ（カナード）ディテール
+            for(let side of [-1, 1]) {{
+                const fwdFlap = new THREE.Mesh(new THREE.BoxGeometry(0.85, 2.1, 0.08), darkSteelMat);
+                fwdFlap.position.set(side * 1.15, 2.2, 0);
+                fwdFlap.rotation.z = side * 0.22;
+                fairingGroup.add(fwdFlap);
+            }}
         }}
 
-        // エンジンクラスターベルノズル群
-        const nozzleMat = new THREE.MeshStandardMaterial({{ color: 0x27272a, roughness: 0.35, metalness: 0.95 }});
-        function buildEngineCluster(parent, count, radius, basePosY) {{
+        // 5. 再生冷却チャンネル付き リアル・パラボラ・エンジンベルノズル群
+        const nozzlePts = [];
+        for(let i=0; i<=16; i++) {{
+            const t = i / 16;
+            const ny = -t * 1.25;
+            const nr = 0.09 + 0.24 * Math.pow(t, 0.65);
+            nozzlePts.push(new THREE.Vector2(nr, ny));
+        }}
+        const realBellGeo = new THREE.LatheGeometry(nozzlePts, 32);
+        const inconelNozzleMat = new THREE.MeshStandardMaterial({{
+            color: 0x3f3f46, metalness: 0.95, roughness: 0.25, side: THREE.DoubleSide
+        }});
+
+        function buildRealEngineCluster(parent, count, radius, basePosY) {{
             const group = new THREE.Group();
             group.position.y = basePosY;
             for(let i=0; i<count; i++) {{
                 const ang = (i / count) * Math.PI * 2;
-                const r = (count === 1) ? 0 : radius;
-                const ex = Math.cos(ang) * r, ez = Math.sin(ang) * r;
-                const bell = new THREE.Mesh(new THREE.ConeGeometry(0.28, 1.1, 24, 1, true), nozzleMat);
-                bell.rotation.x = Math.PI; bell.position.set(ex, -0.55, ez);
+                const r = (count === 1) ? 0 : (i < 3 && count > 6 ? radius * 0.38 : radius);
+                const bell = new THREE.Mesh(realBellGeo, inconelNozzleMat);
+                bell.position.set(Math.cos(ang)*r, 0, Math.sin(ang)*r);
+                // ターボポンプマニホールドリング
+                const manifold = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.035, 8, 20), pipeMat);
+                manifold.rotation.x = Math.PI / 2; manifold.position.y = -0.25;
+                bell.add(manifold);
                 group.add(bell);
             }}
             parent.add(group);
-            return group;
         }}
-        const s1Nozzles = buildEngineCluster(rocket, cfg.s1_eng, 0.65, 2.0);
+        buildRealEngineCluster(rocket, cfg.s1_eng, 0.78, 0.0);
 
-        // 外部追加ブースター (魔改造クラスタ)
+        // 6. 外部ストラップオンブースター
         const straponGroup = new THREE.Group();
         rocket.add(straponGroup);
         if (cfg.strapon_count > 0) {{
             const sCount = cfg.strapon_count;
             for(let i=0; i<sCount; i++) {{
                 const angle = (i / sCount) * Math.PI * 2;
-                const bx = Math.cos(angle) * 1.85, bz = Math.sin(angle) * 1.85;
-                const bLen = (cfg.strapon_type === 'srb') ? 14.0 : 15.0;
-                const bMat = (cfg.strapon_type === 'srb') ? 
-                    new THREE.MeshStandardMaterial({{ color: 0xffffff, roughness: 0.3 }}) : s1Mat;
-                
-                const bBody = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, bLen, 32), bMat);
-                bBody.position.set(bx, bLen / 2 + 1.8, bz);
-                straponGroup.add(bBody);
+                const bx = Math.cos(angle) * 2.05, bz = Math.sin(angle) * 2.05;
+                const bLen = 15.5;
+                const bUnit = new THREE.Group();
+                bUnit.position.set(bx, 0, bz);
 
-                const bNose = new THREE.Mesh(new THREE.ConeGeometry(0.65, 2.2, 32), bMat);
-                bNose.position.set(bx, bLen + 1.8 + 1.1, bz);
-                straponGroup.add(bNose);
+                const bBody = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, bLen, 48), s1Mat);
+                bBody.position.y = bLen / 2; bUnit.add(bBody);
 
-                const bNozzle = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.9, 16, 1, true), nozzleMat);
-                bNozzle.rotation.x = Math.PI;
-                bNozzle.position.set(bx, 1.35, bz);
-                straponGroup.add(bNozzle);
+                const bNose = new THREE.Mesh(ogiveGeo, s1Mat);
+                bNose.scale.set(0.64, 0.55, 0.64); bNose.position.y = bLen; bUnit.add(bNose);
+
+                // ブースター結合ストラット
+                const strutTop = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.2, 8), darkSteelMat);
+                strutTop.rotation.z = Math.PI/2; strutTop.position.set(-Math.cos(angle)*0.6, bLen*0.8, -Math.sin(angle)*0.6);
+                bUnit.add(strutTop);
+
+                const bBell = new THREE.Mesh(realBellGeo, inconelNozzleMat);
+                bBell.scale.set(1.5, 1.3, 1.5); bUnit.add(bBell);
+                straponGroup.add(bUnit);
             }}
         }}
 
-        // 空力フィン・グリッドフィン
+        // 7. チタン鍛造ワッフル・グリッドフィン ＆ 空力主翼
         const wingsGroup = new THREE.Group();
         rocket.add(wingsGroup);
         if (cfg.wing_id === 'grid') {{
-            // チタン製極超音速グリッドフィン × 4基
             for(let i=0; i<4; i++) {{
-                const ang = (i / 4) * Math.PI * 2;
-                const gfMesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.08), new THREE.MeshStandardMaterial({{ color: 0x475569, wireframe: true }}));
-                gfMesh.position.set(Math.cos(ang) * 1.25, s1Len + 1.2, Math.sin(ang) * 1.25);
-                gfMesh.rotation.y = -ang;
-                wingsGroup.add(gfMesh);
+                const ang = (i / 4) * Math.PI * 2 + Math.PI / 4;
+                const gfFrame = new THREE.Group();
+                gfFrame.position.set(Math.cos(ang)*1.22, s1Len - 1.1, Math.sin(ang)*1.22);
+                gfFrame.rotation.y = -ang;
+                // アクチュエータ基部マウント
+                const mount = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.65, 0.35), darkSteelMat);
+                gfFrame.add(mount);
+                // チタン格子フィン本体
+                const gridBox = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.12, 1.15), new THREE.MeshStandardMaterial({{ color: 0x64748b, metalness: 0.9, roughness: 0.35, wireframe: true }}));
+                gridBox.position.x = 0.55;
+                gfFrame.add(gridBox);
+                wingsGroup.add(gfFrame);
             }}
         }} else if (cfg.wing_id === 'delta_wing') {{
-            // 本格超音速可変後退翼 (キャンバー・後退角ディテール)
-            const wingShape = new THREE.Shape();
-            wingShape.moveTo(0, 0);
-            wingShape.lineTo(4.8, -2.5);
-            wingShape.lineTo(4.8, -3.8);
-            wingShape.lineTo(0, -1.8);
-            wingShape.closePath();
-            const wingExtrude = new THREE.ExtrudeGeometry(wingShape, {{ depth: 0.15, bevelEnabled: false }});
-            const wingMeshR = new THREE.Mesh(wingExtrude, new THREE.MeshStandardMaterial({{ color: 0x334155, metalness: 0.85, roughness: 0.3 }}));
-            wingMeshR.position.set(1.05, s1Len * 0.45, 0);
-            wingsGroup.add(wingMeshR);
-
-            const wingMeshL = wingMeshR.clone();
-            wingMeshL.scale.set(-1, 1, 1);
-            wingMeshL.position.set(-1.05, s1Len * 0.45, 0);
-            wingsGroup.add(wingMeshL);
+            for(let side of [-1, 1]) {{
+                const wing = new THREE.Mesh(new THREE.BoxGeometry(4.5, 5.5, 0.14), darkSteelMat);
+                wing.position.set(side * 2.8, s1Len * 0.35, 0);
+                wing.rotation.z = side * 0.42;
+                wingsGroup.add(wing);
+            }}
         }}
 
         // =========================================================================
-        // 🔥 実写ロケット排気噴射炎＆超巨大真空プルーム
+        // 🔥 逆三角形ポリゴン完全撤廃！流体GLSLシェーダーによるリアル・ショックダイヤモンド＆排気プルーム
         // =========================================================================
-        const plume = new THREE.Group();
-        rocket.add(plume);
+        const plumeGroup = new THREE.Group();
+        rocket.add(plumeGroup);
 
-        const fColor = cfg.flame_hex;
-        const oColor = cfg.outer_hex;
+        const plumeShaderMat = new THREE.ShaderMaterial({{
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+            uniforms: {{
+                uTime: {{ value: 0.0 }},
+                uVacFactor: {{ value: 0.0 }},
+                uCoreColor: {{ value: new THREE.Color(0xffffff) }},
+                uMidColor: {{ value: new THREE.Color(cfg.flame_hex) }},
+                uOuterColor: {{ value: new THREE.Color(cfg.outer_hex) }}
+            }},
+            vertexShader: `
+                varying vec2 vUv;
+                uniform float uTime;
+                uniform float uVacFactor;
+                void main() {{
+                    vUv = uv;
+                    vec3 pos = position;
+                    // 下流に向かうほど真空膨張で自然なベル型に広がる（逆三角形にならない流体境界層）
+                    float dist = 1.0 - uv.y;
+                    float bellExpand = pow(dist, 0.65) * (1.0 + uVacFactor * 3.8);
+                    float turb = sin(dist * 28.0 - uTime * 55.0) * 0.08 * dist;
+                    pos.x *= (1.0 + bellExpand + turb);
+                    pos.z *= (1.0 + bellExpand + turb);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+                }}
+            `,
+            fragmentShader: `
+                varying vec2 vUv;
+                uniform float uTime;
+                uniform float uVacFactor;
+                uniform vec3 uCoreColor;
+                uniform vec3 uMidColor;
+                uniform vec3 uOuterColor;
 
-        // 1. 超高温ホワイトコア
-        const coreFlame = new THREE.Mesh(
-            new THREE.ConeGeometry(0.65, 12.0, 32),
-            new THREE.MeshBasicMaterial({{ color: 0xffffff, blending: THREE.AdditiveBlending }})
-        );
-        coreFlame.rotation.x = Math.PI; coreFlame.position.y = -4.0; plume.add(coreFlame);
+                void main() {{
+                    float distFromNozzle = 1.0 - vUv.y;
+                    float radial = abs(vUv.x - 0.5) * 2.0;
 
-        // 2. マッハダイヤモンド群
-        const shockDiamonds = [];
-        for (let i = 0; i < 9; i++) {{
-            const dia = new THREE.Mesh(
-                new THREE.OctahedronGeometry(0.38 - i * 0.03, 1),
-                new THREE.MeshBasicMaterial({{ color: 0xffffff, blending: THREE.AdditiveBlending }})
-            );
-            dia.scale.set(1.1, 0.4, 1.1); dia.position.y = -0.8 - i * 1.4; plume.add(dia); shockDiamonds.push(dia);
-        }}
+                    // 超音速マッハ・ショックダイヤモンド定在波パターン
+                    float waveFreq = 22.0 / (1.0 + uVacFactor * 1.5);
+                    float shockWave = pow(max(0.0, cos(distFromNozzle * waveFreq - uTime * 18.0)), 6.0);
+                    float shockFade = max(0.0, 1.0 - uVacFactor * 1.4) * exp(-distFromNozzle * 2.6);
 
-        // 3. メイン乱流炎
-        const outerPlume = new THREE.Mesh(
-            new THREE.ConeGeometry(2.2, 28.0, 32),
-            new THREE.MeshBasicMaterial({{ color: fColor, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }})
-        );
-        outerPlume.rotation.x = Math.PI; outerPlume.position.y = -12.0; plume.add(outerPlume);
+                    // 中心軸の温度勾配（エッジのパキッとした境界を完全に消すガウシアン減衰）
+                    float coreMask = exp(-radial * radial * 9.0) * exp(-distFromNozzle * 1.8);
+                    float plumeBody = exp(-radial * radial * 3.2) * pow(1.0 - distFromNozzle, 1.35);
 
-        // 4. 真空巨大膨張クラゲプルーム (Jellyfish Effect)
-        const jellyfishGeo = new THREE.SphereGeometry(22.0, 32, 32);
-        const jellyfishMat = new THREE.MeshBasicMaterial({{
-            color: oColor, transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, depthWrite: false
+                    // 高速乱流ノイズ
+                    float noise = 0.88 + 0.12 * sin(distFromNozzle * 45.0 - uTime * 70.0 + radial * 12.0);
+
+                    vec3 col = mix(uOuterColor, uMidColor, plumeBody);
+                    col = mix(col, uCoreColor, clamp(coreMask + shockWave * shockFade * 0.85, 0.0, 1.0));
+
+                    // ノズル直下と末端の両方を滑らかにフェードアウト
+                    float tipFade = smoothstep(0.0, 0.04, distFromNozzle) * smoothstep(1.0, 0.15, distFromNozzle);
+                    float alpha = clamp((plumeBody * 0.95 + coreMask * 0.8) * tipFade * noise, 0.0, 1.0);
+
+                    gl_FragColor = vec4(col * 2.2, alpha);
+                }}
+            `
         }});
-        const jellyfishPlume = new THREE.Mesh(jellyfishGeo, jellyfishMat);
-        jellyfishPlume.position.y = -22.0; plume.add(jellyfishPlume);
+
+        // 3枚の直交ボリュームプレーン＋オープンチューブで全角度から立体的な流体ジェットを描画
+        const plumeLen = 36.0;
+        for(let rAngle of [0, Math.PI / 3, (2 * Math.PI) / 3]) {{
+            const pPlane = new THREE.Mesh(new THREE.PlaneGeometry(3.2, plumeLen, 16, 64), plumeShaderMat);
+            pPlane.position.y = -plumeLen / 2;
+            pPlane.rotation.y = rAngle;
+            plumeGroup.add(pPlane);
+        }}
+        // ノズル出口の強烈なブリリアント・グレア・スプライト
+        const glareCvs = document.createElement('canvas'); glareCvs.width = 128; glareCvs.height = 128;
+        const gctx = glareCvs.getContext('2d');
+        const gg = gctx.createRadialGradient(64,64,2, 64,64,64);
+        gg.addColorStop(0, 'rgba(255,255,255,1)');
+        gg.addColorStop(0.25, 'rgba(180,230,255,0.85)');
+        gg.addColorStop(1, 'rgba(0,120,255,0)');
+        gctx.fillStyle = gg; gctx.fillRect(0,0,128,128);
+        const engineGlare = new THREE.Sprite(new THREE.SpriteMaterial({{
+            map: new THREE.CanvasTexture(glareCvs), blending: THREE.AdditiveBlending, depthWrite: false
+        }}));
+        engineGlare.scale.set(11.0, 6.5, 1.0);
+        engineGlare.position.y = -0.8;
+        plumeGroup.add(engineGlare);
 
         // =========================================================================
-        // 💨 水蒸気消音噴射 ＆ 極低温ボイルオフ蒸気
+        // 💨 ボリューメトリック・パーティクルエンジン (水蒸気・黒煙・白熱火球・衝撃波リング)
         // =========================================================================
-        function createSmokeParticleTexture() {{
+        function createOrganicCloudTexture() {{
             const c = document.createElement('canvas'); c.width = 128; c.height = 128;
             const ctx = c.getContext('2d');
-            const g = ctx.createRadialGradient(64,64,6, 64,64,64);
-            g.addColorStop(0, 'rgba(255,255,255,0.95)');
-            g.addColorStop(0.35, 'rgba(230,238,248,0.7)');
-            g.addColorStop(0.7, 'rgba(170,185,200,0.3)');
-            g.addColorStop(1, 'rgba(120,135,150,0)');
-            ctx.fillStyle = g; ctx.fillRect(0,0,128,128);
+            for(let i=0; i<7; i++) {{
+                const ox = 64 + (Math.random()-0.5)*28;
+                const oy = 64 + (Math.random()-0.5)*28;
+                const rad = 32 + Math.random()*22;
+                const g = ctx.createRadialGradient(ox, oy, 2, ox, oy, rad);
+                g.addColorStop(0, 'rgba(255,255,255,0.35)');
+                g.addColorStop(0.5, 'rgba(225,232,240,0.18)');
+                g.addColorStop(1, 'rgba(160,175,190,0)');
+                ctx.fillStyle = g; ctx.fillRect(0,0,128,128);
+            }}
             return new THREE.CanvasTexture(c);
         }}
-        const smokeTex = createSmokeParticleTexture();
-        const P_MAX = 1800;
+
+        const cloudTex = createOrganicCloudTexture();
+        const P_MAX = 2200;
         const pool = [];
         const pGroup = new THREE.Group(); scene.add(pGroup);
+
         for(let i=0; i<P_MAX; i++) {{
-            const sp = new THREE.Sprite(new THREE.SpriteMaterial({{ map: smokeTex, transparent: true, opacity: 0, depthWrite: false }}));
+            const sp = new THREE.Sprite(new THREE.SpriteMaterial({{
+                map: cloudTex, transparent: true, opacity: 0, depthWrite: false
+            }}));
             sp.visible = false; pGroup.add(sp);
-            pool.push({{ sp, active: false, vx: 0, vy: 0, vz: 0, age: 0, maxAge: 1, s0: 1, s1: 4, o: 0.8 }});
+            pool.push({{
+                sp, active: false, vx: 0, vy: 0, vz: 0,
+                age: 0, maxAge: 1, s0: 1, s1: 5, o: 0.8, rotSpd: 0, mode: 'smoke'
+            }});
         }}
         let pIdx = 0;
-        function emitSmoke(x, y, z, vx, vy, vz, s0, s1, life, opacity) {{
+
+        function emitParticle(x, y, z, vx, vy, vz, s0, s1, life, opacity, hexColor, additive) {{
             const p = pool[pIdx]; pIdx = (pIdx + 1) % P_MAX;
-            p.active = true; p.sp.visible = true; p.sp.position.set(x, y, z);
-            p.vx = vx; p.vy = vy; p.vz = vz; p.age = 0; p.maxAge = life; p.s0 = s0; p.s1 = s1; p.o = opacity;
+            p.active = true; p.sp.visible = true;
+            p.sp.position.set(x, y, z);
+            p.vx = vx; p.vy = vy; p.vz = vz;
+            p.age = 0; p.maxAge = life; p.s0 = s0; p.s1 = s1; p.o = opacity;
+            p.rotSpd = (Math.random() - 0.5) * 0.06;
+            p.sp.material.color.setHex(hexColor);
+            p.sp.material.blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
         }}
 
         // =========================================================================
-        // 💥 超精密 航空宇宙破壊力学エンジン (リアルデブリ＆二次燃焼)
+        // 💥 超リアル RUD 爆発力学エンジン (衝撃波コンデンセーションリング + 多層火球 + 燃焼デブリ軌跡)
         // =========================================================================
-        const DEBRIS_MAX = 240;
+        const shockwaveRing = new THREE.Mesh(
+            new THREE.RingGeometry(0.8, 1.35, 64),
+            new THREE.MeshBasicMaterial({{ color: 0xffffff, transparent: true, opacity: 0.0, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }})
+        );
+        shockwaveRing.visible = false;
+        scene.add(shockwaveRing);
+
+        const DEBRIS_MAX = 260;
         const debrisPool = [];
         const debrisGroup = new THREE.Group(); scene.add(debrisGroup);
-
-        // 不規則な破壊外殻パーツ・配管・ノズル片
         const debGeos = [
-            new THREE.CylinderGeometry(0.5, 0.7, 1.2, 8, 1, true),
-            new THREE.BoxGeometry(1.4, 0.2, 0.8),
-            new THREE.ConeGeometry(0.4, 0.8, 12, 1, true),
-            new THREE.BoxGeometry(0.3, 1.8, 0.2)
+            new THREE.CylinderGeometry(0.6, 0.8, 1.6, 12, 1, true),
+            new THREE.BoxGeometry(1.5, 0.12, 1.1),
+            realBellGeo,
+            new THREE.BoxGeometry(0.25, 2.4, 0.25)
         ];
-        const debMat = new THREE.MeshStandardMaterial({{ color: 0x475569, metalness: 0.9, roughness: 0.3 }});
 
         for(let i=0; i<DEBRIS_MAX; i++) {{
-            const deb = new THREE.Mesh(debGeos[i % debGeos.length], debMat);
+            const deb = new THREE.Mesh(debGeos[i % debGeos.length], (i%3===0) ? s1Mat : darkSteelMat);
             deb.visible = false; debrisGroup.add(deb);
-            debrisPool.push({{ mesh: deb, active: false, vx: 0, vy: 0, vz: 0, rx: 0, ry: 0, rz: 0 }});
+            debrisPool.push({{ mesh: deb, active: false, vx: 0, vy: 0, vz: 0, rx: 0, ry: 0, rz: 0, isBurning: (i % 2 === 0) }});
         }}
 
-        function triggerRealRUD(x, y, vxBase, vyBase) {{
-            // 1. 極低温酸化剤の瞬間気化（超巨大白色マッシュルーム雲）
-            for(let k=0; k<110; k++) {{
+        let shockwaveAge = 0;
+        function triggerPhotorealRUD(x, y, vxBase, vyBase) {{
+            // 1. 超音速膨張コンデンセーション・ショックウェーブリング起動
+            shockwaveRing.visible = true;
+            shockwaveRing.position.set(x, y + 8.0, 0);
+            shockwaveRing.scale.set(1, 1, 1);
+            shockwaveRing.material.opacity = 0.95;
+            shockwaveAge = 1;
+
+            // 2. 中心核の3,200K 白熱フラッシュ＆推進剤ハイパーゴリック火球 (Additive)
+            for(let k=0; k<95; k++) {{
                 const ang = Math.random() * Math.PI * 2;
-                const spd = 2.0 + Math.random() * 6.0;
-                emitSmoke(
-                    x + (Math.random()-0.5)*8, y + (Math.random()-0.5)*12, (Math.random()-0.5)*8,
-                    vxBase * 0.05 + Math.cos(ang) * spd, vyBase * 0.05 + Math.sin(ang) * spd, (Math.random()-0.5)*spd,
-                    16.0, 95.0, 95, 0.95
+                const phi = (Math.random() - 0.5) * Math.PI;
+                const spd = 0.4 + Math.random() * 2.8;
+                const col = (k < 25) ? 0xffffff : (k < 65 ? 0xff7700 : 0xdc2626);
+                emitParticle(
+                    x + (Math.random()-0.5)*5, y + 8 + (Math.random()-0.5)*10, (Math.random()-0.5)*5,
+                    vxBase*0.02 + Math.cos(ang)*Math.cos(phi)*spd,
+                    vyBase*0.02 + Math.sin(phi)*spd + 0.15,
+                    Math.sin(ang)*Math.cos(phi)*spd,
+                    8.0, 68.0, 55 + Math.random()*35, 0.95, col, true
                 );
             }}
 
-            // 2. 超音速スモークストリーマーデブリ
+            // 3. 外周の極低温LOX気化白煙＆炭素スート黒煙クラウド (NormalBlending)
+            for(let k=0; k<120; k++) {{
+                const ang = Math.random() * Math.PI * 2;
+                const spd = 0.5 + Math.random() * 3.4;
+                const isSoot = (k % 2 === 0);
+                emitParticle(
+                    x + (Math.random()-0.5)*8, y + 8 + (Math.random()-0.5)*14, (Math.random()-0.5)*8,
+                    vxBase*0.02 + Math.cos(ang)*spd,
+                    vyBase*0.02 + (Math.random()-0.3)*spd,
+                    (Math.random()-0.5)*spd,
+                    12.0, 95.0, 110 + Math.random()*50, isSoot ? 0.88 : 0.75,
+                    isSoot ? 0x18181b : 0xf1f5f9, false
+                );
+            }}
+
+            // 4. 260個の構造破片＆白煙ストリーマー放出
             for(let i=0; i<DEBRIS_MAX; i++) {{
                 const d = debrisPool[i];
                 d.active = true; d.mesh.visible = true;
-                d.mesh.position.set(x + (Math.random()-0.5)*4, y + (Math.random()-0.5)*12, (Math.random()-0.5)*4);
+                d.mesh.position.set(x + (Math.random()-0.5)*4, y + 8 + (Math.random()-0.5)*14, (Math.random()-0.5)*4);
                 const angle = Math.random() * Math.PI * 2;
-                const spd = 5.0 + Math.random() * 22.0;
-                d.vx = (vxBase * 0.06) + Math.cos(angle) * spd;
-                d.vy = (vyBase * 0.06) + Math.sin(angle) * spd;
-                d.vz = (Math.random()-0.5) * spd * 1.5;
-                d.rx = Math.random()*0.4; d.ry = Math.random()*0.4; d.rz = Math.random()*0.4;
+                const spd = 6.0 + Math.random() * 28.0;
+                d.vx = (vxBase * 0.04) + Math.cos(angle) * spd;
+                d.vy = (vyBase * 0.04) + Math.sin(angle) * spd;
+                d.vz = (Math.random() - 0.5) * spd * 1.6;
+                d.rx = (Math.random()-0.5)*0.5; d.ry = (Math.random()-0.5)*0.5; d.rz = (Math.random()-0.5)*0.5;
             }}
         }}
 
@@ -1062,66 +1288,54 @@ if st.button("🔴 AETHEL-X 極限実写4K中継 ＆ 軌道投入シミュレー
 
             octx.beginPath(); octx.moveTo(20, 76); octx.quadraticCurveTo(px * 0.5, 76, px, py);
             octx.strokeStyle = exploded ? '#ef4444' : '#38bdf8'; octx.lineWidth = 2; octx.stroke();
-
             octx.fillStyle = exploded ? '#dc2626' : '#38bdf8';
             octx.beginPath(); octx.arc(px, py, exploded ? 6 : 4, 0, Math.PI * 2); octx.fill();
         }}
 
         // =========================================================================
-        // 🎥 光学トラッカー・絶対ロックオン・ジンバル制御
+        // 🎥 光学トラッキング望遠カメラ制御
         // =========================================================================
-        const currentTargetPos = new THREE.Vector3(0, 15, 0);
+        const currentTargetPos = new THREE.Vector3(0, 18, 0);
         let camShake = 0.0;
 
         function updateGimbalTracker(simT, rx, ry, alt, pitch, exploded) {{
             const upX = Math.sin(pitch), upY = Math.cos(pitch);
-            const leadLookAhead = 25.0;
-            const targetX = rx + upX * leadLookAhead;
-            const targetY = ry + upY * leadLookAhead;
-            currentTargetPos.lerp(new THREE.Vector3(targetX, targetY, 0), 0.15);
+            const targetX = rx + upX * 16.0;
+            const targetY = ry + 6.0 + upY * 16.0;
+            currentTargetPos.lerp(new THREE.Vector3(targetX, targetY, 0), 0.18);
 
             if (exploded) {{
-                document.getElementById('cam-tag').innerText = "TRACKER 1: OPTICAL BREAKUP LOCK-ON";
-                camera.position.lerp(new THREE.Vector3(rx + 90, ry + 40, 160), 0.06);
+                document.getElementById('cam-tag').innerText = "OPTICS: HIGH-SPEED DEBRIS TRACKING LOCK";
+                camera.position.lerp(new THREE.Vector3(rx + 65, ry + 28, 145), 0.05);
             }} else if (simT < 0.0) {{
-                document.getElementById('cam-tag').innerText = "TRACKER 1: PAD CLOSE-UP TELEPHOTO";
-                camera.position.set(45.0, 14.0, 85.0);
-            }} else if (simT < 3.5) {{
-                document.getElementById('cam-tag').innerText = "PAD TRACKER: TOWER CLEARANCE";
-                camera.position.lerp(new THREE.Vector3(-75.0, 24.0, 135.0), 0.08);
+                document.getElementById('cam-tag').innerText = "PAD CAM 01: OLM & MECHAZILLA TELEPHOTO";
+                camera.position.set(38.0, 16.0, 78.0);
+            }} else if (simT < 4.0) {{
+                document.getElementById('cam-tag').innerText = "PAD PERIMETER: TOWER CLEARANCE TRACKER";
+                camera.position.lerp(new THREE.Vector3(-55.0, 22.0, 115.0), 0.06);
             }} else if (alt < 18.0) {{
-                document.getElementById('cam-tag').innerText = "COASTAL KINETO TRACKER (1200mm)";
-                const camDist = 320.0 + alt * 18.0;
-                const camX = rx - camDist * 0.75;
-                const camY = Math.max(15.0, ry * 0.35);
-                const camZ = camDist * 0.95;
-                camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.06);
+                document.getElementById('cam-tag').innerText = "COASTAL KINETO TRACKER (2400mm APO)";
+                const camDist = 115.0 + alt * 5.0;
+                camera.position.lerp(new THREE.Vector3(rx - camDist * 0.55, Math.max(12.0, ry * 0.55), camDist * 0.85), 0.08);
             }} else if (alt < 85.0) {{
-                document.getElementById('cam-tag').innerText = "AIRBORNE WB-57 CHASE TRACKER (WIDE HORIZON)";
-                const camDist = 550.0 + (alt - 18.0) * 4.0;
-                const camX = rx - camDist * 0.65;
-                const camY = ry - camDist * 0.15;
-                const camZ = camDist * 0.9;
-                camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.06);
+                document.getElementById('cam-tag').innerText = "WB-57 HIGH-ALTITUDE OPTICAL CHASE";
+                const camDist = 195.0;
+                camera.position.lerp(new THREE.Vector3(rx - camDist * 0.5, ry - 15.0, camDist * 0.85), 0.08);
             }} else {{
-                document.getElementById('cam-tag').innerText = "ORBITAL TELEMETRY: ULTRA-WIDE VACUUM CAM";
-                const camDist = 950.0;
-                const camX = rx - upX * 450.0 + upY * 180.0;
-                const camY = ry - upY * 450.0 - upX * 180.0;
-                const camZ = camDist;
-                camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.08);
+                document.getElementById('cam-tag').innerText = "ORBITAL INSERTION LONG-RANGE TELESCOPE";
+                camera.position.lerp(new THREE.Vector3(rx - upX * 110.0, ry - upY * 110.0 + 15.0, 185.0), 0.09);
             }}
 
             if (camShake > 0.002) {{
                 camera.position.x += (Math.random() - 0.5) * camShake;
                 camera.position.y += (Math.random() - 0.5) * camShake;
-                camShake *= 0.92;
+                camShake *= 0.93;
             }}
             camera.lookAt(currentTargetPos);
         }}
 
         // =========================================================================
-        // ⏱️ アニメーション・メインループ
+        // ⏱️ メインレンダリングループ
         // =========================================================================
         let tStart = performance.now();
         let explodedTriggered = false;
@@ -1130,7 +1344,9 @@ if st.button("🔴 AETHEL-X 極限実写4K中継 ＆ 軌道投入シミュレー
             requestAnimationFrame(animate);
             initAudio();
 
-            const simT = -10.0 + (now - tStart) / 1000.0;
+            const elapsedSec = (now - tStart) / 1000.0;
+            const simT = -10.0 + elapsedSec;
+            plumeShaderMat.uniforms.uTime.value = elapsedSec;
 
             let idx = 0;
             while (idx < data.length - 1 && data[idx + 1].t <= simT) idx++;
@@ -1148,152 +1364,144 @@ if st.button("🔴 AETHEL-X 極限実写4K中継 ＆ 軌道投入シミュレー
             const accG = p0.g + (p1.g - p0.g) * a;
             const dRangeKm = (rx * 10.0) / 1000.0;
 
-            rocket.position.set(rx, ry, 0);
+            rocket.position.set(rx, ry + 6.0, 0);
             rocket.rotation.z = -pitch;
 
-            // 地球自転微動
-            earthMesh.rotation.y = -Math.PI * 0.62 + (dRangeKm * 0.00003);
-            cloudMesh.rotation.y = earthMesh.rotation.y + 0.00005;
-
-            // ブースター分離の反映
-            if (p0.strapon === false) {{
-                straponGroup.visible = false;
+            // 高度に応じた星空の露出と第1段分離
+            starMat.opacity = Math.min(0.95, 0.1 + (alt / 45.0) * 0.85);
+            if (p0.strapon === false) straponGroup.visible = false;
+            if (p0.stage === 2) {{
+                s1Body.visible = false; skirtRing.visible = false; wingsGroup.visible = false;
             }}
 
             updateGimbalTracker(simT, rx, ry, alt, pitch, p0.exploded);
             drawOrbitMap(alt, dRangeKm, p0.exploded);
 
-            // 💥 本格志向 RUD 爆発演出
+            // 💥 RUD 爆発トリガー
             if (p0.exploded && !explodedTriggered) {{
                 explodedTriggered = true;
                 rocket.visible = false;
-                plume.visible = false;
-                camShake = 1.4;
-                flashOverlay.style.opacity = '1.0';
-                setTimeout(() => {{ flashOverlay.style.opacity = '0.0'; }}, 85);
+                plumeGroup.visible = false;
+                camShake = 2.4;
+                flashOverlay.style.opacity = '0.95';
+                setTimeout(() => {{ flashOverlay.style.opacity = '0.0'; }}, 140);
 
                 playExplosionSound();
-                triggerRealRUD(rx, ry, p0.v * Math.cos(p0.pitch), p0.v * Math.sin(p0.pitch));
+                triggerPhotorealRUD(rx, ry, p0.v * Math.cos(p0.pitch), p0.v * Math.sin(p0.pitch));
 
                 rudBanner.style.display = 'block';
                 rudDesc.innerText = failMessage;
-                announceWebcast("We have an anomaly. Vehicle breakup confirmed.");
-                document.getElementById('tv-stage-badge').innerText = "VEHICLE DESTROYED";
+                announceWebcast("Anomaly detected on the vehicle. Loss of telemetry.");
+                document.getElementById('tv-stage-badge').innerText = "VEHICLE LOSS (RUD)";
                 document.getElementById('tv-stage-badge').style.color = "#ef4444";
-                document.getElementById('comm-status').innerText = "LOSS OF SIGNAL (LOS)";
+                document.getElementById('comm-status').innerText = "SIGNAL LOST";
                 document.getElementById('comm-status').style.color = "#ef4444";
             }}
 
+            // 衝撃波リングと燃焼デブリの物理更新
             if (explodedTriggered) {{
+                if (shockwaveAge > 0 && shockwaveAge < 70) {{
+                    shockwaveAge++;
+                    const sScale = 1.0 + shockwaveAge * 2.2;
+                    shockwaveRing.scale.set(sScale, sScale, 1);
+                    shockwaveRing.lookAt(camera.position);
+                    shockwaveRing.material.opacity = Math.max(0, 0.95 * (1.0 - shockwaveAge / 70.0));
+                }} else {{
+                    shockwaveRing.visible = false;
+                }}
+
                 for(let i=0; i<DEBRIS_MAX; i++) {{
                     const d = debrisPool[i]; if (!d.active) continue;
                     d.mesh.position.x += d.vx * 0.016;
                     d.mesh.position.y += d.vy * 0.016;
                     d.mesh.position.z += d.vz * 0.016;
-                    d.vy -= 9.8 * 0.016 * 0.1;
+                    d.vy -= 9.8 * 0.016 * 0.12;
                     d.mesh.rotation.x += d.rx; d.mesh.rotation.y += d.ry;
-                    if (Math.random() < 0.28) {{
-                        emitSmoke(d.mesh.position.x, d.mesh.position.y, d.mesh.position.z, 0, 0, 0, 1.8, 8.5, 38, 0.45);
+                    // デブリの炎＆白煙ストリーマー
+                    if (Math.random() < 0.42) {{
+                        emitParticle(
+                            d.mesh.position.x, d.mesh.position.y, d.mesh.position.z,
+                            (Math.random()-0.5)*0.08, (Math.random()-0.5)*0.08, (Math.random()-0.5)*0.08,
+                            d.isBurning ? 1.5 : 2.2, d.isBurning ? 6.5 : 11.0, 35,
+                            d.isBurning ? 0.75 : 0.45,
+                            d.isBurning ? 0xf97316 : 0xe2e8f0, d.isBurning
+                        );
                     }}
                 }}
             }}
 
-            let regime = "TROPOSPHERE (対流圏)";
-            if (alt >= 100.0) regime = "THERMOSPHERE / ORBIT (宇宙空間)";
-            else if (alt >= 50.0) regime = "MESOSPHERE (中間圏)";
-            else if (alt >= 12.0) regime = "STRATOSPHERE (成層圏)";
-            document.getElementById('hud-regime').innerText = regime;
-            document.getElementById('hud-downrange').innerText = `${{dRangeKm.toFixed(1)}} km`;
-
-            // 実況＆ボイルオフ蒸気＆サウンドサプレッション消音注水
+            // カウントダウン極低温ベント ＆ デリュージ水蒸気システム
             if (simT < 0.0) {{
                 const sec = Math.ceil(Math.abs(simT));
                 document.getElementById('tv-timer').innerText = `T- 00:0${{sec}}.0`;
-                
-                // 極低温ベント（白煙ボイルオフ）
-                emitSmoke(rx + 1.1, ry + s1Len + 1.0, 0, 0.3, 0.05, 0, 0.8, 3.5, 40, 0.4);
+                emitParticle(rx + 1.25, ry + 20.0, 0, 0.25, 0.04, 0, 0.9, 4.2, 45, 0.35, 0xffffff, false);
 
                 if (simT >= -3.0 && !p0.exploded) {{
-                    camShake = 0.22;
-                    if (rumbleGain) rumbleGain.gain.setTargetAtTime(0.65, actx.currentTime, 0.1);
-                    for(let i=0; i<12; i++) {{
-                        const side = (i%2 === 0)? 1 : -1;
-                        emitSmoke(
-                            rx + (Math.random()-0.5)*4, 1.2, (Math.random()-0.5)*4,
-                            side * (1.2 + Math.random()*1.5), 0.15 + Math.random()*0.3, (Math.random()-0.5)*0.6,
-                            5.0, 26.0, 65, 0.95
+                    camShake = 0.25;
+                    engineBounceLight.intensity = 6.0;
+                    engineBounceLight.position.set(rx, ry + 3.0, 4.0);
+                    if (rumbleGain) rumbleGain.gain.setTargetAtTime(0.7, actx.currentTime, 0.1);
+                    for(let i=0; i<10; i++) {{
+                        const side = (i%2 === 0) ? 1 : -1;
+                        emitParticle(
+                            rx + (Math.random()-0.5)*4, 1.5, (Math.random()-0.5)*4,
+                            side * (1.1 + Math.random()*1.6), 0.12 + Math.random()*0.28, (Math.random()-0.5)*0.8,
+                            4.5, 28.0, 68, 0.85, 0xf8fafc, false
                         );
                     }}
                 }}
             }} else if (!p0.exploded) {{
                 const m = Math.floor(simT / 60); const s = simT % 60;
                 document.getElementById('tv-timer').innerText = `T+ ${{String(m).padStart(2,'0')}}:${{s.toFixed(1).padStart(4,'0')}}`;
-                
-                // 実況アナウンス
                 if (simT >= 0 && !voicedEvents.has('liftoff')) {{
                     voicedEvents.add('liftoff');
-                    announceWebcast("Liftoff of Aethel-X. Tower cleared.");
+                    announceWebcast("Liftoff. Tower cleared.");
                     if (rumbleGain) rumbleGain.gain.setTargetAtTime(0.95, actx.currentTime, 0.1);
                     if (crackleGain) crackleGain.gain.setTargetAtTime(0.55, actx.currentTime, 0.1);
                 }}
-                if (mach >= 1.0 && !voicedEvents.has('mach1')) {{
-                    voicedEvents.add('mach1');
-                    announceWebcast("Vehicle is now supersonic.");
-                }}
-                if (p0.event === 'MAX_Q' && !voicedEvents.has('maxq')) {{
-                    voicedEvents.add('maxq');
-                    announceWebcast("Vehicle has passed through Max-Q. Maximum aerodynamic pressure.");
-                }}
-                if (p0.event === 'HOT_STAGING' && !voicedEvents.has('staging')) {{
-                    voicedEvents.add('staging');
-                    announceWebcast("Stage separation confirmed. Second stage ignition.");
-                }}
-                if (p0.event === 'ORBIT' && !voicedEvents.has('orbit')) {{
-                    voicedEvents.add('orbit');
-                    announceWebcast("Second stage engine cutoff. Nominal orbital insertion.");
-                }}
             }}
 
-            // 排気火炎・真空膨張
+            // 流体シェーダープルーム更新
             if (p0.thrust && !p0.exploded) {{
-                plume.visible = true;
-                const vacExp = 1.0 + Math.min(16.0, alt / 7.0);
-                const flicker = 0.94 + Math.random() * 0.12;
+                plumeGroup.visible = true;
+                const vacFactor = Math.min(1.0, alt / 65.0);
+                plumeShaderMat.uniforms.uVacFactor.value = vacFactor;
+                engineGlare.scale.set(11.0 + Math.sin(now*0.05)*1.8, 6.5, 1.0);
+                engineBounceLight.intensity = Math.max(0.0, 5.5 - alt * 0.4);
+                engineBounceLight.position.set(rx, ry + 2.0, 4.0);
 
-                coreFlame.scale.set(1.0, flicker, 1.0);
-                outerPlume.scale.set(vacExp * 0.7, flicker * (1.0 + vacExp * 0.35), vacExp * 0.7);
-
-                const shockVis = Math.max(0.0, 1.0 - alt / 35.0);
-                shockDiamonds.forEach(sd => {{ sd.visible = shockVis > 0.05; sd.material.opacity = shockVis; }});
-
-                if (alt > 35.0 && alt < 140.0) {{
-                    const jProg = Math.sin(((alt - 35.0) / 105.0) * Math.PI);
-                    jellyfishPlume.material.opacity = jProg * 0.65;
-                    jellyfishPlume.scale.set(vacExp * 1.6, vacExp * 2.8, vacExp * 1.6);
-                }} else {{
-                    jellyfishPlume.material.opacity = 0.0;
-                }}
-
-                if (alt < 35.0) {{
+                if (alt < 28.0) {{
                     const ux = Math.sin(pitch), uy = Math.cos(pitch);
-                    for(let k=0; k<2; k++) {{
-                        emitSmoke(rx - ux * 2.5, ry - uy * 2.5, 0, -ux * 0.6 + (Math.random()-0.5)*0.2, -uy * 0.6, (Math.random()-0.5)*0.2, 3.2, 18.0, 55, 0.75);
-                    }}
+                    emitParticle(
+                        rx - ux * 6.0, ry + 6.0 - uy * 6.0, 0,
+                        -ux * 0.55 + (Math.random()-0.5)*0.18, -uy * 0.55, (Math.random()-0.5)*0.18,
+                        3.5, 22.0, 55, 0.65, 0xf1f5f9, false
+                    );
                 }}
             }} else if (!p0.exploded) {{
-                plume.visible = false;
+                plumeGroup.visible = false;
+                engineBounceLight.intensity = 0.0;
             }}
 
-            // パーティクル更新
+            // パーティクル物理・回転・フェード更新
             for(let i=0; i<P_MAX; i++) {{
                 const p = pool[i]; if (!p.active) continue;
                 p.age++;
                 if (p.age >= p.maxAge) {{ p.active = false; p.sp.visible = false; continue; }}
                 p.sp.position.x += p.vx; p.sp.position.y += p.vy; p.sp.position.z += p.vz;
+                p.sp.material.rotation += p.rotSpd;
                 const pr = p.age / p.maxAge;
-                p.sp.scale.set(p.s0 + (p.s1 - p.s0)*pr, p.s0 + (p.s1 - p.s0)*pr, 1);
+                const curScale = p.s0 + (p.s1 - p.s0) * Math.pow(pr, 0.7);
+                p.sp.scale.set(curScale, curScale, 1);
                 p.sp.material.opacity = p.o * (1.0 - pr * pr);
             }}
+
+            let regime = "TROPOSPHERE";
+            if (alt >= 100.0) regime = "THERMOSPHERE (VACUUM)";
+            else if (alt >= 50.0) regime = "MESOSPHERE";
+            else if (alt >= 12.0) regime = "STRATOSPHERE";
+            document.getElementById('hud-regime').innerText = regime;
+            document.getElementById('hud-downrange').innerText = `${{dRangeKm.toFixed(1)}} km`;
 
             document.getElementById('tv-mach').innerText = `M ${{mach.toFixed(2)}}`;
             document.getElementById('tv-spd').innerText = `(${{Math.round(vel * 3.6).toLocaleString()}} km/h)`;
@@ -1301,7 +1509,7 @@ if st.button("🔴 AETHEL-X 極限実写4K中継 ＆ 軌道投入シミュレー
             document.getElementById('tv-q').innerText   = q.toFixed(1);
             document.getElementById('tv-g').innerText   = accG.toFixed(1);
             if (!p0.exploded) {{
-                document.getElementById('tv-stage-badge').innerText = p0.stage === 1 ? (p0.strapon ? "CORE + STRAP-ON" : "CORE BOOSTER") : "STAGE 2 VACUUM";
+                document.getElementById('tv-stage-badge').innerText = p0.stage === 1 ? (p0.strapon ? "STAGE 1 + BOOSTERS" : "STAGE 1 ASCENT") : "STAGE 2 ORBITAL";
             }}
 
             renderer.render(scene, camera);
