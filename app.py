@@ -480,12 +480,12 @@ html_template = """
         .pip-alt { position: absolute; bottom: 6px; right: 8px; font-size: 10px; font-family: monospace; color: #38bdf8; font-weight: 700; background: rgba(15, 23, 42, 0.92); padding: 2px 6px; border-radius: 2px; z-index: 65; pointer-events: none; }
         .pip-toggle-hint { position: absolute; top: 6px; right: 8px; font-size: 9px; font-family: monospace; color: #94a3b8; background: rgba(15, 23, 42, 0.92); padding: 3px 6px; border-radius: 2px; z-index: 65; pointer-events: none; }
 
-        /* 🛰️ 軌道HUD 左上配置 (PiPやロケット中央と絶対に被らない完全分離) */
-        .hud-orbit { position: absolute; top: 58px; left: 24px; width: 280px; background: rgba(3, 7, 18, 0.72); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; padding: 10px 12px; box-sizing: border-box; z-index: 25; color: #fff; }
-        .hud-orbit:hover { background: rgba(3, 7, 18, 0.9); }
+        /* 🛰️ 軌道HUD 左上配置 (完全ボックスサイジングで見切れ防止) */
+        .hud-orbit { position: absolute; top: 58px; left: 24px; width: 310px; max-width: 85vw; background: rgba(3, 7, 18, 0.78); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 4px; padding: 12px; box-sizing: border-box; z-index: 25; color: #fff; }
+        .hud-orbit:hover { background: rgba(3, 7, 18, 0.92); }
         
-        .top-banner { position: absolute; top: 0; left: 0; width: 100%; height: 44px; background: rgba(2, 6, 16, 0.88); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 20; }
-        .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, rgba(1, 3, 8, 0.95) 0%, rgba(2, 6, 14, 0.72) 75%, transparent 100%); padding: 22px 32px 14px 32px; box-sizing: border-box; display: flex; align-items: flex-end; justify-content: space-between; z-index: 20; pointer-events: none; }
+        .top-banner { position: absolute; top: 0; left: 0; width: 100%; height: 44px; background: rgba(2, 6, 16, 0.92); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 20; }
+        .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; max-width: 100vw; background: linear-gradient(to top, rgba(1, 3, 8, 0.98) 0%, rgba(2, 6, 14, 0.85) 75%, transparent 100%); padding: 18px 28px 12px 28px; box-sizing: border-box; display: flex; align-items: flex-end; justify-content: space-between; z-index: 20; pointer-events: none; }
         .hud-telemetry > * { pointer-events: auto; }
         .rud-banner { display: none; position: absolute; top: 150px; left: 50%; transform: translateX(-50%); background: rgba(120, 10, 10, 0.94); backdrop-filter: blur(16px); border: 2px solid #ef4444; border-radius: 4px; padding: 16px 28px; z-index: 70; text-align: center; box-shadow: 0 0 60px rgba(239, 68, 68, 0.7); }
     </style>
@@ -518,17 +518,17 @@ html_template = """
         </div>
     </div>
 
-    <!-- 左上に配置された軌道トラジェクトリHUD ＆ 実況コールアウト -->
+    <!-- 左上に配置された軌道トラジェクトリHUD ＆ 実況コールアウト (見切れ防止仕様) -->
     <div class="hud-orbit" id="hud-orbit-box">
-        <div style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 1.2px; margin-bottom: 4px; display: flex; justify-content: space-between;">
+        <div style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 1.2px; margin-bottom: 6px; display: flex; justify-content: space-between;">
             <span>DOWNRANGE TRAJECTORY</span>
             <span id="hud-downrange" style="color: #38bdf8; font-family: monospace;">0.0 km</span>
         </div>
-        <canvas id="orbit-canvas" width="256" height="58" style="width: 100%; height: 58px; background: #020617; border-radius: 2px; border: 1px solid rgba(255,255,255,0.06);"></canvas>
-        <div id="event-log" style="margin-top: 6px; font-family: monospace; font-size: 10px; color: #34d399; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
+        <canvas id="orbit-canvas" width="284" height="60" style="width: 100%; height: 60px; background: #020617; border-radius: 2px; border: 1px solid rgba(255,255,255,0.08);"></canvas>
+        <div id="event-log" style="margin-top: 8px; font-family: monospace; font-size: 10.5px; font-weight: 700; color: #34d399; border-top: 1px solid rgba(255,255,255,0.12); padding-top: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
             > [LD] GO FOR TERMINAL COUNTDOWN
         </div>
-        <div id="sub-callout" style="font-family: monospace; font-size: 9px; color: #93c5fd; margin-top: 2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
+        <div id="sub-callout" style="font-family: monospace; font-size: 9.5px; color: #93c5fd; margin-top: 3px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
             > Propellant tanks pressurized for flight
         </div>
     </div>
@@ -541,28 +541,28 @@ html_template = """
     <div class="hud-telemetry">
         <div>
             <div id="tv-status" style="color: #38bdf8; font-size: 10px; font-weight: 700; letter-spacing: 1.8px; margin-bottom: 2px;">COUNTDOWN SEQUENCE</div>
-            <div id="tv-timer" style="color: #ffffff; font-size: 42px; font-weight: 900; font-family: 'Consolas', monospace; letter-spacing: 2px; text-shadow: 0 0 20px rgba(56, 189, 248, 0.4);">T- 00:10.0</div>
+            <div id="tv-timer" style="color: #ffffff; font-size: 38px; font-weight: 900; font-family: 'Consolas', monospace; letter-spacing: 2px; text-shadow: 0 0 20px rgba(56, 189, 248, 0.4);">T- 00:10.0</div>
         </div>
-        <div style="display: flex; gap: 32px; border-left: 1px solid rgba(255,255,255,0.15); padding-left: 28px;">
+        <div style="display: flex; gap: 24px; border-left: 1px solid rgba(255,255,255,0.15); padding-left: 20px; overflow-x: auto;">
             <div>
                 <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1.2px;">SPEED / MACH</div>
-                <div style="color: #fff; font-size: 22px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-mach">M 0.00</span> <span style="font-size: 11px; color: #94a3b8;" id="tv-spd">(0 km/h)</span></div>
+                <div style="color: #fff; font-size: 20px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-mach">M 0.00</span> <span style="font-size: 11px; color: #94a3b8;" id="tv-spd">(0 km/h)</span></div>
             </div>
             <div>
                 <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1.2px;">ALTITUDE</div>
-                <div style="color: #fff; font-size: 22px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-alt">0.0</span> <span style="font-size: 11px; color: #94a3b8;">km</span></div>
+                <div style="color: #fff; font-size: 20px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-alt">0.0</span> <span style="font-size: 11px; color: #94a3b8;">km</span></div>
             </div>
             <div>
                 <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1.2px;">DYNAMIC PRESSURE</div>
-                <div style="color: #fff; font-size: 22px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-q">0.0</span> <span style="font-size: 11px; color: #94a3b8;">kPa</span></div>
+                <div style="color: #fff; font-size: 20px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-q">0.0</span> <span style="font-size: 11px; color: #94a3b8;">kPa</span></div>
             </div>
             <div>
                 <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1.2px;">AXIAL LOAD</div>
-                <div style="color: #fff; font-size: 22px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-g">1.0</span> <span style="font-size: 11px; color: #94a3b8;">G</span></div>
+                <div style="color: #fff; font-size: 20px; font-weight: 800; font-family: 'Consolas', monospace;"><span id="tv-g">1.0</span> <span style="font-size: 11px; color: #94a3b8;">G</span></div>
             </div>
             <div>
                 <div style="font-size: 9px; color: #94a3b8; letter-spacing: 1.2px;">STAGE CONFIG</div>
-                <div id="tv-stage-badge" style="color: #34d399; font-size: 18px; font-weight: 800; font-family: 'Consolas', monospace;">PAD READY</div>
+                <div id="tv-stage-badge" style="color: #34d399; font-size: 16px; font-weight: 800; font-family: 'Consolas', monospace; white-space: nowrap;">PAD READY</div>
             </div>
         </div>
     </div>
@@ -596,7 +596,7 @@ html_template = """
         });
 
         // =========================================================================
-        // 🔊 実録級・重低音ランブル＆超音速クラックル音響合成
+        // 🔊 実録級・重低音ランブル＆パイロテクニクス爆薬音響合成
         // =========================================================================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let actx = null, subRumble = null, shockCrackle = null, gasHiss = null;
@@ -629,15 +629,33 @@ html_template = """
             if (actx && actx.state === 'suspended') actx.resume();
         }
 
+        // 💥 実録パイロ爆薬分離音（おもちゃピープ音を完全撤廃し実物インパルス衝撃波を合成）
         function playPyro() {
             if (!actx) return;
+            const now = actx.currentTime;
+            
+            // 1. パイロ爆薬ボルト破断の超高圧バースト
+            const noiseBuf = actx.createBuffer(1, Math.floor(actx.sampleRate * 0.25), actx.sampleRate);
+            const nd = noiseBuf.getChannelData(0);
+            for(let i=0; i<nd.length; i++) nd[i] = (Math.random() * 2 - 1) * Math.exp(-i / (actx.sampleRate * 0.03));
+            const nSrc = actx.createBufferSource(); nSrc.buffer = noiseBuf;
+            const nFilt = actx.createBiquadFilter(); nFilt.type = 'bandpass'; nFilt.frequency.value = 850; nFilt.Q.value = 1.2;
+            const nGain = actx.createGain();
+            nGain.gain.setValueAtTime(1.0, now);
+            nGain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+            nSrc.connect(nFilt); nFilt.connect(nGain); nGain.connect(actx.destination);
+            nSrc.start(now);
+
+            // 2. 胴体金属構造を伝わる重低音インパクト (45Hz〜25Hz)
             const osc = actx.createOscillator();
             const g = actx.createGain();
-            osc.type = 'triangle'; osc.frequency.setValueAtTime(320, actx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(35, actx.currentTime + 0.35);
-            g.gain.setValueAtTime(0.7, actx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + 0.35);
-            osc.connect(g); g.connect(actx.destination); osc.start(); osc.stop(actx.currentTime + 0.35);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(95, now);
+            osc.frequency.exponentialRampToValueAtTime(28, now + 0.35);
+            g.gain.setValueAtTime(1.2, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+            osc.connect(g); g.connect(actx.destination);
+            osc.start(now); osc.stop(now + 0.36);
         }
 
         // =========================================================================
@@ -657,7 +675,7 @@ html_template = """
         rendererMain.shadowMap.enabled = true;
         rendererMain.shadowMap.type = THREE.PCFSoftShadowMap;
 
-        // 🎥 レンダラー2 (CAM 02 望遠専用独立レンダラー: 描画被り・黒画面バグを完全解消)
+        // 🎥 レンダラー2 (CAM 02 望遠専用独立レンダラー)
         const rendererPip = new THREE.WebGLRenderer({ canvas: canvasPip, antialias: true, powerPreference: "high-performance" });
         rendererPip.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         rendererPip.setSize(340, 195);
@@ -736,7 +754,6 @@ html_template = """
         cctx.bezierCurveTo(1000, 550, 850, 1250, 720, 2048);
         cctx.lineTo(0, 2048); cctx.closePath(); cctx.fill();
 
-        // 2条の砂利クローラーウェイ（VABから発射台への重運搬路）
         cctx.strokeStyle = '#9ca3af'; cctx.lineWidth = 14;
         cctx.beginPath(); cctx.moveTo(180, 1014); cctx.lineTo(950, 1014); cctx.stroke();
         cctx.beginPath(); cctx.moveTo(180, 1034); cctx.lineTo(950, 1034); cctx.stroke();
@@ -1286,7 +1303,7 @@ html_template = """
             const s = sparkPool[sIdx]; sIdx = (sIdx + 1) % SPARK_MAX;
             s.active = true; s.sp.visible = true;
             s.sp.position.set(x, y, z);
-            s.vx = vx; s.vy = vy; s.vz = vz;
+            s.vx = vx; p.vy = vy; s.vz = vz;
             s.age = 0; s.maxAge = life; s.size = size;
             s.sp.scale.set(size, size * 1.8, 1);
             s.sp.material.color.setHex(hexCol);
@@ -1294,11 +1311,11 @@ html_template = """
         }
 
         function drawOrbitMap(altKm, dRangeKm, exploded) {
-            octx.clearRect(0, 0, 256, 58);
-            octx.beginPath(); octx.arc(128, 150, 125, Math.PI, 0); octx.strokeStyle = '#1e293b'; octx.lineWidth = 2.5; octx.stroke();
-            const px = 12 + Math.min(232, (dRangeKm / 1200.0) * 232);
-            const py = 50 - Math.min(42, (altKm / 200.0) * 42);
-            octx.beginPath(); octx.moveTo(12, 50); octx.quadraticCurveTo(px * 0.5, 50, px, py);
+            octx.clearRect(0, 0, 284, 60);
+            octx.beginPath(); octx.arc(142, 160, 135, Math.PI, 0); octx.strokeStyle = '#1e293b'; octx.lineWidth = 2.5; octx.stroke();
+            const px = 14 + Math.min(256, (dRangeKm / 1200.0) * 256);
+            const py = 52 - Math.min(44, (altKm / 200.0) * 44);
+            octx.beginPath(); octx.moveTo(14, 52); octx.quadraticCurveTo(px * 0.5, 52, px, py);
             octx.strokeStyle = exploded ? '#ef4444' : '#38bdf8'; octx.lineWidth = 1.8; octx.stroke();
             octx.fillStyle = exploded ? '#dc2626' : '#38bdf8';
             octx.beginPath(); octx.arc(px, py, 3.5, 0, Math.PI * 2); octx.fill();
@@ -1411,33 +1428,37 @@ html_template = """
             const perpX = Math.cos(pitch), perpY = -Math.sin(pitch);
 
             // =====================================================================
-            // 🎙️ 実況コールアウト・音声風テキストログ (完全同期復元)
+            // 🎙️ 本格フライトディレクター実況・コールアウト音声ログ (完全復元・拡充)
             // =====================================================================
             if (!simCfg.is_preview) {
                 if (simT >= -10.0 && simT < -5.0 && !voicedEvents.has('t_minus_10')) {
                     voicedEvents.add('t_minus_10');
-                    eventLog.innerText = "> [FIDO] T-10 SECONDS AND COUNTING";
-                    subCallout.innerText = "> Flight computers aligned, vehicle on internal power";
+                    eventLog.innerText = "> [FIDO] T-10s: TERMINAL COUNTDOWN INITIATED";
+                    subCallout.innerText = "> Flight computers aligned, vehicle on internal batteries";
                 } else if (simT >= -5.0 && simT < -3.8 && !voicedEvents.has('deluge_start')) {
                     voicedEvents.add('deluge_start');
-                    eventLog.innerText = "> [PAD] SOUND SUPPRESSION WATER DELUGE INITIATED";
-                    subCallout.innerText = "> 300,000 GPM water barrier active across flame trench";
+                    eventLog.innerText = "> [PAD] T-5s: SOUND SUPPRESSION WATER DELUGE ACTIVE";
+                    subCallout.innerText = "> 300,000 GPM water flowing into flame trench";
                 } else if (simT >= -3.8 && simT < 0.0 && !voicedEvents.has('ign_start')) {
                     voicedEvents.add('ign_start');
-                    eventLog.innerText = "> [ENG] IGNITION SEQUENCE START";
-                    subCallout.innerText = "> Turbopumps spinning up, chamber pressures nominal";
-                } else if (simT >= 0.0 && simT < 5.0 && !voicedEvents.has('liftoff')) {
+                    eventLog.innerText = "> [ENG] T-3.8s: MAIN ENGINE START SEQUENCE";
+                    subCallout.innerText = "> Turbopumps spinning up, chamber pressure rising";
+                } else if (simT >= 0.0 && simT < 4.0 && !voicedEvents.has('liftoff')) {
                     voicedEvents.add('liftoff');
-                    eventLog.innerText = "> [COMM] LIFTOFF! WE HAVE A LIFTOFF!";
-                    subCallout.innerText = "> Tower cleared, roll program initiated";
+                    eventLog.innerText = "> [COMM] T+0s: LIFTOFF! WE HAVE A LIFTOFF!";
+                    subCallout.innerText = "> Tower cleared, roll and pitch program nominal";
+                } else if (simT >= 12.0 && simT < 25.0 && !voicedEvents.has('gravity_turn')) {
+                    voicedEvents.add('gravity_turn');
+                    eventLog.innerText = "> [NAV] GRAVITY TURN INITIATED";
+                    subCallout.innerText = "> Vehicle pitching downrange toward orbital trajectory";
                 } else if (mach >= 1.0 && !voicedEvents.has('mach1')) {
                     voicedEvents.add('mach1');
-                    eventLog.innerText = "> [FDIR] VEHICLE IS SUPERSONIC (MACH 1.0)";
-                    subCallout.innerText = "> Telemetry nominal, transonic aerodynamic flutter dampening";
+                    eventLog.innerText = "> [FDIR] VEHICLE IS SUPERSONIC (MACH 1.0 PASS)";
+                    subCallout.innerText = "> Transonic shock collar dampening active";
                 } else if (p0.event === "MAX_Q" && !voicedEvents.has('max_q')) {
                     voicedEvents.add('max_q');
                     eventLog.innerText = "> [FDIR] MAX-Q: MAXIMUM DYNAMIC PRESSURE";
-                    subCallout.innerText = "> Throttling engines down to relieve structural aerodynamic stress";
+                    subCallout.innerText = "> Throttling engines down to relieve aerodynamic loading";
                 }
             }
 
@@ -1589,34 +1610,46 @@ html_template = """
             }
 
             // =====================================================================
-            // 🤖 5. 作用・反作用（ニュートン力学）に完全準拠した間欠パルスRCS噴射
+            // 🤖 5. 作用・反作用＆デッドバンド制御に基づく実機志向の間欠RCS噴射
             // =====================================================================
             const pitchRate = (pitch - prevPitch) / 0.016; // 角速度 (rad/s)
             prevPitch = pitch;
             let rcsFiring = false;
 
-            for(let rcs of rcsMountNodes) {
-                // 機首を右（水平）へ倒し込む時は「左側のノズル(side=-1)が右へ」ガスを噴射してモーメントを発生
-                // 行き過ぎた角速度を抑え制動をかける時は「右側のノズル(side=1)が左へ」カウンター噴射
-                const wantsPitchOver = (pitchRate > 0.003 && rcs.side === -1);
-                const needsCounterBrake = (pitchRate < -0.003 && rcs.side === 1);
-                const isPulseTriggered = (Math.sin(now * 0.045) > 0.65); // 常に出ずミリ秒パルスで断続噴射
-                const isS1Boostback = (stage1Detached && rcs.isS1 && rcs.side === 1);
+            // デッドバンド制御（閾値を超えた瞬間だけ短いパルスを噴射して姿勢を保つ）
+            const targetPitchProg = (alt > 2.0 && alt < 120.0);
+            const pitchAccelNeeded = targetPitchProg && (pitchRate < 0.002);
+            const dampingNeeded = (Math.abs(pitchRate) > 0.008);
+            
+            // 0.1秒ごとのパルスウィンドウ（連続噴射せず間欠的にプシュッと噴射）
+            const pulseClock = (now % 800) < 110;
 
-                if (!simCfg.is_preview && simT > 0.5 && (((wantsPitchOver || needsCounterBrake) && isPulseTriggered && !rcs.isS1) || isS1Boostback)) {
+            for(let rcs of rcsMountNodes) {
+                // 機首を右へ倒す加速時: 左ノズル(side=-1)から右向きに噴射
+                // 角速度が行き過ぎて抑える制動時: 右ノズル(side=1)から左向きに逆噴射
+                let shouldFire = false;
+                if (!simCfg.is_preview && simT > 2.0 && pulseClock && !rcs.isS1) {
+                    if (pitchAccelNeeded && rcs.side === -1) shouldFire = true;
+                    if (dampingNeeded && pitchRate > 0 && rcs.side === 1) shouldFire = true;
+                    if (dampingNeeded && pitchRate < 0 && rcs.side === -1) shouldFire = true;
+                }
+                if (stage1Detached && rcs.isS1 && rcs.side === 1 && (now % 600) < 120) {
+                    shouldFire = true; // 第1段反転ブーストバック用パルス
+                }
+
+                if (shouldFire) {
                     rcsFiring = true;
                     rcs.node.getWorldPosition(tempTipPos);
-                    // 噴射ガスは外側へ激しく吹き出し、反作用で機体姿勢を制御
                     const jetDirX = perpX * rcs.side;
                     const jetDirY = perpY * rcs.side;
                     emitParticle(
                         tempTipPos.x + jetDirX * 0.35, tempTipPos.y + jetDirY * 0.35, tempTipPos.z,
-                        jetDirX * (3.8 + Math.random()*1.4), jetDirY * (3.8 + Math.random()*1.4), (Math.random()-0.5)*0.3,
-                        0.32, 2.6, 12, 0.9, 0xf0f9ff, false
+                        jetDirX * (3.8 + Math.random()*1.2), jetDirY * (3.8 + Math.random()*1.2), (Math.random()-0.5)*0.3,
+                        0.32, 2.4, 10, 0.92, 0xf0f9ff, false
                     );
                 }
             }
-            document.getElementById('hud-rcs').innerText = rcsFiring ? "REACTION CONTROL (ACTIVE PULSE)" : "STANDBY (CLOSED-LOOP)";
+            document.getElementById('hud-rcs').innerText = rcsFiring ? "PULSE FIRING (GN2)" : "STANDBY (DEADBAND OK)";
             document.getElementById('hud-rcs').style.color = rcsFiring ? "#34d399" : "#38bdf8";
 
             updateDualCameraTracking(simT, elapsedSec, alt, pitch, p0.stage, p0.exploded);
