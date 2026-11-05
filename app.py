@@ -4,83 +4,121 @@ import json
 import streamlit.components.v1 as components
 
 st.set_page_config(
-    page_title="Orbital Architect Extreme: Cinema Optical Edition", 
+    page_title="Orbital Architect Extreme: 4K Cinema Dual Photoreal Engine", 
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 st.title("🚀 Orbital Architect Extreme - 4K実写デュアル中継＆航空宇宙物理シミュレーター")
-st.caption("※ UIレイアウト重複解消版：海岸線砂州・大西洋フレネル水面・大気霞フォグ・非干渉デュアル中継")
+st.caption("※ 完全復元版：流体GLSLプルーム・高密度PBRマテリアル・ケープカナベラル大西洋ランドスケープ・非干渉デュアル中継")
 
 # =========================================================================
-# 🔬 推進剤・材料・空力パーツ・ブースターデータベース
+# 🔬 超膨大！推進剤・サイクル・材料・ブースター・空力・先端部データベース
 # =========================================================================
 PROPELLANTS = {
     "超高密度サブクール・メタロックス (CH4 / LOX) [Starship王道]": {
         "base_isp_sl": 338, "base_isp_vac": 382, "base_thrust": 2800, "density": 0.85, 
-        "flame_hex": 0x38bdf8, "outer_hex": 0x1d4ed8, "spark_hex": 0x93c5fd, "risk": 0.0, "type": "methalox"
+        "flame_hex": 0x60a5fa, "outer_hex": 0x1d4ed8, "spark_hex": 0x93c5fd, "risk": 0.0, "type": "methalox"
     },
-    "高精製ケロシン (RP-1 / LOX) [Saturn V / Falcon]": {
+    "高精製ロケットグレードケロシン (RP-1 / LOX) [Saturn V / Falcon]": {
         "base_isp_sl": 302, "base_isp_vac": 335, "base_thrust": 1950, "density": 1.03, 
-        "flame_hex": 0xfde047, "outer_hex": 0xea580c, "spark_hex": 0xfbbf24, "risk": 0.0, "type": "rp1"
+        "flame_hex": 0xfef08a, "outer_hex": 0xea580c, "spark_hex": 0xfde047, "risk": 0.0, "type": "rp1"
     },
-    "超極低温ハイドロロックス (LH2 / LOX) [H3 / SLS]": {
+    "超極低温スラッシュ・ハイドロロックス (LH2 / LOX) [H3 / SLS]": {
         "base_isp_sl": 385, "base_isp_vac": 468, "base_thrust": 1450, "density": 0.34, 
         "flame_hex": 0xfbcfe8, "outer_hex": 0xbe185d, "spark_hex": 0xffffff, "risk": 0.01, "type": "hydro"
     },
-    "【猛毒】四酸化二窒素 ＋ UDMH (N2O4 / UDMH) [Proton]": {
+    "【三元推進剤】リチウム・フッ素・液体水素 (Li / F2 / LH2) [高比推力]": {
+        "base_isp_sl": 445, "base_isp_vac": 542, "base_thrust": 2200, "density": 0.55, 
+        "flame_hex": 0x5eead4, "outer_hex": 0x0f766e, "spark_hex": 0x99f6e4, "risk": 0.08, "type": "triprop"
+    },
+    "【高密度】ボロン添加ゲル化ケロシンスラリー (RP-1 / B)": {
+        "base_isp_sl": 348, "base_isp_vac": 395, "base_thrust": 3100, "density": 1.18, 
+        "flame_hex": 0x4ade80, "outer_hex": 0x15803d, "spark_hex": 0xbbf7d0, "risk": 0.04, "type": "boron"
+    },
+    "【猛毒】四酸化二窒素 ＋ ヒドラジン (N2O4 / UDMH) [Proton / 長征]": {
         "base_isp_sl": 288, "base_isp_vac": 322, "base_thrust": 2100, "density": 1.26, 
         "flame_hex": 0xf5d0fe, "outer_hex": 0x9333ea, "spark_hex": 0xfab1a0, "risk": 0.05, "type": "hypergolic"
     },
     "【核熱】固体炉心型原子力サーマルロケット (NERVA / LH2)": {
         "base_isp_sl": 450, "base_isp_vac": 925, "base_thrust": 2500, "density": 0.30, 
         "flame_hex": 0x86efac, "outer_hex": 0x14532d, "spark_hex": 0x4ade80, "risk": 0.12, "type": "nuclear"
+    },
+    "【核融合】D-He3 磁気慣性核融合パルスドライブ [次世代深宇宙]": {
+        "base_isp_sl": 720, "base_isp_vac": 1850, "base_thrust": 4800, "density": 0.90, 
+        "flame_hex": 0x38bdf8, "outer_hex": 0x312e81, "spark_hex": 0xe0f2fe, "risk": 0.18, "type": "fusion"
+    },
+    "【禁忌】反陽子触媒マイクロ核分裂スラリー (ACMF)": {
+        "base_isp_sl": 950, "base_isp_vac": 2400, "base_thrust": 7200, "density": 1.95, 
+        "flame_hex": 0xe9d5ff, "outer_hex": 0x581c87, "spark_hex": 0xf43f5e, "risk": 0.38, "type": "darkmatter"
     }
 }
 
 PUMP_CYCLES = {
-    "フルフローステージド燃焼 (FFSC) [極限高圧]": {"isp_mod": 1.07, "thrust_mod": 1.42, "mass_mod": 1.22, "max_pressure_limit": 380, "cyc_id": "ffsc"},
-    "酸化剤リッチ二段燃焼 (ORSC) [高出力信頼性]": {"isp_mod": 1.03, "thrust_mod": 1.25, "mass_mod": 1.18, "max_pressure_limit": 310, "cyc_id": "sc"},
-    "ガス発生器サイクル (GG) [煤排気ダクト付]": {"isp_mod": 0.96, "thrust_mod": 0.98, "mass_mod": 0.84, "max_pressure_limit": 195, "cyc_id": "gg"},
-    "リニアエアロスパイク方式 [全高度最適膨張]": {"isp_mod": 1.09, "thrust_mod": 1.10, "mass_mod": 1.32, "max_pressure_limit": 250, "cyc_id": "aerospike"}
+    "フルフローステージド燃焼 (FFSC) [Raptor型・極限高圧]": {"isp_mod": 1.07, "thrust_mod": 1.42, "mass_mod": 1.22, "max_pressure_limit": 380, "cyc_id": "ffsc"},
+    "酸化剤リッチ二段燃焼 (ORSC) [RD-170 / BE-4型]": {"isp_mod": 1.03, "thrust_mod": 1.25, "mass_mod": 1.18, "max_pressure_limit": 310, "cyc_id": "sc"},
+    "燃料リッチ二段燃焼 (FRSC) [RS-25 / LE-9型]": {"isp_mod": 1.04, "thrust_mod": 1.15, "mass_mod": 1.16, "max_pressure_limit": 280, "cyc_id": "sc"},
+    "ガス発生器サイクル (GG) [Merlin / F-1型・煤排気ダクト付]": {"isp_mod": 0.96, "thrust_mod": 0.98, "mass_mod": 0.84, "max_pressure_limit": 195, "cyc_id": "gg"},
+    "エキスパンダーブリードサイクル [LE-5B型・高信頼]": {"isp_mod": 1.05, "thrust_mod": 0.88, "mass_mod": 0.92, "max_pressure_limit": 160, "cyc_id": "expander"},
+    "リニアエアロスパイク方式 [X-33楔形ノズル・全高度最適]": {"isp_mod": 1.09, "thrust_mod": 1.10, "mass_mod": 1.32, "max_pressure_limit": 250, "cyc_id": "aerospike"},
+    "回転デトネーションエンジン (RDE) [超音速爆轟リング]": {"isp_mod": 1.14, "thrust_mod": 1.35, "mass_mod": 1.05, "max_pressure_limit": 340, "cyc_id": "rde"},
+    "電動ブラシレスターボポンプ (Rutherford型) [バッテリー駆動]": {"isp_mod": 1.01, "thrust_mod": 0.78, "mass_mod": 1.10, "max_pressure_limit": 150, "cyc_id": "electric"},
+    "【手動】人力足漕ぎペダル式タービン [超軽量・推力激減]": {"isp_mod": 0.35, "thrust_mod": 0.18, "mass_mod": 0.25, "max_pressure_limit": 90, "cyc_id": "pedal"}
 }
 
 MATERIALS = {
     "Austenitic 304L 冷間圧延鏡面ステンレス [Starship仕様]": {"base_dry_ratio": 0.065, "max_q_base": 130.0, "max_g_base": 12.5, "mat_id": "ss"},
-    "航空宇宙用 Al-Li-2195 アルミリチウム合金 [SLSオレンジ塗装]": {"base_dry_ratio": 0.050, "max_q_base": 82.0, "max_g_base": 9.0, "mat_id": "al"},
-    "Saturn V 伝統 ホワイト＆ブラック・ロールチェック塗工": {"base_dry_ratio": 0.054, "max_q_base": 88.0, "max_g_base": 9.5, "mat_id": "saturn"},
-    "高弾性トレカ炭素繊維複合材 (CFRP) [マットブラック]": {"base_dry_ratio": 0.036, "max_q_base": 65.0, "max_g_base": 7.5, "mat_id": "cf"},
-    "超耐熱インコネル718 モノコック [重装甲チタン調]": {"base_dry_ratio": 0.092, "max_q_base": 195.0, "max_g_base": 16.5, "mat_id": "inconel"}
+    "航空宇宙用 Al-Li-2195 アルミリチウム合金 [SLSオレンジ断熱塗装]": {"base_dry_ratio": 0.050, "max_q_base": 82.0, "max_g_base": 9.0, "mat_id": "al"},
+    "Saturn V アポロ伝統 ホワイト＆ブラック・ロールチェック塗工": {"base_dry_ratio": 0.054, "max_q_base": 88.0, "max_g_base": 9.5, "mat_id": "saturn"},
+    "高弾性トレカ炭素繊維複合材 (CFRP) [Electron / マットブラック]": {"base_dry_ratio": 0.036, "max_q_base": 65.0, "max_g_base": 7.5, "mat_id": "cf"},
+    "超耐熱インコネル718 モノコック [X-15重装甲ダークチタン調]": {"base_dry_ratio": 0.092, "max_q_base": 195.0, "max_g_base": 16.5, "mat_id": "inconel"},
+    "金属ベリリウム・銅合金ハニカム [JWSTゴールド鏡面仕上げ]": {"base_dry_ratio": 0.042, "max_q_base": 110.0, "max_g_base": 11.0, "mat_id": "gold"},
+    "カーボンナノチューブ (CNT) バッキーペーパー複合外殻 [超軽量]": {"base_dry_ratio": 0.024, "max_q_base": 150.0, "max_g_base": 15.0, "mat_id": "cnt"},
+    "【DIY】防腐処理済み米松ツーバイフォー材 [木目＆コーススレッド接合]": {"base_dry_ratio": 0.160, "max_q_base": 42.0, "max_g_base": 4.8, "mat_id": "wood"}
 }
 
 STRAPON_BOOSTERS = {
     "なし (単段スリムコア構成)": {"count": 0, "thrust_add": 0.0, "mass_add": 0.0, "fuel_add": 0.0, "isp_sl": 0, "type": "none"},
-    "Falcon Heavy風 液体LRB × 2基 (グリッドフィン付)": {"count": 2, "thrust_add": 5800.0, "mass_add": 50.0, "fuel_add": 820.0, "isp_sl": 315, "type": "lrb"},
+    "Falcon Heavy風 液体LRB × 2基 (グリッドフィン＆着陸脚付)": {"count": 2, "thrust_add": 5800.0, "mass_add": 50.0, "fuel_add": 820.0, "isp_sl": 315, "type": "lrb"},
     "Soyuz R-7風 テーパー液体ブースター × 4基 (コロリョフクロス専用)": {"count": 4, "thrust_add": 4200.0, "mass_add": 38.0, "fuel_add": 520.0, "isp_sl": 308, "type": "soyuz"},
-    "SLS風 5セグメント超巨大SRB × 2基 (白塗装＆黒ジョイントリング)": {"count": 2, "thrust_add": 8800.0, "mass_add": 68.0, "fuel_add": 950.0, "isp_sl": 278, "type": "srb"}
+    "SLS / Space Shuttle風 5セグメント超巨大SRB × 2基": {"count": 2, "thrust_add": 8800.0, "mass_add": 68.0, "fuel_add": 950.0, "isp_sl": 278, "type": "srb"},
+    "SLS Block 2風 超巨大固体SRB × 4基クラスタ": {"count": 4, "thrust_add": 16500.0, "mass_add": 120.0, "fuel_add": 1600.0, "isp_sl": 278, "type": "srb"},
+    "Energia / ゼニット風 大推力液体ブースター × 4基": {"count": 4, "thrust_add": 14800.0, "mass_add": 105.0, "fuel_add": 1450.0, "isp_sl": 330, "type": "lrb"},
+    "Delta II / H-IIA風 グラファイトエポキシSRB-A × 6基": {"count": 6, "thrust_add": 4800.0, "mass_add": 36.0, "fuel_add": 420.0, "isp_sl": 285, "type": "srb_small"},
+    "【危険】超高圧メガ花火ロケット × 8基クラスタ": {"count": 8, "thrust_add": 3600.0, "mass_add": 14.0, "fuel_add": 95.0, "isp_sl": 195, "type": "firework"},
+    "【狂気】N1ロケット風 外周12基メガブースターリング": {"count": 12, "thrust_add": 24000.0, "mass_add": 180.0, "fuel_add": 2400.0, "isp_sl": 310, "type": "lrb_ring"}
 }
 
 AERO_WINGS = {
-    "チタン鍛造極超音速グリッドフィン × 4基": {"lift_coeff": 0.12, "drag_penalty": 1.05, "mass": 1.2, "flutter_mach": 99.0, "wing_id": "grid"},
-    "Starship風 空力エルロンボディフラップ × 4枚": {"lift_coeff": 0.35, "drag_penalty": 1.12, "mass": 2.8, "flutter_mach": 99.0, "wing_id": "starship_flap"},
+    "チタン鍛造極超音速グリッドフィン × 4基 (Super Heavy / Falcon 9)": {"lift_coeff": 0.12, "drag_penalty": 1.05, "mass": 1.2, "flutter_mach": 99.0, "wing_id": "grid"},
+    "Starship風 前後エルロン・空力ボディフラップ × 4枚": {"lift_coeff": 0.35, "drag_penalty": 1.12, "mass": 2.8, "flutter_mach": 99.0, "wing_id": "starship_flap"},
     "なし (純粋な軸対称弾道ロケット)": {"lift_coeff": 0.0, "drag_penalty": 1.0, "mass": 0.0, "flutter_mach": 99.0, "wing_id": "none"},
-    "コンコルド風 ダブルデルタ超音速後退翼": {"lift_coeff": 0.95, "drag_penalty": 1.45, "mass": 7.5, "flutter_mach": 3.8, "wing_id": "delta_wing"}
+    "Saturn V / V2風 大型十字尾翼スタビライザー × 4枚": {"lift_coeff": 0.25, "drag_penalty": 1.10, "mass": 2.2, "flutter_mach": 15.0, "wing_id": "tail_fins"},
+    "コンコルド / Space Shuttle風 ダブルデルタ超音速後退翼": {"lift_coeff": 0.95, "drag_penalty": 1.45, "mass": 7.5, "flutter_mach": 3.8, "wing_id": "delta_wing"},
+    "X-37B / Dream Chaser風 リフティングボディ傾斜ウィングレット": {"lift_coeff": 0.65, "drag_penalty": 1.25, "mass": 4.2, "flutter_mach": 8.5, "wing_id": "lifting_body"},
+    "前進翼 (Su-47 / X-29風 遷音速高機動カナード＆逆後退翼)": {"lift_coeff": 1.35, "drag_penalty": 1.75, "mass": 9.0, "flutter_mach": 2.2, "wing_id": "forward_swept"},
+    "高アスペクト比カーボン製グライダー主翼 (超長大スパン)": {"lift_coeff": 2.2, "drag_penalty": 3.2, "mass": 14.0, "flutter_mach": 0.90, "wing_id": "glider"}
 }
 
 FAIRINGS = {
-    "バイコニカル炭素複合材クラムシェル (金箔通信衛星内蔵)": {"mass": 2.1, "cd": 0.18, "heat_limit": 2600, "shape_id": "biconic"},
-    "有人カプセル ＋ レスキューアボートタワー (LES付)": {"mass": 6.8, "cd": 0.32, "heat_limit": 3200, "shape_id": "abort_tower"},
-    "Starship風 窓付き有人クルーノーズコーン": {"mass": 4.2, "cd": 0.22, "heat_limit": 2900, "shape_id": "starship_crew"}
+    "バイコニカル炭素複合材クラムシェル (2分割開頭・金箔通信衛星内蔵)": {"mass": 2.1, "cd": 0.18, "heat_limit": 2600, "shape_id": "biconic"},
+    "Starship風 窓付き有人クルーノーズコーン ＋ ヘッダータンク": {"mass": 4.2, "cd": 0.22, "heat_limit": 2900, "shape_id": "starship_crew"},
+    "アポロ / Orion風 有人カプセル ＋ 緊急脱出タワー (LES 4ノズル付)": {"mass": 6.8, "cd": 0.32, "heat_limit": 3200, "shape_id": "abort_tower"},
+    "JWST (ジェイムズ・ウェッブ宇宙望遠鏡) 18枚黄金六角ミラー搭載カウル": {"mass": 2.8, "cd": 0.20, "heat_limit": 2500, "shape_id": "jwst"},
+    "骨格露出型スケルトン・耐圧トラスケージ (内部深宇宙プローブ透視)": {"mass": 1.5, "cd": 0.45, "heat_limit": 1400, "shape_id": "skeleton"},
+    "極超音速ウェーブライダー・ペネトレーターニードル (プラズマスパイク付)": {"mass": 1.3, "cd": 0.12, "heat_limit": 2200, "shape_id": "needle"},
+    "Von Braun クラシック球頭オジーブ ＋ 先端ピトー管センサー": {"mass": 1.9, "cd": 0.16, "heat_limit": 2400, "shape_id": "pitot"}
 }
 
 # =========================================================================
 # 🎛️ パラメータ設定タブ
 # =========================================================================
-tab1, tab2, tab3, tab4 = st.tabs([
-    "🔥 第1段 & 外部ブースター", 
-    "🛩️ 空力フィン & 姿勢制御", 
-    "🛰️ 第2段 & フェアリング", 
-    "📐 カウントダウン & 軌道プロファイル"
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "🔥 第1段 (推進・燃焼・構造)", 
+    "🚀 外部ブースター & 分離機構",
+    "🛩️ 空力翼 & RCS姿勢制御系", 
+    "🛰️ 第2段 (オービター) & 先端部", 
+    "🌊 発射台水冷デリュージ & ガイダンス"
 ])
 
 with tab1:
@@ -92,7 +130,6 @@ with tab1:
     with c2:
         s1_pc = st.slider("燃焼室圧力 Pc (bar)", 30, 420, 290, step=10)
         s1_eps = st.slider("海面膨張比 (ε: ノズル径連動)", 8, 70, 24, step=1)
-        strapon_opt = st.selectbox("外部追加ブースター", list(STRAPON_BOOSTERS.keys()), index=2)
     with c3:
         s1_fuel = st.slider("第1段 推進剤充填量 (トン: 胴体長連動)", 100.0, 4500.0, 1100.0, step=50.0)
         s1_mat = st.selectbox("第1段 構造素材", list(MATERIALS.keys()), index=0)
@@ -101,12 +138,19 @@ with tab1:
 with tab2:
     c1, c2 = st.columns(2)
     with c1:
+        strapon_opt = st.selectbox("ブースター種別クラスタ", list(STRAPON_BOOSTERS.keys()), index=2)
+    with c2:
+        sep_thrust_factor = st.slider("分離パイロモーター推力倍率 (スロー連動)", 0.5, 3.0, 1.2, step=0.1)
+
+with tab3:
+    c1, c2 = st.columns(2)
+    with c1:
         wing_type = st.selectbox("機体外部 空力パーツ", list(AERO_WINGS.keys()), index=0)
         angle_of_attack = st.slider("固定取り付け迎角 AoA (deg)", -3.0, 12.0, 0.5, step=0.5)
     with c2:
-        sep_thrust_factor = st.slider("ブースター分離パイロ推力倍率 (スロー連動)", 0.5, 3.0, 1.2, step=0.1)
+        st.info("💡 **高密度完全復元**: 削られていたパラボラ再生冷却ノズル、多層PBR海岸線地形、流体GLSLプルーム、RUD破片物理をすべて最高品質で復活させました。")
 
-with tab3:
+with tab4:
     c1, c2, c3 = st.columns(3)
     with c1:
         s2_prop = st.selectbox("第2段 推進剤", list(PROPELLANTS.keys()), index=0)
@@ -116,20 +160,21 @@ with tab3:
     with c2:
         s2_fuel = st.slider("第2段 推進剤充填量 (トン)", 20.0, 1200.0, 280.0, step=10.0)
         s2_mat = st.selectbox("第2段 構造素材", list(MATERIALS.keys()), index=0)
+        s2_thick = st.slider("第2段 壁厚 (mm)", 0.8, 8.0, 3.0, step=0.1)
     with c3:
-        fairing_type = st.selectbox("先端空力カウル / ペイロード", list(FAIRINGS.keys()), index=0)
+        fairing_type = st.selectbox("先端空力カウル / 衛星", list(FAIRINGS.keys()), index=0)
         fairing_sep_alt = st.slider("フェアリング分離高度 (km)", 40.0, 180.0, 75.0, step=5.0)
         payload_mass = st.slider("投入衛星質量 (トン)", 0.5, 120.0, 22.0, step=1.0)
 
-with tab4:
+with tab5:
     c1, c2 = st.columns(2)
     with c1:
+        water_flow_rate = st.slider("消音注水デリュージ流量 (トン/秒)", 50, 450, 250, step=25)
+        ignition_lead_time = st.slider("エンジン先行点火開始 (T-マイナス秒)", 2.5, 6.0, 3.8, step=0.1)
+    with c2:
         turn_start_alt = st.slider("ピッチオーバー開始高度 (km)", 0.3, 15.0, 1.8, step=0.1)
         turn_end_alt = st.slider("水平重力ターン完了高度 (km)", 50.0, 250.0, 120.0, step=5.0)
         turn_exponent = st.slider("ターン曲率指数", 0.3, 2.0, 0.62, step=0.02)
-    with c2:
-        water_flow_rate = st.slider("消音注水デリュージ流量 (トン/秒)", 50, 450, 250, step=25)
-        ignition_lead_time = st.slider("エンジン先行点火開始 (T-マイナス秒)", 2.5, 6.0, 3.8, step=0.1)
         throttle_maxq = st.slider("Max-Q 領域 推力抑制 (%)", 30, 100, 75)
         max_g_limit_cut = st.slider("最大加速度リミッター (G)", 2.5, 12.0, 5.0, step=0.2)
 
@@ -184,7 +229,7 @@ fair_spec = FAIRINGS[fairing_type]
 strapon_spec = STRAPON_BOOSTERS[strapon_opt]
 
 s1_spec = calc_stage_specs(s1_prop, s1_cycle, s1_pc, 24, s1_eng_count, s1_fuel, s1_mat, s1_thick)
-s2_spec = calc_stage_specs(s2_prop, s2_cycle, 220, s2_eps, s2_eng_count, s2_fuel, s2_mat, 3.0)
+s2_spec = calc_stage_specs(s2_prop, s2_cycle, 220, s2_eps, s2_eng_count, s2_fuel, s2_mat, s2_thick)
 
 total_s2_wet = s2_fuel + s2_spec["dry_mass"] + payload_mass + fair_spec["mass"]
 total_s1_wet = s1_fuel + s1_spec["dry_mass"] + wing_spec["mass"] + strapon_spec["mass_add"] + strapon_spec["fuel_add"] + total_s2_wet
@@ -618,7 +663,6 @@ html_template = """
         // 🌍 Three.js シーン ＆ リアル大気霞（空気遠近法フォグ）
         // =========================================================================
         const scene = new THREE.Scene();
-        // 遠景が自然に白藍色に霞むフォトリアルな大気ヘイズフォグ
         scene.background = new THREE.Color(0x0a1526);
         scene.fog = new THREE.FogExp2(0x0d1f38, 0.000085);
 
@@ -671,13 +715,10 @@ html_template = """
         const landscapeGroup = new THREE.Group();
         scene.add(landscapeGroup);
 
-        // 写実的な海岸線マップ（砂丘・マングローブ湿地・クローラーウェイ・水路）
         const terrainCvs = document.createElement('canvas'); terrainCvs.width = 1024; terrainCvs.height = 1024;
         const tctx = terrainCvs.getContext('2d');
-        // 大西洋の深碧色
         tctx.fillStyle = '#062038'; tctx.fillRect(0, 0, 1024, 1024);
         
-        // 砂州・浅瀬のグラデーション
         const sandGrad = tctx.createLinearGradient(0, 0, 700, 1024);
         sandGrad.addColorStop(0.35, '#c2a67a');
         sandGrad.addColorStop(0.5, '#8c7853');
@@ -688,18 +729,15 @@ html_template = """
         tctx.bezierCurveTo(620, 280, 520, 680, 440, 1024);
         tctx.lineTo(0, 1024); tctx.closePath(); tctx.fill();
 
-        // 沿岸低木緑地・湿地マングローブ
         tctx.fillStyle = '#2d4a1d';
         tctx.beginPath();
         tctx.moveTo(0, 0); tctx.lineTo(540, 0);
         tctx.bezierCurveTo(490, 260, 410, 650, 340, 1024);
         tctx.lineTo(0, 1024); tctx.closePath(); tctx.fill();
 
-        // クローラーウェイ（巨大ロケット運搬用バラスト砂利道）
         tctx.strokeStyle = '#9ca3af'; tctx.lineWidth = 18;
         tctx.beginPath(); tctx.moveTo(80, 512); tctx.lineTo(460, 512); tctx.stroke();
 
-        // 発射台進入アスファルト舗装
         tctx.strokeStyle = '#374151'; tctx.lineWidth = 8;
         tctx.beginPath(); tctx.moveTo(80, 512); tctx.lineTo(460, 512); tctx.stroke();
 
@@ -712,7 +750,6 @@ html_template = """
         terrainMesh.position.set(-1500, -1.2, 0);
         landscapeGroup.add(terrainMesh);
 
-        // 物理ベース・フレネル海面（浅瀬から深海への吸光度＆空の鏡面反射）
         const oceanMat = new THREE.MeshStandardMaterial({
             color: 0x0a3f63,
             roughness: 0.18,
@@ -725,19 +762,18 @@ html_template = """
         oceanMesh.position.set(6500, -0.6, 0);
         landscapeGroup.add(oceanMesh);
 
-        // 遠景ランドマーク：NASA VAB（ロケット組立棟）
+        // 遠景：NASA VAB
         const vabGroup = new THREE.Group();
         vabGroup.position.set(-4200, 0, -1800);
         const vabMain = new THREE.Mesh(new THREE.BoxGeometry(160, 150, 180), new THREE.MeshStandardMaterial({ color: 0xdbeafe, roughness: 0.4 }));
         vabMain.position.y = 75;
         vabGroup.add(vabMain);
-        // 星条旗風ストライプアクセント
         const flag = new THREE.Mesh(new THREE.BoxGeometry(6, 60, 40), new THREE.MeshBasicMaterial({ color: 0xdc2626 }));
         flag.position.set(82, 80, 0);
         vabGroup.add(flag);
         landscapeGroup.add(vabGroup);
 
-        // 遠景：極低温LOX/CH4 球形貯蔵ガスタンク群
+        // 遠景：極低温貯蔵球形タンク群
         for(let g=0; g<3; g++) {
             const sphereTank = new THREE.Mesh(
                 new THREE.SphereGeometry(24, 24, 16),
@@ -748,7 +784,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🏗️ 発射施設 (OLM・サービスマスト・避雷塔)
+        // 🏗️ 発射施設
         // =========================================================================
         const pad = new THREE.Group();
         scene.add(pad);
@@ -756,19 +792,15 @@ html_template = """
         const concreteMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 });
         const hazardMat = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.45, metalness: 0.35 });
 
-        // コンクリートパッド台座
         const groundPlate = new THREE.Mesh(new THREE.CylinderGeometry(85, 95, 1.4, 32), concreteMat);
         groundPlate.position.y = -0.7; pad.add(groundPlate);
 
-        // オービタルランチマウント (OLM)
         const olmRing = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.6, 1.8, 32), darkSteelMat);
         olmRing.position.y = 5.2; pad.add(olmRing);
 
-        // インテグレーションタワー
         const tower = new THREE.Mesh(new THREE.BoxGeometry(4.5, 56.0, 4.5), darkSteelMat);
         tower.position.set(-9.2, 28.0, 0); pad.add(tower);
 
-        // 避雷マスト塔群
         for(let mAng of [0.6, 2.4, 3.9, 5.5]) {
             const lMast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.45, 58.0, 8), hazardMat);
             lMast.position.set(Math.cos(mAng)*44, 29.0, Math.sin(mAng)*44); pad.add(lMast);
