@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 st.title("🚀 Orbital Architect Extreme - 4K実写級航空宇宙シミュレーター")
-st.caption("※ 超魔改造仕様：実録級爆轟音響・Pad 39A立体トラス施設・自律姿勢RCSパルス制御・望遠光学トラッカー")
+st.caption("※ 完全復元仕様：実時間同期リアル物理・ケープカナベラルPad 39A実写級ランドスケープ・2画面独立シネマ中継")
 
 # =========================================================================
 # 🔬 推進剤・材料・空力パーツ・ブースターデータベース
@@ -460,7 +460,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 完全描画テンプレート (超魔改造実写シネマ仕様)
+# 📺 HTML / JS 完全描画テンプレート (4K実写シネマ仕様魔改造)
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -471,23 +471,23 @@ html_template = """
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #01040a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; }
         #canvas-main { width: 100%; height: 100%; display: block; }
         .vignette { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; box-shadow: inset 0 0 160px rgba(0,0,0,0.88); z-index: 5; }
-        .grain { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 6; opacity: 0.03; background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 3px 3px; }
+        .grain { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index: 6; opacity: 0.035; background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 3px 3px; }
         
         /* 🎥 PiP 右上完全独立配置 (被り防止ベゼル ＆ 実写シネマアスペクト) */
-        .pip-border { position: absolute; top: 54px; right: 20px; width: 340px; height: 195px; border: 1.5px solid rgba(56, 189, 248, 0.65); border-radius: 4px; pointer-events: auto; cursor: pointer; z-index: 20; box-shadow: 0 14px 40px rgba(0,0,0,0.92); backdrop-filter: blur(4px); transition: all 0.2s ease; }
-        .pip-border:hover { border-color: #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.4); }
-        .pip-tag { position: absolute; top: 60px; right: 185px; font-size: 9px; font-weight: 800; color: #fff; background: rgba(15, 23, 42, 0.88); padding: 3px 6px; border-radius: 2px; letter-spacing: 1px; font-family: monospace; z-index: 25; pointer-events: none; border-left: 2px solid #38bdf8; }
-        .pip-alt { position: absolute; top: 222px; right: 28px; font-size: 10px; font-family: monospace; color: #38bdf8; font-weight: 700; background: rgba(15, 23, 42, 0.88); padding: 2px 6px; border-radius: 2px; z-index: 25; pointer-events: none; }
-        .pip-toggle-hint { position: absolute; top: 60px; right: 26px; font-size: 9px; font-family: monospace; color: #94a3b8; background: rgba(15, 23, 42, 0.88); padding: 3px 6px; border-radius: 2px; z-index: 25; pointer-events: none; }
+        .pip-border { position: absolute; top: 54px; right: 20px; width: 340px; height: 195px; border: 1.5px solid rgba(56, 189, 248, 0.75); border-radius: 4px; pointer-events: auto; cursor: pointer; z-index: 50; box-shadow: 0 14px 40px rgba(0,0,0,0.95); background: #01040a; transition: all 0.2s ease; }
+        .pip-border:hover { border-color: #38bdf8; box-shadow: 0 0 20px rgba(56, 189, 248, 0.5); }
+        .pip-tag { position: absolute; top: 60px; right: 185px; font-size: 9px; font-weight: 800; color: #fff; background: rgba(15, 23, 42, 0.92); padding: 3px 6px; border-radius: 2px; letter-spacing: 1px; font-family: monospace; z-index: 55; pointer-events: none; border-left: 2px solid #38bdf8; }
+        .pip-alt { position: absolute; top: 222px; right: 28px; font-size: 10px; font-family: monospace; color: #38bdf8; font-weight: 700; background: rgba(15, 23, 42, 0.92); padding: 2px 6px; border-radius: 2px; z-index: 55; pointer-events: none; }
+        .pip-toggle-hint { position: absolute; top: 60px; right: 26px; font-size: 9px; font-family: monospace; color: #94a3b8; background: rgba(15, 23, 42, 0.92); padding: 3px 6px; border-radius: 2px; z-index: 55; pointer-events: none; }
 
-        /* 🛰️ 軌道HUD 左上配置 */
-        .hud-orbit { position: absolute; top: 54px; left: 20px; width: 280px; background: rgba(3, 7, 18, 0.65); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; padding: 10px 12px; box-sizing: border-box; z-index: 15; color: #fff; }
-        .hud-orbit:hover { background: rgba(3, 7, 18, 0.85); }
+        /* 🛰️ 軌道HUD 左上配置 (PiPやロケット中央と絶対に被らない完全分離) */
+        .hud-orbit { position: absolute; top: 54px; left: 20px; width: 280px; background: rgba(3, 7, 18, 0.72); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; padding: 10px 12px; box-sizing: border-box; z-index: 25; color: #fff; }
+        .hud-orbit:hover { background: rgba(3, 7, 18, 0.9); }
         
-        .top-banner { position: absolute; top: 0; left: 0; width: 100%; height: 44px; background: rgba(2, 6, 16, 0.88); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 10; }
-        .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, rgba(1, 3, 8, 0.95) 0%, rgba(2, 6, 14, 0.72) 75%, transparent 100%); padding: 22px 32px 14px 32px; box-sizing: border-box; display: flex; align-items: flex-end; justify-content: space-between; z-index: 10; pointer-events: none; }
+        .top-banner { position: absolute; top: 0; left: 0; width: 100%; height: 44px; background: rgba(2, 6, 16, 0.88); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; box-sizing: border-box; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 20; }
+        .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, rgba(1, 3, 8, 0.95) 0%, rgba(2, 6, 14, 0.72) 75%, transparent 100%); padding: 22px 32px 14px 32px; box-sizing: border-box; display: flex; align-items: flex-end; justify-content: space-between; z-index: 20; pointer-events: none; }
         .hud-telemetry > * { pointer-events: auto; }
-        .rud-banner { display: none; position: absolute; top: 150px; left: 50%; transform: translateX(-50%); background: rgba(120, 10, 10, 0.94); backdrop-filter: blur(16px); border: 2px solid #ef4444; border-radius: 4px; padding: 16px 28px; z-index: 30; text-align: center; box-shadow: 0 0 60px rgba(239, 68, 68, 0.7); }
+        .rud-banner { display: none; position: absolute; top: 150px; left: 50%; transform: translateX(-50%); background: rgba(120, 10, 10, 0.94); backdrop-filter: blur(16px); border: 2px solid #ef4444; border-radius: 4px; padding: 16px 28px; z-index: 60; text-align: center; box-shadow: 0 0 60px rgba(239, 68, 68, 0.7); }
     </style>
 </head>
 <body>
@@ -495,7 +495,7 @@ html_template = """
     <div class="vignette"></div>
     <div class="grain"></div>
     
-    <!-- 2画面用PiP 右上ベゼル枠 (CAM 02: 実写超望遠トラッカー) -->
+    <!-- 2画面用PiP 右上ベゼル枠 (CAM 02: 海岸線長距離超望遠実写カメラ) -->
     <div id="pip-frame" class="pip-border" title="クリックでPiPの表示/非表示を切り替え"></div>
     <div id="pip-tag" class="pip-tag">CAM 02: COASTAL TELEPHOTO</div>
     <div id="pip-hud-alt" class="pip-alt">ALT: 0.0 km</div>
@@ -516,7 +516,7 @@ html_template = """
         </div>
     </div>
 
-    <!-- 左上軌道トラジェクトリHUD ＆ 実況コールアウト -->
+    <!-- 左上に配置された軌道トラジェクトリHUD ＆ 実況コールアウト -->
     <div class="hud-orbit" id="hud-orbit-box">
         <div style="font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: 1.2px; margin-bottom: 4px; display: flex; justify-content: space-between;">
             <span>DOWNRANGE TRAJECTORY</span>
@@ -607,21 +607,18 @@ html_template = """
                 const d = buf.getChannelData(0);
                 for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 
-                // 1. 20Hz〜55Hz 地響きサブウーファー
                 const rSrc = actx.createBufferSource(); rSrc.buffer = buf; rSrc.loop = true;
                 const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 45;
                 subRumble = actx.createGain(); subRumble.gain.value = 0;
                 rSrc.connect(lp); lp.connect(subRumble); subRumble.connect(actx.destination);
                 rSrc.start(0);
 
-                // 2. 180Hz〜850Hz 大気を切り裂く超音速衝撃波クラックル
                 const cSrc = actx.createBufferSource(); cSrc.buffer = buf; cSrc.loop = true;
                 const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 420; bp.Q.value = 3.8;
                 shockCrackle = actx.createGain(); shockCrackle.gain.value = 0;
                 cSrc.connect(bp); bp.connect(shockCrackle); shockCrackle.connect(actx.destination);
                 cSrc.start(0);
 
-                // 3. 高圧ガス噴射・消音水流ヒス音
                 const hSrc = actx.createBufferSource(); hSrc.buffer = buf; hSrc.loop = true;
                 const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1600;
                 gasHiss = actx.createGain(); gasHiss.gain.value = 0;
@@ -661,9 +658,9 @@ html_template = """
         // 🎥 CAM 01: 近接シネマ広角カメラ (FOV 38度)
         const cameraMain = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 1.0, 50000000);
         
-        // 🎥 CAM 02: 発射台から850m離れた南東の海岸線追尾マストに設置した超望遠実写カメラ (FOV 12度)
-        const cameraPip = new THREE.PerspectiveCamera(12.0, 340 / 195, 2.0, 50000000);
-        cameraPip.position.set(-650, 45, 820);
+        // 🎥 CAM 02: 海岸線長距離超望遠カメラ (焦点距離1200mm相当、クリアでシャープな狭角4.8度)
+        const cameraPip = new THREE.PerspectiveCamera(4.8, 340 / 195, 10.0, 50000000);
+        cameraPip.position.set(-2400, 120, 3100);
 
         const sunLight = new THREE.DirectionalLight(0xfffaed, 5.8);
         sunLight.position.set(7000, 11000, 8000);
@@ -730,7 +727,6 @@ html_template = """
         cctx.bezierCurveTo(1000, 550, 850, 1250, 720, 2048);
         cctx.lineTo(0, 2048); cctx.closePath(); cctx.fill();
 
-        // 2条の砂利クローラーウェイ（VABから発射台への重運搬路）
         cctx.strokeStyle = '#9ca3af'; cctx.lineWidth = 14;
         cctx.beginPath(); cctx.moveTo(180, 1014); cctx.lineTo(950, 1014); cctx.stroke();
         cctx.beginPath(); cctx.moveTo(180, 1034); cctx.lineTo(950, 1034); cctx.stroke();
@@ -753,7 +749,6 @@ html_template = """
         oceanMesh.position.set(12000, -1.0, 0);
         landscapeGroup.add(oceanMesh);
 
-        // 遠景：連なる山並み・稜線（スカイライン）
         const mountainMat = new THREE.MeshStandardMaterial({ color: 0x172533, roughness: 0.95 });
         for(let m=0; m<7; m++) {
             const mMesh = new THREE.Mesh(
@@ -1207,18 +1202,18 @@ html_template = """
             fairingHalves.push({ mesh: halfMesh, side: side, detached: false, vx: 0, vy: 0, rotZ: 0 });
         }
 
-        // 4. RCSマウントノズル (前後左右8基)
+        // 4. RCSマウントノズル (作用・反作用配置: 左ノズルは右へ傾ける際に噴射、右ノズルは左へ傾ける際に噴射)
         const rcsMountNodes = [];
         for(let side of [-1, 1]) {
             const block = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.45, 0.25), darkSteelMat);
             block.position.set(side * 1.15, s2Len - 0.8, 0);
             s2Group.add(block);
-            rcsMountNodes.push({ node: block, side: side, isS1: false, axis: 'pitch' });
+            rcsMountNodes.push({ node: block, side: side, isS1: false });
 
             const s1Block = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.45, 0.25), darkSteelMat);
             s1Block.position.set(side * 1.15, s1Len - 0.6, 0);
             s1Group.add(s1Block);
-            rcsMountNodes.push({ node: s1Block, side: side, isS1: true, axis: 'pitch' });
+            rcsMountNodes.push({ node: s1Block, side: side, isS1: true });
         }
 
         // =========================================================================
@@ -1405,7 +1400,9 @@ html_template = """
             const ux = Math.sin(pitch), uy = Math.cos(pitch);
             const perpX = Math.cos(pitch), perpY = -Math.sin(pitch);
 
-            // 実況コールアウト (同期アナウンス)
+            // =====================================================================
+            // 🎙️ 実況コールアウト・音声風テキストログ (完全同期復元)
+            // =====================================================================
             if (!simCfg.is_preview) {
                 if (simT >= -10.0 && simT < -5.0 && !voicedEvents.has('t_minus_10')) {
                     voicedEvents.add('t_minus_10');
@@ -1582,32 +1579,34 @@ html_template = """
             }
 
             // =====================================================================
-            // 🤖 5. 姿勢制御コンピューター連動 RCSスラスターパルス
+            // 🤖 5. 作用・反作用（ニュートン力学）に完全準拠した間欠パルスRCS噴射
             // =====================================================================
             const pitchRate = (pitch - prevPitch) / 0.016; // 角速度 (rad/s)
             prevPitch = pitch;
             let rcsFiring = false;
 
             for(let rcs of rcsMountNodes) {
-                // 機体の傾き誤差やステージ分離後の反転操舵に応答してミリ秒パルス点射
-                const pitchError = Math.sin(pitch);
-                const needsCounterThrust = (rcs.side > 0 && pitchRate > 0.003) || (rcs.side < 0 && pitchRate < -0.003);
-                const isVacuumStationKeeping = (alt > 45.0 && Math.sin(now * 0.035 + rcs.side * 2.0) > 0.72);
+                // 右へ倒れる（pitchRate > 0）場合は、機首を左へ押し戻すため「右側のノズル(side=1)が外側へ」噴射する
+                // 左へ倒れる（pitchRate < 0）場合は、機首を右へ押し戻すため「左側のノズル(side=-1)が外側へ」噴射する
+                const isCorrectingRightDrift = (rcs.side === 1 && pitchRate > 0.004);
+                const isCorrectingLeftDrift  = (rcs.side === -1 && pitchRate < -0.004);
+                const isPulseTriggered = (Math.sin(now * 0.045) > 0.65); // 常に出ずミリ秒パルスで断続噴射
                 const isS1Boostback = (stage1Detached && rcs.isS1 && rcs.side === 1);
 
-                if (!simCfg.is_preview && simT > 0.5 && ((needsCounterThrust || isVacuumStationKeeping) && !rcs.isS1 || isS1Boostback)) {
+                if (!simCfg.is_preview && simT > 0.5 && (((isCorrectingRightDrift || isCorrectingLeftDrift) && isPulseTriggered && !rcs.isS1) || isS1Boostback)) {
                     rcsFiring = true;
                     rcs.node.getWorldPosition(tempTipPos);
+                    // 噴射ガスはノズル外側（機体側面の法線方向）へと吹き出し、反作用で機首を制御
                     const jetDirX = perpX * rcs.side;
                     const jetDirY = perpY * rcs.side;
                     emitParticle(
                         tempTipPos.x + jetDirX * 0.35, tempTipPos.y + jetDirY * 0.35, tempTipPos.z,
-                        jetDirX * (3.4 + Math.random()*1.2), jetDirY * (3.4 + Math.random()*1.2), (Math.random()-0.5)*0.3,
-                        0.35, 2.8, 14, 0.88, 0xf0f9ff, false
+                        jetDirX * (3.8 + Math.random()*1.4), jetDirY * (3.8 + Math.random()*1.4), (Math.random()-0.5)*0.3,
+                        0.32, 2.6, 12, 0.9, 0xf0f9ff, false
                     );
                 }
             }
-            document.getElementById('hud-rcs').innerText = rcsFiring ? "CLOSED-LOOP FIRING" : "ACTIVE / STANDBY";
+            document.getElementById('hud-rcs').innerText = rcsFiring ? "REACTION CONTROL (ACTIVE PULSE)" : "STANDBY (CLOSED-LOOP)";
             document.getElementById('hud-rcs').style.color = rcsFiring ? "#34d399" : "#38bdf8";
 
             updateDualCameraTracking(simT, elapsedSec, alt, pitch, p0.stage, p0.exploded);
@@ -1720,12 +1719,12 @@ html_template = """
             }
 
             // =====================================================================
-            // 🎥 2画面完全描画 (メイン全画面 ＋ 右上独立望遠中継)
+            // 🎥 2画面完全描画 (CAM 01全画面 ＋ CAM 02超望遠独立ビューポート)
             // =====================================================================
             const w = window.innerWidth;
             const h = window.innerHeight;
 
-            // 1. メイン画面描画 (全画面)
+            // 1. CAM 01 メイン画面描画 (全画面)
             scene.fog = sceneFog;
             renderer.setScissorTest(false);
             renderer.clear();
@@ -1735,14 +1734,14 @@ html_template = """
             renderer.setViewport(0, 0, w, h);
             renderer.render(scene, cameraMain);
 
-            // 2. PiP 画面描画 (CAM 02: 望遠時はフォグを外してクリアに実写描画)
+            // 2. CAM 02 望遠画面描画 (WebGLのY軸反転を完全補正し鮮明に表示)
             if (pipVisible) {
                 const pipW = 340;
                 const pipH = 195;
                 const pipX = w - pipW - 20;
-                const pipY = h - pipH - 54;
+                const pipY = h - pipH - 54; // WebGL座標系での下からのオフセット
 
-                scene.fog = null; // 望遠カメラの霧消失バグを防止
+                scene.fog = null; // 望遠トラッカー時の霧干渉・ボケを完全に排除
                 renderer.setScissorTest(true);
                 renderer.setScissor(pipX, pipY, pipW, pipH);
                 renderer.setViewport(pipX, pipY, pipW, pipH);
