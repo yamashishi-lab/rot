@@ -553,7 +553,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 完全描画テンプレート（CAM02完全独立追尾＆対数深度チカチカ完全除去版）
+# 📺 HTML / JS 完全描画テンプレート（リアルタイム設定連動＆CAM02完全追尾版）
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -643,7 +643,7 @@ html_template = """
 
         .top-banner { position: absolute; top: 0; left: 0; width: 100%; min-height: 42px; background: #020610; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: space-between; padding: 4px 18px; z-index: 20; flex-wrap: wrap; gap: 8px; }
         
-        /* 画面下部チカチカ・点滅防止：ソリッド黒背景で確実固定 */
+        /* 画面下部チカチカ・点滅防止：ソリッド黒背景 */
         .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; height: 76px; background: #01040a; border-top: 1px solid rgba(255,255,255,0.12); padding: 8px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 20; pointer-events: none; }
         .hud-telemetry > * { pointer-events: auto; }
         .telemetry-row { display: flex; gap: clamp(14px, 2.2vw, 28px); align-items: center; flex-wrap: nowrap; overflow-x: auto; }
@@ -837,61 +837,52 @@ html_template = """
             window.addEventListener(evt, () => { initAudio(); }, { once: true });
         });
 
+        // 💥 【実機準拠】パイロ点火＋空気衝撃＋重爆圧サウンド（おもちゃ感を完全追放）
         function playHeavySeparationSound() {
             if (!actx) return;
             const now = actx.currentTime;
 
+            // 1. 低周波インパルス（空気爆縮・重厚なドゥン音）
             const osc = actx.createOscillator();
             const oscGain = actx.createGain();
             osc.type = 'triangle';
-            osc.frequency.setValueAtTime(140, now);
-            osc.frequency.exponentialRampToValueAtTime(18, now + 0.6);
-            oscGain.gain.setValueAtTime(1.8, now);
-            oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+            osc.frequency.setValueAtTime(110, now);
+            osc.frequency.exponentialRampToValueAtTime(16, now + 0.65);
+            oscGain.gain.setValueAtTime(2.2, now);
+            oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
             osc.connect(oscGain);
             oscGain.connect(actx.destination);
             osc.start(now);
-            osc.stop(now + 0.66);
+            osc.stop(now + 0.71);
 
+            // 2. パイロ破裂ノイズ（ホワイトノイズの瞬間的バンドパス爆発）
             const noiseBuf = actx.createBuffer(1, Math.floor(actx.sampleRate * 0.4), actx.sampleRate);
             const nd = noiseBuf.getChannelData(0);
-            for(let i=0; i<nd.length; i++) nd[i] = (Math.random() * 2 - 1) * Math.exp(-i / (actx.sampleRate * 0.08));
+            for(let i=0; i<nd.length; i++) nd[i] = (Math.random() * 2 - 1) * Math.exp(-i / (actx.sampleRate * 0.07));
             const nSrc = actx.createBufferSource();
             nSrc.buffer = noiseBuf;
             const nFilter = actx.createBiquadFilter();
             nFilter.type = 'bandpass';
-            nFilter.frequency.setValueAtTime(450, now);
-            nFilter.Q.value = 2.0;
+            nFilter.frequency.setValueAtTime(320, now);
+            nFilter.Q.value = 1.8;
             const nGain = actx.createGain();
-            nGain.gain.setValueAtTime(1.5, now);
-            nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+            nGain.gain.setValueAtTime(1.8, now);
+            nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
             nSrc.connect(nFilter);
             nFilter.connect(nGain);
             nGain.connect(actx.destination);
             nSrc.start(now);
-
-            const clickOsc = actx.createOscillator();
-            const clickGain = actx.createGain();
-            clickOsc.type = 'sine';
-            clickOsc.frequency.setValueAtTime(1800, now);
-            clickOsc.frequency.exponentialRampToValueAtTime(220, now + 0.06);
-            clickGain.gain.setValueAtTime(0.7, now);
-            clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
-            clickOsc.connect(clickGain);
-            clickGain.connect(actx.destination);
-            clickOsc.start(now);
-            clickOsc.stop(now + 0.08);
         }
 
         // =========================================================================
-        // 🌍 Three.js シーン ＆ 環境ライティング（対数深度バッファでチカチカ完全除去）
+        // 🌍 Three.js シーン ＆ 環境ライティング
         // =========================================================================
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x020813);
 
         const rendererMain = new THREE.WebGLRenderer({ 
             canvas: canvasMain, antialias: true, powerPreference: "high-performance",
-            logarithmicDepthBuffer: true // 遠近深度競合（Z-fighting）の根本対策
+            logarithmicDepthBuffer: true // 深度バッファ競合を根絶
         });
         rendererMain.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
         rendererMain.setSize(window.innerWidth, window.innerHeight);
@@ -943,7 +934,7 @@ html_template = """
         const starMat = new THREE.PointsMaterial({ size: 2.0, color: 0xffffff, transparent: true, opacity: 0.25 });
         scene.add(new THREE.Points(starGeo, starMat));
 
-        // 沿岸ランドスケープ（地面と海のY座標・距離を明確に分離してチラつき完全排除）
+        // 沿岸ランドスケープ
         const landscapeGroup = new THREE.Group();
         scene.add(landscapeGroup);
 
@@ -960,7 +951,7 @@ html_template = """
             new THREE.MeshStandardMaterial({ color: 0x031d33, roughness: 0.1, metalness: 0.9 })
         );
         oceanMesh.rotation.x = -Math.PI / 2;
-        oceanMesh.position.set(22000, -12.0, 0); // 海面を十分に離してZ競合を完全防止
+        oceanMesh.position.set(22000, -12.0, 0);
         landscapeGroup.add(oceanMesh);
 
         // 発射台 Pad 39A ＆ Mechazilla キャッチタワー
@@ -999,60 +990,32 @@ html_template = """
         chopstickGroup.add(armRight);
 
         // =========================================================================
-        // 🎨 【実写4K級】プロシージャルテクスチャ生成
+        // 🎨 【選択値リアル連動】素材別動的シェーダーマテリアル
         // =========================================================================
-        function createMaterialSkin(matId, hasHeatshield) {
-            const w = 512, h = 1024;
-            const diffCvs = document.createElement('canvas'); diffCvs.width = w; diffCvs.height = h;
-            const dctx = diffCvs.getContext('2d');
-            const bumpCvs = document.createElement('canvas'); bumpCvs.width = w; bumpCvs.height = h;
-            const bctx = bumpCvs.getContext('2d');
-            bctx.fillStyle = '#808080'; bctx.fillRect(0, 0, w, h);
+        function getRealisticMaterial(matId, hasHeatshield) {
+            let color = 0xd5dce6;
+            let metal = 0.92;
+            let rough = 0.16;
 
-            if (matId === 'ss') {
-                dctx.fillStyle = '#d5dce6'; dctx.fillRect(0, 0, w, h);
-                for(let y = 0; y < h; y += 46) {
-                    const tint = (Math.random() - 0.5) * 15;
-                    dctx.fillStyle = `rgba(${195+tint}, ${202+tint}, ${212+tint}, 0.5)`;
-                    dctx.fillRect(0, y, w, 44);
-                    dctx.fillStyle = 'rgba(75, 55, 40, 0.65)'; dctx.fillRect(0, y, w, 2);
-                    bctx.fillStyle = '#404040'; bctx.fillRect(0, y, w, 2);
-                }
-            } else if (matId === 'al') {
-                dctx.fillStyle = '#f8fafc'; dctx.fillRect(0, 0, w, h);
-                dctx.fillStyle = '#c2410c'; dctx.fillRect(0, h * 0.18, w, h * 0.64);
-            } else if (matId === 'saturn') {
-                dctx.fillStyle = '#f8fafc'; dctx.fillRect(0, 0, w, h);
-                dctx.fillStyle = '#0f172a';
-                for(let i=0; i<8; i++) {
-                    if (i%2===0) {
-                        dctx.fillRect(i*(w/8), h*0.12, w/8, h*0.18);
-                        dctx.fillRect(i*(w/8), h*0.65, w/8, h*0.20);
-                    }
-                }
-            } else if (matId === 'cf') {
-                dctx.fillStyle = '#111317'; dctx.fillRect(0, 0, w, h);
-            } else {
-                dctx.fillStyle = '#374151'; dctx.fillRect(0, 0, w, h);
+            if (matId === 'al') { // アルミリチウム合金 (SLSオレンジ)
+                color = 0xc2410c; metal = 0.15; rough = 0.65;
+            } else if (matId === 'saturn') { // Saturn V ホワイト
+                color = 0xf8fafc; metal = 0.25; rough = 0.35;
+            } else if (matId === 'cf') { // 炭素繊維 (マットブラック)
+                color = 0x111317; metal = 0.08; rough = 0.78;
+            } else if (matId === 'inconel') { // インコネル (重装甲チタン)
+                color = 0x3f3f46; metal = 0.85; rough = 0.32;
             }
 
-            if (hasHeatshield) {
-                dctx.fillStyle = '#090a0c'; 
-                dctx.fillRect(0, 0, w * 0.5, h);
-                bctx.fillStyle = '#151515';
-                for(let ty = 0; ty < h; ty += 16) {
-                    bctx.fillRect(0, ty, w * 0.5, 2);
-                }
-            }
-
-            return { 
-                map: new THREE.CanvasTexture(diffCvs), 
-                bumpMap: new THREE.CanvasTexture(bumpCvs) 
-            };
+            return new THREE.MeshStandardMaterial({
+                color: color,
+                metalness: metal,
+                roughness: rough
+            });
         }
 
         // =========================================================================
-        // 🔥 個別ノズル独立バーナーコーン生成
+        // 🔥 ノズル独立バーナーコーン生成
         // =========================================================================
         function createFlameTexture() {
             const cvs = document.createElement('canvas'); cvs.width = 64; cvs.height = 256;
@@ -1144,32 +1107,21 @@ html_template = """
         }
 
         // =========================================================================
-        // 🚀 ロケット本体モデル構築
+        // 🚀 ロケット本体モデル構築（選んだパラメータが忠実に外観反映）
         // =========================================================================
         const rocket = new THREE.Group();
         rocket.position.y = 6.0;
         scene.add(rocket);
 
-        const s1Maps = createMaterialSkin(simCfg.s1_mat, false);
-        const s2Maps = createMaterialSkin(simCfg.s2_mat, true);
-
-        const s1Mat = new THREE.MeshStandardMaterial({
-            map: s1Maps.map, bumpMap: s1Maps.bumpMap, bumpScale: 0.04,
-            metalness: (simCfg.s1_mat === 'ss') ? 0.92 : 0.25,
-            roughness: (simCfg.s1_mat === 'ss') ? 0.16 : 0.42
-        });
-        const s2Mat = new THREE.MeshStandardMaterial({
-            map: s2Maps.map, bumpMap: s2Maps.bumpMap, bumpScale: 0.045,
-            metalness: (simCfg.s2_mat === 'ss') ? 0.90 : 0.28,
-            roughness: (simCfg.s2_mat === 'ss') ? 0.18 : 0.45
-        });
+        const s1Mat = getRealisticMaterial(simCfg.s1_mat, false);
+        const s2Mat = getRealisticMaterial(simCfg.s2_mat, true);
 
         const s1Len = simCfg.s1_len;
         const interLen = 2.2;
         const s2Len = simCfg.s2_len;
         const s2BaseY = s1Len + interLen;
 
-        // 第1段ブースターグループ（分離後は独立してsceneへ物理所属）
+        // 第1段ブースターグループ（独立オブジェクト化可能設計）
         const s1Group = new THREE.Group();
         rocket.add(s1Group);
 
@@ -1177,6 +1129,7 @@ html_template = """
         s1Body.position.y = s1Len / 2;
         s1Group.add(s1Body);
 
+        // 構造リング
         for(let ry = 2.5; ry < s1Len; ry += 3.8) {
             const ring = new THREE.Mesh(new THREE.TorusGeometry(1.125, 0.015, 6, 24), darkSteelMat);
             ring.rotation.x = Math.PI / 2;
@@ -1192,6 +1145,7 @@ html_template = """
         const s1EpsScale = 0.75 + (simCfg.s1_eps / 70.0) * 0.75;
         const s1Engines = buildFullDetailedEngineCluster(s1Group, simCfg.s1_eng, 0.0, s1EpsScale, s1NozzleTips, 28.0, simCfg.flame_hex);
 
+        // 外部空力パーツ（選択値に応じて即座に反映）
         const wingsGroup = new THREE.Group();
         s1Group.add(wingsGroup);
         const aoaRad = (simCfg.aoa * Math.PI) / 180.0;
@@ -1212,22 +1166,55 @@ html_template = """
                 aftFlap.position.set(side * 1.7, 2.8, 0); aftFlap.rotation.z = side * 0.15; aftFlap.rotation.x = aoaRad;
                 wingsGroup.add(aftFlap);
             }
+        } else if (simCfg.wing_id === 'delta_wing') {
+            for(let side of [-1, 1]) {
+                const wingShape = new THREE.Shape();
+                wingShape.moveTo(0, 0);
+                wingShape.lineTo(side * 4.8, -1.8);
+                wingShape.lineTo(side * 4.2, -6.5);
+                wingShape.lineTo(0, -5.2);
+                const deltaMesh = new THREE.Mesh(new THREE.ShapeGeometry(wingShape), s1Mat);
+                deltaMesh.position.set(0, s1Len * 0.45, 0);
+                wingsGroup.add(deltaMesh);
+            }
         }
 
+        // ストラップオンブースター（選択値に応じて外観・本数を完全連動）
         const boosterUnits = [];
-        if (simCfg.strapon_count > 0) {
+        if (simCfg.strapon_count > 0 && simCfg.strapon_type !== 'none') {
             const sCount = simCfg.strapon_count;
+            const isSRB = (simCfg.strapon_type === 'srb');
+            const isSoyuz = (simCfg.strapon_type === 'soyuz');
+            const bMat = isSRB ? new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 }) : s1Mat;
+
             for(let i=0; i<sCount; i++) {
                 const angle = (i / sCount) * Math.PI * 2;
-                const bx = Math.cos(angle) * 2.15, bz = Math.sin(angle) * 2.15;
+                const distR = isSoyuz ? 2.3 : 2.15;
+                const bx = Math.cos(angle) * distR, bz = Math.sin(angle) * distR;
                 const bUnit = new THREE.Group();
                 bUnit.position.set(bx, 0, bz);
-                const bLen = s1Len * 0.82;
-                const bBody = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.68, bLen, 24), s1Mat);
+                const bLen = s1Len * (isSoyuz ? 0.75 : 0.84);
+                
+                // ブースター本体（Soyuz風テーパーまたはストレート）
+                const topR = isSoyuz ? 0.42 : 0.68;
+                const botR = isSoyuz ? 0.78 : 0.68;
+                const bBody = new THREE.Mesh(new THREE.CylinderGeometry(topR, botR, bLen, 24), bMat);
                 bBody.position.y = bLen / 2;
                 bUnit.add(bBody);
-                const bNose = new THREE.Mesh(new THREE.ConeGeometry(0.68, 1.9, 24), s1Mat);
-                bNose.position.y = bLen + 0.95; bUnit.add(bNose);
+
+                // ノーズコーン
+                const bNose = new THREE.Mesh(new THREE.ConeGeometry(topR, 2.2, 24), bMat);
+                bNose.position.y = bLen + 1.1;
+                bUnit.add(bNose);
+
+                // SRB用黒ジョイントリング
+                if (isSRB) {
+                    for(let seg = 1; seg <= 4; seg++) {
+                        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.70, 0.70, 0.18, 24), darkSteelMat);
+                        ring.position.y = (bLen / 5) * seg;
+                        bUnit.add(ring);
+                    }
+                }
 
                 const localTips = [];
                 buildFullDetailedEngineCluster(bUnit, 1, 0, 1.0, localTips, 24.0, simCfg.flame_hex);
@@ -1253,6 +1240,7 @@ html_template = """
         const s2Engines = buildFullDetailedEngineCluster(s2Group, simCfg.s2_eng, 0.0, s2EpsScale, s2NozzleTips, 32.0, simCfg.s2_flame_hex);
         s2NozzleTips.forEach(t => { t.plume.visible = false; });
 
+        // 先端部 / フェアリング / ペイロード（選択値に応じて即座に外観変形）
         const payloadGroup = new THREE.Group();
         payloadGroup.position.y = s2Len + 1.8;
         s2Group.add(payloadGroup);
@@ -1260,18 +1248,30 @@ html_template = """
         payloadGroup.add(satBus);
 
         const fairingHalves = [];
-        const ogivePts = [];
-        const noseH = 5.4;
-        for(let i=0; i<=20; i++) {
-            const t = i / 20;
-            ogivePts.push(new THREE.Vector2(Math.max(0.01, 1.12 * Math.pow(1.0 - Math.pow(t, 1.65), 0.72)), t * noseH));
-        }
-        for(let side of [-1, 1]) {
-            const halfGeo = new THREE.LatheGeometry(ogivePts, 20, (side === 1) ? 0 : Math.PI, Math.PI);
-            const halfMesh = new THREE.Mesh(halfGeo, s2Mat);
-            halfMesh.position.y = s2Len;
-            s2Group.add(halfMesh);
-            fairingHalves.push({ mesh: halfMesh, side: side, detached: false, vx: 0, vy: 0, rotZ: 0 });
+        if (simCfg.fairing_shape === 'abort_tower') {
+            // LESアボートタワー付き有人カプセル
+            const capMesh = new THREE.Mesh(new THREE.ConeGeometry(1.14, 2.8, 24), s2Mat);
+            capMesh.position.y = s2Len + 1.4;
+            s2Group.add(capMesh);
+
+            const towerSpike = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 3.8, 12), darkSteelMat);
+            towerSpike.position.y = s2Len + 4.2;
+            s2Group.add(towerSpike);
+        } else {
+            // クラウドシェルまたは有人スターシップノーズ
+            const ogivePts = [];
+            const noseH = (simCfg.fairing_shape === 'biconic') ? 6.2 : 5.4;
+            for(let i=0; i<=16; i++) {
+                const t = i / 16;
+                ogivePts.push(new THREE.Vector2(Math.max(0.01, 1.12 * Math.pow(1.0 - Math.pow(t, 1.65), 0.72)), t * noseH));
+            }
+            for(let side of [-1, 1]) {
+                const halfGeo = new THREE.LatheGeometry(ogivePts, 16, (side === 1) ? 0 : Math.PI, Math.PI);
+                const halfMesh = new THREE.Mesh(halfGeo, s2Mat);
+                halfMesh.position.y = s2Len;
+                s2Group.add(halfMesh);
+                fairingHalves.push({ mesh: halfMesh, side: side, detached: false, vx: 0, vy: 0, rotZ: 0 });
+            }
         }
 
         // =========================================================================
@@ -1341,7 +1341,7 @@ html_template = """
         const cloudTex = createCloudTexture();
         const sparkTex = createSparkTexture();
 
-        const P_MAX = 600;
+        const P_MAX = 500;
         const pool = [];
         const pGroup = new THREE.Group(); scene.add(pGroup);
         for(let i=0; i<P_MAX; i++) {
@@ -1360,7 +1360,7 @@ html_template = """
             p.sp.material.blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
         }
 
-        const SPARK_MAX = 200;
+        const SPARK_MAX = 180;
         const sparkPool = [];
         const sparkGroup = new THREE.Group(); scene.add(sparkGroup);
         for(let i=0; i<SPARK_MAX; i++) {
@@ -1434,16 +1434,11 @@ html_template = """
             octx.arc(curPx, curPy, 3.5, 0, Math.PI * 2);
             octx.fill();
 
-            octx.fillStyle = '#64748b';
-            octx.font = '7.5px monospace';
-            octx.fillText('PAD', startX - 8, groundY + 9);
-            octx.fillText('100km KARMAN', w - 74, karmanY - 2);
-
             octx.restore();
         }
 
         // =========================================================================
-        // 🎥 【根本修正】CAM 02 地上固定光学トラッキング（切り離し後ブースター100%完全追尾）
+        // 🎥 【完全再構築】CAM 02 地上固定光学トラッキング（切り離し後ブースター100%追跡）
         // =========================================================================
         const groundTrackerStationPos = new THREE.Vector3(260.0, 14.0, 240.0);
         const towerCloseupPos = new THREE.Vector3(22.0, 42.0, 44.0);
@@ -1456,10 +1451,9 @@ html_template = """
             let desiredCamPos = groundTrackerStationPos;
             let targetFov = 10.0;
 
-            // 切り離し後は絶対にブースター（s1Group）の物理ワールド座標のみを追跡
+            // 切り離し後は絶対にブースター（s1Group）のワールド位置のみを追跡
             if (isBoosterMode) {
                 targetPos.set(bX * 0.1, bY * 0.1 + 6.0 + s1Len * 0.5, 0);
-
                 const dist = groundTrackerStationPos.distanceTo(targetPos);
 
                 if (bCaught) {
@@ -1621,7 +1615,7 @@ html_template = """
                 }
             }
 
-            // 2. 第1段ホットステージング分離 ＆ SpaceX型RTLSタワーキャッチ（階層構造の完全分離）
+            // 2. 第1段ホットステージング分離 ＆ SpaceX型RTLSタワーキャッチ（完全独立オブジェクト化）
             const isSeparated = (p0.stage === 2 || p0.b_active);
             if (isSeparated && !stage1Detached && !simCfg.is_preview) {
                 stage1Detached = true;
@@ -1635,7 +1629,6 @@ html_template = """
             }
 
             if (stage1Detached) {
-                // ブースターの位置・回転をワールド空間で単独駆動
                 s1Group.position.set(bX * 0.1, bY * 0.1 + 6.0, 0);
                 s1Group.rotation.set(0, 0, -bPitch);
                 s1Group.updateMatrixWorld(true);
