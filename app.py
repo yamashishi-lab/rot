@@ -305,7 +305,6 @@ def run_simulation(preview_only=False):
         pitch_rate = (pitch_deg - prev_pitch_val) / dt
         prev_pitch_val = pitch_deg
         rcs_cmd = 0.0
-        # 姿勢を大きく変更している瞬間だけパルスを立てる
         if abs(pitch_rate) > 0.04 and alt_km > 0.5:
             rcs_cmd = -1.0 if pitch_rate > 0 else 1.0
 
@@ -828,7 +827,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🔊 音響合成システム（完全アクティベート＆実写音響）
+        // 🔊 音響合成システム（確実な起動＆実写音響）
         // =========================================================================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let actx = null, subRumble = null, shockCrackle = null, gasHiss = null;
@@ -1364,6 +1363,7 @@ html_template = """
         // 🛰️ 【作用反作用厳密化】4象限パルスRCSスラスター
         // =========================================================================
         const rcsNozzles = [];
+        // 🎯 機首を右（+Pitch）へ倒すには上部ノズルは「左側（-X方向）」へ噴射して反作用を得る
         const rcsDirs = [
             { id: "+Pitch", dx: -1, dy:  0, dz:  0, rotZ:  Math.PI / 2 },
             { id: "-Pitch", dx:  1, dy:  0, dz:  0, rotZ: -Math.PI / 2 },
