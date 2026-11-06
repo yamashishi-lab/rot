@@ -566,15 +566,16 @@ html_template = """
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #01040a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; }
         #canvas-main { width: 100%; height: 100%; display: block; position: absolute; top:0; left:0; z-index: 1; }
         
-        /* 🎯 ご要望のサイズ：横幅メインウィンドウいっぱい(vw単位)、高さも修正前と同等の大サイズ、上部テキスト非干渉(top: 76px) */
+        /* 🎯 ご要望のサイズ：横幅メインウィンドウいっぱい(100vwから左右マージン引いた幅)、高さ修正前の大サイズ、上部テキスト非干渉(top: 76px) */
         .pip-container { 
             position: absolute; 
             top: 76px; 
+            left: 18px; 
             right: 18px; 
-            width: min(520px, 46vw); 
-            height: 285px; 
+            width: calc(100vw - 36px); 
+            height: 295px; 
             border: 2px solid rgba(56, 189, 248, 0.95); 
-            border-radius: 4px; 
+            border-radius: 6px; 
             z-index: 60; 
             box-shadow: 0 14px 45px rgba(0,0,0,0.98); 
             background: #071526; 
@@ -582,9 +583,9 @@ html_template = """
             cursor: pointer; 
         }
         #canvas-pip { width: 100%; height: 100%; display: block; }
-        .pip-tag { position: absolute; top: 6px; left: 8px; font-size: 9px; font-weight: 800; color: #fff; background: rgba(15, 23, 42, 0.94); padding: 3px 6px; border-radius: 2px; letter-spacing: 1px; font-family: monospace; z-index: 65; pointer-events: none; border-left: 2px solid #38bdf8; }
-        .pip-alt { position: absolute; bottom: 6px; right: 8px; font-size: 10px; font-family: monospace; color: #38bdf8; font-weight: 700; background: rgba(15, 23, 42, 0.94); padding: 2px 6px; border-radius: 2px; z-index: 65; pointer-events: none; }
-        .pip-toggle-hint { position: absolute; top: 6px; right: 8px; font-size: 9px; font-family: monospace; color: #94a3b8; background: rgba(15, 23, 42, 0.94); padding: 3px 6px; border-radius: 2px; z-index: 65; pointer-events: none; }
+        .pip-tag { position: absolute; top: 6px; left: 12px; font-size: 10px; font-weight: 800; color: #fff; background: rgba(15, 23, 42, 0.94); padding: 3px 8px; border-radius: 2px; letter-spacing: 1px; font-family: monospace; z-index: 65; pointer-events: none; border-left: 2px solid #38bdf8; }
+        .pip-alt { position: absolute; bottom: 6px; right: 12px; font-size: 11px; font-family: monospace; color: #38bdf8; font-weight: 700; background: rgba(15, 23, 42, 0.94); padding: 2px 8px; border-radius: 2px; z-index: 65; pointer-events: none; }
+        .pip-toggle-hint { position: absolute; top: 6px; right: 12px; font-size: 9px; font-family: monospace; color: #94a3b8; background: rgba(15, 23, 42, 0.94); padding: 3px 6px; border-radius: 2px; z-index: 65; pointer-events: none; }
         
         .hud-orbit { position: absolute; bottom: 86px; left: 24px; width: 320px; background: #030712; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 4px; padding: 8px 12px; z-index: 50; color: #fff; box-shadow: 0 8px 32px rgba(0,0,0,0.85); }
         #orbit-canvas { width: 296px; height: 64px; background: #020617; border-radius: 2px; border: 1px solid rgba(255,255,255,0.08); display: block; margin-top: 4px; }
@@ -677,13 +678,27 @@ html_template = """
         let isMissionEnded = false, catchPopPlayed = false, pipVisible = true;
         let landingSonicBoomPlayed = false;
         const pipBox = document.getElementById('pip-box');
+        
+        // 🎯 カンバスの解像度を動的コンテナ幅に連動
+        function resizePipRenderer() {
+            if (pipBox) {
+                const w = pipBox.clientWidth || 800;
+                const h = pipBox.clientHeight || 295;
+                rendererPip.setSize(w, h);
+                cameraPip.aspect = w / h;
+                cameraPip.updateProjectionMatrix();
+            }
+        }
+        window.addEventListener('resize', resizePipRenderer);
+
         pipBox.addEventListener('click', () => {
             pipVisible = !pipVisible;
             canvasPip.style.display = pipVisible ? 'block' : 'none';
             document.getElementById('pip-tag').style.display = pipVisible ? 'block' : 'none';
             document.getElementById('pip-hud-alt').style.display = pipVisible ? 'block' : 'none';
-            pipBox.style.height = pipVisible ? '285px' : '32px';
+            pipBox.style.height = pipVisible ? '295px' : '32px';
             document.getElementById('pip-hint').innerText = pipVisible ? '[CLICK TO HIDE]' : '[CLICK TO SHOW]';
+            setTimeout(resizePipRenderer, 50);
         });
 
         function speakCallout(text) {
@@ -862,12 +877,12 @@ html_template = """
         rendererMain.toneMappingExposure = 1.35;
 
         const rendererPip = new THREE.WebGLRenderer({ canvas: canvasPip, antialias: true });
-        rendererPip.setSize(520, 285);
+        rendererPip.setSize(520, 295);
         rendererPip.toneMapping = THREE.ACESFilmicToneMapping;
         rendererPip.toneMappingExposure = 1.45;
 
         const cameraMain = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 2.0, 75000);
-        const cameraPip = new THREE.PerspectiveCamera(38.0, 520 / 285, 2.0, 75000);
+        const cameraPip = new THREE.PerspectiveCamera(38.0, 520 / 295, 2.0, 75000);
 
         const sunLight = new THREE.DirectionalLight(0xfffaed, 5.0);
         sunLight.position.set(4000, 6000, 3000); scene.add(sunLight);
@@ -1493,10 +1508,7 @@ html_template = """
                 engineBounceLight.intensity = 0.0;
             }
 
-            // =====================================================================
-            // 🎯 バーナー付近の常時スラスター煙バグを修正：
-            //   「コマンド要求が入った瞬間（cmdFired）」のみ発火させ、常時発生ループを完全に排除
-            // =====================================================================
+            // RCS スラスター噴射制御（コマンド要求時のみ）
             let rcsActiveHUD = false;
             const cmdFired = (Math.abs(rcsCmd) > 0.2 && Math.abs(prevRcsCmd) <= 0.2);
             prevRcsCmd = rcsCmd;
@@ -1507,7 +1519,6 @@ html_template = """
                     if (rcs.isS1 && stage1Detached && p0.b_caught) {
                         burst = false;
                     } else {
-                        // 🎯 修正：常時ランダム発火を廃止し、軌道修正コマンドが入力された瞬間のみに限定
                         if (cmdFired) {
                             if (rcs.isS1 && !stage1Detached && ((rcs.dir.dx < -0.3 && rcsCmd > 0) || (rcs.dir.dx > 0.3 && rcsCmd < 0))) burst = true;
                             if (!rcs.isS1 && stage1Detached && ((rcs.dir.dx < -0.3 && rcsCmd > 0) || (rcs.dir.dx > 0.3 && rcsCmd < 0))) burst = true;
@@ -1720,19 +1731,19 @@ html_template = """
                 rudDesc.innerText = failMessage || "機体過負荷による空中分解";
             }
 
-            rendererMain.render(scene, cameraMain);
-        }
-
-        requestAnimationFrame(animate);
-
-        window.addEventListener('resize', () => {
-            cameraMain.aspect = window.innerWidth / window.innerHeight;
-            cameraMain.updateProjectionMatrix();
-            rendererMain.setSize(window.innerWidth, window.innerHeight);
-        });
     } catch(err) {
         console.error("Simulation Render Error:", err);
     }
+    }
+
+    requestAnimationFrame(animate);
+
+    window.addEventListener('resize', () => {
+        cameraMain.aspect = window.innerWidth / window.innerHeight;
+        cameraMain.updateProjectionMatrix();
+        rendererMain.setSize(window.innerWidth, window.innerHeight);
+        resizePipRenderer();
+    });
     </script>
 </body>
 </html>
