@@ -214,7 +214,7 @@ m3.metric("構造限界動圧 / 耐G", f"{s1_spec['max_q']:.1f} kPa", f"耐G: {s
 m4.metric("ブースター追加推力", f"+{strapon_spec['thrust_add']:.0f} kN", f"基数: {strapon_spec['count']} 基")
 
 # =========================================================================
-# 💥 物理シミュレーション (SpaceX RTLSタワーキャッチ軌道統合)
+# 💥 物理シミュレーション (軌道投入完了で自動終了設計)
 # =========================================================================
 def run_simulation(preview_only=False):
     if preview_only:
@@ -484,9 +484,11 @@ def run_simulation(preview_only=False):
             "b_x": float(b_x), "b_y": float(b_y), "b_active": b_active, "b_pitch": float(b_pitch), "b_thrust": b_thrust, "b_caught": b_caught
         })
 
+        # 🚀 軌道到達判定：高度160km以上かつ速度7780m/s以上（第一宇宙速度）で即座に完了
         if alt_km >= 160.0 and vx >= 7780.0 and abs(vy) < 400.0:
             cur_event = "ORBIT"
-            for orbit_step in range(1200):
+            # 完了余韻のために数秒（8ステップ）だけ記録して即時終了
+            for orbit_step in range(8):
                 t_orb = t + (orbit_step + 1) * dt
                 x_orb = x + vx * (orbit_step + 1) * dt
                 history.append({
@@ -553,7 +555,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 完全描画テンプレート（リアルタイム設定連動＆CAM02完全追尾版）
+# 📺 HTML / JS 完全描画テンプレート（軌道投入で自動ミッション完了＆終了版）
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -643,7 +645,6 @@ html_template = """
 
         .top-banner { position: absolute; top: 0; left: 0; width: 100%; min-height: 42px; background: #020610; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: space-between; padding: 4px 18px; z-index: 20; flex-wrap: wrap; gap: 8px; }
         
-        /* 画面下部チカチカ・点滅防止：ソリッド黒背景 */
         .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; height: 76px; background: #01040a; border-top: 1px solid rgba(255,255,255,0.12); padding: 8px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 20; pointer-events: none; }
         .hud-telemetry > * { pointer-events: auto; }
         .telemetry-row { display: flex; gap: clamp(14px, 2.2vw, 28px); align-items: center; flex-wrap: nowrap; overflow-x: auto; }
@@ -652,6 +653,9 @@ html_template = """
         .telemetry-val { color: #fff; font-size: clamp(13px, 1.6vw, 17px); font-weight: 800; font-family: 'Consolas', monospace; }
 
         .rud-banner { display: none; position: absolute; top: 150px; left: 50%; transform: translateX(-50%); background: #7f1d1d; border: 2px solid #ef4444; border-radius: 4px; padding: 16px 28px; z-index: 70; text-align: center; box-shadow: 0 0 60px rgba(239, 68, 68, 0.7); }
+
+        /* 🏁 ミッション完了バナー */
+        .complete-banner { display: none; position: absolute; top: 140px; left: 50%; transform: translateX(-50%); background: rgba(6, 78, 59, 0.95); border: 2px solid #10b981; border-radius: 6px; padding: 20px 36px; z-index: 70; text-align: center; box-shadow: 0 0 70px rgba(16, 185, 129, 0.7); }
     </style>
 </head>
 <body>
@@ -667,8 +671,8 @@ html_template = """
 
     <div class="top-banner">
         <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex-shrink: 1;">
-            <span style="display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 10px #ef4444; flex-shrink: 0;"></span>
-            <span style="color: #ffffff; font-weight: 800; font-size: clamp(10px, 1.2vw, 12px); letter-spacing: 1.5px; white-space: nowrap;">4K WEBCAST</span>
+            <span id="live-indicator" style="display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 10px #ef4444; flex-shrink: 0;"></span>
+            <span id="webcast-title" style="color: #ffffff; font-weight: 800; font-size: clamp(10px, 1.2vw, 12px); letter-spacing: 1.5px; white-space: nowrap;">4K WEBCAST</span>
             <span style="color: rgba(255,255,255,0.2);">|</span>
             <span id="cam-tag" style="color: #38bdf8; font-size: clamp(9px, 1.1vw, 11px); font-weight: 700; letter-spacing: 1px; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">CAM 01: CINEMATIC WIDE CHASE</span>
         </div>
@@ -693,6 +697,13 @@ html_template = """
         <div id="sub-callout" style="font-family: monospace; font-size: 8.5px; color: #93c5fd; margin-top: 1px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
             > Propellant tanks pressurized for flight
         </div>
+    </div>
+
+    <!-- 🏁 ミッション完了バナー -->
+    <div id="complete-banner" class="complete-banner">
+        <div style="color: #6ee7b7; font-size: 20px; font-weight: 900; letter-spacing: 3px; font-family: monospace;">🎉 MISSION COMPLETE 🎉</div>
+        <div style="color: #ecfdf5; font-size: 14px; font-weight: 700; margin-top: 8px;">NOMINAL ORBITAL INSERTION CONFIRMED</div>
+        <div style="color: #a7f3d0; font-size: 12px; margin-top: 4px; font-family: monospace;">Vehicle in stable Low Earth Orbit. Webcast broadcast terminated.</div>
     </div>
 
     <div id="rud-banner" class="rud-banner">
@@ -742,9 +753,12 @@ html_template = """
         const orbitCvs = document.getElementById('orbit-canvas');
         const octx = orbitCvs.getContext('2d');
         const rudBanner = document.getElementById('rud-banner');
+        const completeBanner = document.getElementById('complete-banner');
         const rudDesc = document.getElementById('rud-desc');
         const eventLog = document.getElementById('event-log');
         const subCallout = document.getElementById('sub-callout');
+
+        let isMissionEnded = false;
 
         let pipVisible = true;
         const pipBox = document.getElementById('pip-box');
@@ -781,7 +795,7 @@ html_template = """
             { t: 165.0, main: "> [STAGE] FIRST STAGE MECO & HOT STAGING", sub: "> Second stage vacuum ignition confirmed", spoken: "Staging confirmed" },
             { t: 195.0, main: "> [AERO] PAYLOAD FAIRING JETTISON", sub: "> Exo-atmospheric telemetry optimal", spoken: "Fairing separation" },
             { t: 360.0, main: "> [CATCH] MECHAZILLA TOWER CATCH ATTEMPT", sub: "> Super heavy booster alignment with chopstick arms", spoken: "Booster approaching Mechazilla chopsticks" },
-            { t: 480.0, main: "> [ORBIT] SECO - NOMINAL ORBITAL INSERTION", sub: "> Spacecraft cruising in stable Low Earth Orbit", spoken: "Orbital insertion confirmed" }
+            { t: 480.0, main: "> [ORBIT] SECO - NOMINAL ORBITAL INSERTION", sub: "> Spacecraft cruising in stable Low Earth Orbit", spoken: "Orbital insertion confirmed. Mission Complete." }
         ];
 
         let calloutTrackIndex = 0;
@@ -837,12 +851,10 @@ html_template = """
             window.addEventListener(evt, () => { initAudio(); }, { once: true });
         });
 
-        // 💥 【実機準拠】パイロ点火＋空気衝撃＋重爆圧サウンド（おもちゃ感を完全追放）
         function playHeavySeparationSound() {
             if (!actx) return;
             const now = actx.currentTime;
 
-            // 1. 低周波インパルス（空気爆縮・重厚なドゥン音）
             const osc = actx.createOscillator();
             const oscGain = actx.createGain();
             osc.type = 'triangle';
@@ -855,7 +867,6 @@ html_template = """
             osc.start(now);
             osc.stop(now + 0.71);
 
-            // 2. パイロ破裂ノイズ（ホワイトノイズの瞬間的バンドパス爆発）
             const noiseBuf = actx.createBuffer(1, Math.floor(actx.sampleRate * 0.4), actx.sampleRate);
             const nd = noiseBuf.getChannelData(0);
             for(let i=0; i<nd.length; i++) nd[i] = (Math.random() * 2 - 1) * Math.exp(-i / (actx.sampleRate * 0.07));
@@ -882,7 +893,7 @@ html_template = """
 
         const rendererMain = new THREE.WebGLRenderer({ 
             canvas: canvasMain, antialias: true, powerPreference: "high-performance",
-            logarithmicDepthBuffer: true // 深度バッファ競合を根絶
+            logarithmicDepthBuffer: true
         });
         rendererMain.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
         rendererMain.setSize(window.innerWidth, window.innerHeight);
@@ -997,13 +1008,13 @@ html_template = """
             let metal = 0.92;
             let rough = 0.16;
 
-            if (matId === 'al') { // アルミリチウム合金 (SLSオレンジ)
+            if (matId === 'al') {
                 color = 0xc2410c; metal = 0.15; rough = 0.65;
-            } else if (matId === 'saturn') { // Saturn V ホワイト
+            } else if (matId === 'saturn') {
                 color = 0xf8fafc; metal = 0.25; rough = 0.35;
-            } else if (matId === 'cf') { // 炭素繊維 (マットブラック)
+            } else if (matId === 'cf') {
                 color = 0x111317; metal = 0.08; rough = 0.78;
-            } else if (matId === 'inconel') { // インコネル (重装甲チタン)
+            } else if (matId === 'inconel') {
                 color = 0x3f3f46; metal = 0.85; rough = 0.32;
             }
 
@@ -1107,7 +1118,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🚀 ロケット本体モデル構築（選んだパラメータが忠実に外観反映）
+        // 🚀 ロケット本体モデル構築
         // =========================================================================
         const rocket = new THREE.Group();
         rocket.position.y = 6.0;
@@ -1121,7 +1132,6 @@ html_template = """
         const s2Len = simCfg.s2_len;
         const s2BaseY = s1Len + interLen;
 
-        // 第1段ブースターグループ（独立オブジェクト化可能設計）
         const s1Group = new THREE.Group();
         rocket.add(s1Group);
 
@@ -1129,7 +1139,6 @@ html_template = """
         s1Body.position.y = s1Len / 2;
         s1Group.add(s1Body);
 
-        // 構造リング
         for(let ry = 2.5; ry < s1Len; ry += 3.8) {
             const ring = new THREE.Mesh(new THREE.TorusGeometry(1.125, 0.015, 6, 24), darkSteelMat);
             ring.rotation.x = Math.PI / 2;
@@ -1145,7 +1154,6 @@ html_template = """
         const s1EpsScale = 0.75 + (simCfg.s1_eps / 70.0) * 0.75;
         const s1Engines = buildFullDetailedEngineCluster(s1Group, simCfg.s1_eng, 0.0, s1EpsScale, s1NozzleTips, 28.0, simCfg.flame_hex);
 
-        // 外部空力パーツ（選択値に応じて即座に反映）
         const wingsGroup = new THREE.Group();
         s1Group.add(wingsGroup);
         const aoaRad = (simCfg.aoa * Math.PI) / 180.0;
@@ -1179,7 +1187,6 @@ html_template = """
             }
         }
 
-        // ストラップオンブースター（選択値に応じて外観・本数を完全連動）
         const boosterUnits = [];
         if (simCfg.strapon_count > 0 && simCfg.strapon_type !== 'none') {
             const sCount = simCfg.strapon_count;
@@ -1195,19 +1202,16 @@ html_template = """
                 bUnit.position.set(bx, 0, bz);
                 const bLen = s1Len * (isSoyuz ? 0.75 : 0.84);
                 
-                // ブースター本体（Soyuz風テーパーまたはストレート）
                 const topR = isSoyuz ? 0.42 : 0.68;
                 const botR = isSoyuz ? 0.78 : 0.68;
                 const bBody = new THREE.Mesh(new THREE.CylinderGeometry(topR, botR, bLen, 24), bMat);
                 bBody.position.y = bLen / 2;
                 bUnit.add(bBody);
 
-                // ノーズコーン
                 const bNose = new THREE.Mesh(new THREE.ConeGeometry(topR, 2.2, 24), bMat);
                 bNose.position.y = bLen + 1.1;
                 bUnit.add(bNose);
 
-                // SRB用黒ジョイントリング
                 if (isSRB) {
                     for(let seg = 1; seg <= 4; seg++) {
                         const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.70, 0.70, 0.18, 24), darkSteelMat);
@@ -1240,7 +1244,6 @@ html_template = """
         const s2Engines = buildFullDetailedEngineCluster(s2Group, simCfg.s2_eng, 0.0, s2EpsScale, s2NozzleTips, 32.0, simCfg.s2_flame_hex);
         s2NozzleTips.forEach(t => { t.plume.visible = false; });
 
-        // 先端部 / フェアリング / ペイロード（選択値に応じて即座に外観変形）
         const payloadGroup = new THREE.Group();
         payloadGroup.position.y = s2Len + 1.8;
         s2Group.add(payloadGroup);
@@ -1249,7 +1252,6 @@ html_template = """
 
         const fairingHalves = [];
         if (simCfg.fairing_shape === 'abort_tower') {
-            // LESアボートタワー付き有人カプセル
             const capMesh = new THREE.Mesh(new THREE.ConeGeometry(1.14, 2.8, 24), s2Mat);
             capMesh.position.y = s2Len + 1.4;
             s2Group.add(capMesh);
@@ -1258,7 +1260,6 @@ html_template = """
             towerSpike.position.y = s2Len + 4.2;
             s2Group.add(towerSpike);
         } else {
-            // クラウドシェルまたは有人スターシップノーズ
             const ogivePts = [];
             const noseH = (simCfg.fairing_shape === 'biconic') ? 6.2 : 5.4;
             for(let i=0; i<=16; i++) {
@@ -1275,7 +1276,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🛰️ 4象限パルスRCSスラスター（作用・反作用厳密化）
+        // 🛰️ 4象限パルスRCSスラスター
         // =========================================================================
         const rcsNozzles = [];
         const rcsDirs = [
@@ -1438,7 +1439,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🎥 【完全再構築】CAM 02 地上固定光学トラッキング（切り離し後ブースター100%追跡）
+        // 🎥 CAM 02 地上固定光学トラッキング（切り離し後ブースター100%追跡）
         // =========================================================================
         const groundTrackerStationPos = new THREE.Vector3(260.0, 14.0, 240.0);
         const towerCloseupPos = new THREE.Vector3(22.0, 42.0, 44.0);
@@ -1451,7 +1452,6 @@ html_template = """
             let desiredCamPos = groundTrackerStationPos;
             let targetFov = 10.0;
 
-            // 切り離し後は絶対にブースター（s1Group）のワールド位置のみを追跡
             if (isBoosterMode) {
                 targetPos.set(bX * 0.1, bY * 0.1 + 6.0 + s1Len * 0.5, 0);
                 const dist = groundTrackerStationPos.distanceTo(targetPos);
@@ -1524,6 +1524,8 @@ html_template = """
         const smoothOffset = new THREE.Vector3(75.0, 26.0, 145.0);
 
         function animate(now) {
+            if (isMissionEnded) return; // 軌道投入完了後の安全停止
+
             requestAnimationFrame(animate);
 
             const elapsedSec = (now - tStart) / 1000.0;
@@ -1552,13 +1554,6 @@ html_template = """
             let bX = p0.b_x + (p1.b_x - p0.b_x) * a;
             let bY = p0.b_y + (p1.b_y - p0.b_y) * a;
             let bPitch = p0.b_pitch + (p1.b_pitch - p0.b_pitch) * a;
-
-            if (simT > simData[simData.length - 1].t) {
-                const overT = simT - simData[simData.length - 1].t;
-                rx += vel * overT * 0.1;
-                q = 0.0;
-                accG = 0.0;
-            }
 
             const dRangeKm = (rx * 10.0) / 1000.0;
 
@@ -1615,7 +1610,7 @@ html_template = """
                 }
             }
 
-            // 2. 第1段ホットステージング分離 ＆ SpaceX型RTLSタワーキャッチ（完全独立オブジェクト化）
+            // 2. 第1段ホットステージング分離 ＆ SpaceX型RTLSタワーキャッチ
             const isSeparated = (p0.stage === 2 || p0.b_active);
             if (isSeparated && !stage1Detached && !simCfg.is_preview) {
                 stage1Detached = true;
@@ -1623,8 +1618,6 @@ html_template = """
                 camShake = 0.3;
                 s1NozzleTips.forEach(t => { t.plume.visible = false; });
                 s2NozzleTips.forEach(t => { t.plume.visible = true; });
-                
-                // scene直下に完全に再配置してrocket本体の移動干渉を断ち切る
                 scene.attach(s1Group);
             }
 
@@ -1764,7 +1757,7 @@ html_template = """
             document.getElementById('hud-rcs').innerText = rcsActiveHUD ? "GN2 PULSE FIRING" : "STANDBY (DEADBAND OK)";
             document.getElementById('hud-rcs').style.color = rcsActiveHUD ? "#34d399" : "#38bdf8";
 
-            // 6. 発射台消音注水デリュージ・水蒸気雲・白煙
+            // 6. 発射台消音注水デリュージ
             if (simT < 0.0) {
                 const sec = Math.ceil(Math.abs(simT));
                 document.getElementById('tv-timer').innerText = simCfg.is_preview ? "PAD INSPECTION" : `T- 00:0${sec}.0`;
@@ -1832,15 +1825,9 @@ html_template = """
                         );
                     }
                 }
-            } else {
-                if (actx) {
-                    if (subRumble) subRumble.gain.setTargetAtTime(0.001, actx.currentTime, 0.1);
-                    if (shockCrackle) shockCrackle.gain.setTargetAtTime(0.001, actx.currentTime, 0.1);
-                    if (gasHiss) gasHiss.gain.setTargetAtTime(0.001, actx.currentTime, 0.1);
-                }
             }
 
-            // パーティクル更新ループ
+            // パーティクル更新
             for(let i=0; i<P_MAX; i++) {
                 const p = pool[i]; if (!p.active) continue;
                 p.age++;
@@ -1923,15 +1910,34 @@ html_template = """
             document.getElementById('tv-q').innerText   = q.toFixed(1);
             document.getElementById('tv-g').innerText   = accG.toFixed(1);
 
+            // 🏁 軌道到達・ミッション完了時の映像自動終了シーケンス
+            if (p0.event === "ORBIT" && !isMissionEnded) {
+                completeBanner.style.display = 'block';
+                document.getElementById('tv-stage-badge').innerText = "ORBIT INSERTION ACHIEVED";
+                document.getElementById('tv-stage-badge').style.color = "#10b981";
+                document.getElementById('live-indicator').style.background = "#10b981";
+                document.getElementById('live-indicator').style.boxShadow = "0 0 10px #10b981";
+                document.getElementById('webcast-title').innerText = "MISSION COMPLETED";
+
+                if (actx) {
+                    if (subRumble) subRumble.gain.setTargetAtTime(0.0001, actx.currentTime, 0.5);
+                    if (shockCrackle) shockCrackle.gain.setTargetAtTime(0.0001, actx.currentTime, 0.5);
+                    if (gasHiss) gasHiss.gain.setTargetAtTime(0.0001, actx.currentTime, 0.5);
+                }
+
+                // 2.5秒後に映像ループを停止
+                setTimeout(() => {
+                    isMissionEnded = true;
+                }, 2500);
+            }
+
             if (p0.exploded) {
                 rudBanner.style.display = 'block';
                 rudDesc.innerText = failMessage || "機体過負荷による空中分解";
             }
 
-            // メインカメラ描画
             rendererMain.render(scene, cameraMain);
 
-            // CAM 02 地上固定光学トラッカー描画（切り離し後は完全にブースター単独追従）
             if (pipVisible) {
                 const isBoosterTrackActive = simCfg.spacex_return && (stage1Detached || p0.b_active || p0.stage === 2);
                 renderGroundOpticalTracker(isBoosterTrackActive, bX, bY, p0.b_caught, rocket.position);
