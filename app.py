@@ -554,7 +554,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 描画テンプレート (CAM 02 フル幅・高さ大・上部非被り・黒画面バグ修正)
+# 📺 HTML / JS 描画テンプレート (CAM 02 横幅フル・縦大きめ・トップ被り完全防止 top: 56px)
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -566,10 +566,10 @@ html_template = """
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #01040a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; }
         #canvas-main { width: 100%; height: 100%; display: block; position: absolute; top:0; left:0; z-index: 1; }
         
-        /* 🎯 CAM 02ウィンドウ：横幅メインウィンドウいっぱい(left: 18px, right: 18px), 高さは修正前の大サイズ(295px), 上部非被り(top: 50px) */
+        /* 🎯 ご要望のサイズ・位置：横幅メインウィンドウいっぱい(left: 18px, right: 18px), 高さは修正前の大サイズ(295px), 上部テキストに絶対に被らない位置(top: 56px) */
         .pip-container { 
             position: absolute; 
-            top: 50px; 
+            top: 56px; 
             left: 18px; 
             right: 18px; 
             width: calc(100vw - 36px); 
