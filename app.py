@@ -26,7 +26,7 @@ PROPELLANTS = {
     },
     "超極低温スラッシュ・ハイドロロックス (LH2 / LOX) [H3 / SLS]": {
         "base_isp_sl": 385, "base_isp_vac": 468, "base_thrust": 1450, "density": 0.34, 
-        "flame_hex": 0xfbcfe8, "outer_hex": 0be185d, "spark_hex": 0xffffff, "risk": 0.01, "type": "hydro"
+        "flame_hex": 0xfbcfe8, "outer_hex": 0xbe185d, "spark_hex": 0xffffff, "risk": 0.01, "type": "hydro"
     },
     "【猛毒】四酸化二窒素 ＋ UDMH (N2O4 / UDMH) [Proton]": {
         "base_isp_sl": 288, "base_isp_vac": 322, "base_thrust": 2100, "density": 1.26, 
@@ -214,7 +214,7 @@ m3.metric("構造限界動圧 / 耐G", f"{s1_spec['max_q']:.1f} kPa", f"耐G: {s
 m4.metric("ブースター追加推力", f"+{strapon_spec['thrust_add']:.0f} kN", f"基数: {strapon_spec['count']} 基")
 
 # =========================================================================
-# 💥 物理シミュレーション
+# 💥 物理シミュレーション (高度200km〜、秒速7.9km横向き投入 ＆ 超高速アームキャッチ)
 # =========================================================================
 def run_simulation(preview_only=False):
     if preview_only:
@@ -278,6 +278,7 @@ def run_simulation(preview_only=False):
         rho = float(1.225 * np.exp(-alt / 7400.0)) if alt < 140000 else 0.0
         q = float(0.5 * rho * (v**2) / 1000.0)
 
+        # 🎯 軌道プロファイル：垂直→斜め上昇、高度200km到達時にピッチ0度（完全水平・横向き）へ姿勢変更
         if alt_km < turn_start_alt:
             target_pitch_deg = 90.0
         elif alt_km < 200.0:
@@ -555,7 +556,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 完全描画テンプレート（暗転バグ完全解消版）
+# 📺 HTML / JS 完全描画テンプレート
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -894,7 +895,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🌍 Three.js シーン ＆ 環境ライティング（暗転防止：標準適正クリッピング）
+        // 🌍 Three.js シーン ＆ 環境ライティング（安定クリッピング）
         // =========================================================================
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x0a192f);
@@ -915,7 +916,6 @@ html_template = """
         rendererPip.toneMapping = THREE.ACESFilmicToneMapping;
         rendererPip.toneMappingExposure = 1.45;
 
-        // 暗転・消滅を防ぐ安定した視野クリッピング
         const cameraMain = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.5, 60000);
         const cameraPip = new THREE.PerspectiveCamera(10.0, 360 / 205, 0.5, 60000);
 
@@ -932,7 +932,6 @@ html_template = """
         const pipTrackingSpot = new THREE.DirectionalLight(0xffffff, 3.5);
         scene.add(pipTrackingSpot);
 
-        // スカイドーム（暗転防止のためカメラファープレーン内に収まる適正半径35,000）
         const skyDomeGeo = new THREE.SphereGeometry(35000, 24, 16);
         const skyDomeMat = new THREE.MeshBasicMaterial({ color: 0x142842, side: THREE.BackSide, depthWrite: false });
         const skyDome = new THREE.Mesh(skyDomeGeo, skyDomeMat);
@@ -973,7 +972,7 @@ html_template = """
         landscapeGroup.add(oceanMesh);
 
         // =========================================================================
-        // 🏗️ 【ロケットごとに変化する動的発射台 ＆ スイングアーム機構】
+        // 🏗️ 発射台 ＆ スイングアーム機構
         // =========================================================================
         const pad = new THREE.Group();
         scene.add(pad);
@@ -1003,7 +1002,6 @@ html_template = """
         towerMain.position.y = towerHeight / 2;
         towerGroup.add(towerMain);
 
-        // チョップスティック・スイングアーム機構（開閉ギミック）
         const chopstickGroup = new THREE.Group();
         chopstickGroup.position.set(0, 67.5, 0);
         towerGroup.add(chopstickGroup);
@@ -1024,7 +1022,6 @@ html_template = """
         armRight.position.set(8.0, 0, 0);
         armRightPivot.add(armRight);
 
-        // 初期状態：格納状態（オープン退避）
         armLeftPivot.rotation.y = -0.75;
         armRightPivot.rotation.y = 0.75;
 
@@ -1467,7 +1464,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🎥 CAM 02 地上固定光学トラッキング（アームキャッチ完全追従）
+        // 🎥 CAM 02 地上固定光学トラッキング
         // =========================================================================
         const groundTrackerStationPos = new THREE.Vector3(260.0, 14.0, 240.0);
         const towerCloseupPos = new THREE.Vector3(24.0, 70.0, 36.0);
@@ -1649,6 +1646,7 @@ html_template = """
                 scene.attach(s1Group);
             }
 
+            // スイングアーム開閉
             if (simCfg.spacex_return) {
                 if (stage1Detached && bY <= 2500) {
                     armLeftPivot.rotation.y = THREE.MathUtils.lerp(armLeftPivot.rotation.y, 0.02, 0.08);
@@ -1757,7 +1755,7 @@ html_template = """
                 engineBounceLight.intensity = 0.0;
             }
 
-            // 5. 【多方向微調整RCS】
+            // 5. 多方向微調整RCS
             let rcsActiveHUD = false;
             const rcsDelta = Math.abs(rcsCommand - prevRcsCmdVal);
             prevRcsCmdVal = rcsCommand;
@@ -1955,7 +1953,7 @@ html_template = """
             document.getElementById('tv-q').innerText   = q.toFixed(1);
             document.getElementById('tv-g').innerText   = accG.toFixed(1);
 
-            // 🏁 ミッション完了判定（軌道投入 28,400km/h ＆ ブースター回収）
+            // 🏁 ミッション完了判定
             const isOrbitAchieved = (p0.event === "ORBIT");
             const isCatchComplete = p0.b_caught || (!simCfg.spacex_return);
 
