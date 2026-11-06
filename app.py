@@ -554,7 +554,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 描画テンプレート (CAM 02 フル幅・折たたみ完全連動・黒画面バグ修正)
+# 📺 HTML / JS 描画テンプレート (CAM 02 フル幅・高さ大・上部非被り・黒画面バグ修正)
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -566,7 +566,7 @@ html_template = """
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #01040a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; }
         #canvas-main { width: 100%; height: 100%; display: block; position: absolute; top:0; left:0; z-index: 1; }
         
-        /* 🎯 ご要望のサイズ：横幅メインウィンドウいっぱい(左右各18pxマージン)、上部テキストに被らない限界の高さ(top: 50px)、高さ295px */
+        /* 🎯 CAM 02ウィンドウ：横幅メインウィンドウいっぱい(left: 18px, right: 18px), 高さは修正前の大サイズ(295px), 上部非被り(top: 50px) */
         .pip-container { 
             position: absolute; 
             top: 50px; 
@@ -1508,7 +1508,7 @@ html_template = """
                 engineBounceLight.intensity = 0.0;
             }
 
-            // RCS スラスター噴射制御
+            // RCS スラスター噴射制御（コマンド要求時のみ）
             let rcsActiveHUD = false;
             const cmdFired = (Math.abs(rcsCmd) > 0.2 && Math.abs(prevRcsCmd) <= 0.2);
             prevRcsCmd = rcsCmd;
