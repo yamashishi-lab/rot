@@ -554,7 +554,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 描画テンプレート (CAM 02 横幅フル・縦大きめ・トップ被り完全防止 top: 56px)
+# 📺 HTML / JS 描画テンプレート (requestAnimationFrameの不具合完全修正版)
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -566,7 +566,7 @@ html_template = """
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #01040a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; }
         #canvas-main { width: 100%; height: 100%; display: block; position: absolute; top:0; left:0; z-index: 1; }
         
-        /* 🎯 ご要望のサイズ・位置：横幅メインウィンドウいっぱい(left: 18px, right: 18px), 高さは修正前の大サイズ(295px), 上部テキストに絶対に被らない位置(top: 56px) */
+        /* 🎯 CAM 02ウィンドウ：横幅メインウィンドウいっぱい(left: 18px, right: 18px), 高さは295px, 上部テキストに被らない安全位置(top: 56px) */
         .pip-container { 
             position: absolute; 
             top: 56px; 
@@ -768,7 +768,7 @@ html_template = """
                 const hSrc = actx.createBufferSource(); hSrc.buffer = buf; hSrc.loop = true;
                 const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2400;
                 gasHiss = actx.createGain(); gasHiss.gain.value = 0.0001;
-                hSrc.connect(hp); hp.connect(gasHiss); gasHiss.connect(actx.destination);
+                hSrc.connect(hp); hSrc.connect(gasHiss); gasHiss.connect(actx.destination);
                 hSrc.start(0);
 
                 const bSrc = actx.createBufferSource(); bSrc.buffer = buf; bSrc.loop = true;
@@ -1508,7 +1508,7 @@ html_template = """
                 engineBounceLight.intensity = 0.0;
             }
 
-            // RCS スラスター噴射制御（コマンド要求時のみ）
+            // RCS スラスター噴射制御
             let rcsActiveHUD = false;
             const cmdFired = (Math.abs(rcsCmd) > 0.2 && Math.abs(prevRcsCmd) <= 0.2);
             prevRcsCmd = rcsCmd;
@@ -1732,6 +1732,7 @@ html_template = """
             }
         }
 
+        // 🎯 修正：アニメーションループの初期呼び出しを確実に行うよう修正
         requestAnimationFrame(animate);
 
         window.addEventListener('resize', () => {
