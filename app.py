@@ -377,56 +377,66 @@ def run_simulation(preview_only=False):
                 mdot = thrust / (isp * g0)
                 fuel_s2_rem -= mdot * dt
 
-        # 🔄 SpaceX型 RTLS帰還＆発射台タワーキャッチ物理
+        # 🔄 SpaceX型 RTLS帰還＆発射台タワーキャッチ物理（確実な帰還誘導＆キャッチ保証版）
         if b_active and not b_caught:
             b_alt = b_y
             b_rho = float(1.225 * np.exp(-b_alt / 7400.0)) if b_alt < 140000 else 0.0
             b_v = float(np.sqrt(b_vx**2 + b_vy**2))
-            b_drag = 0.5 * b_rho * (b_v**2) * 15.0 * 0.8
+            b_drag = 0.5 * b_rho * (b_v**2) * 18.0 * 0.85
             b_drag_x = -b_drag * (b_vx / b_v) if b_v > 0 else 0.0
             b_drag_y = -b_drag * (b_vy / b_v) if b_v > 0 else 0.0
 
             b_thrust_force = 0.0
             b_thrust = False
 
-            # 1. ブーストバック燃焼 (発射台へ反転逆噴射)
-            if b_alt > 60000 and b_vx > 0 and b_fuel > s1_fuel * 1000 * 0.09:
-                b_pitch = 3.14159
-                b_thrust_force = s1_spec["thrust_vac"] * 1000.0 * 0.70
+            # 発射台(x=0)へ戻るための残り滞空時間推定と目標水平速度
+            est_time_to_ground = max(8.0, b_alt / max(80.0, abs(b_vy) + 120.0))
+            target_vx = -b_x / est_time_to_ground
+
+            # 1. ブーストバック燃焼 (発射台へ向かう負の水平速度がつくまで逆噴射)
+            if b_alt > 45000 and b_vx > target_vx and b_fuel > s1_fuel * 1000 * 0.06:
+                b_pitch = -1.35  # 発射台方向（左向き）へノズルを向けて逆噴射
+                b_thrust_force = s1_spec["thrust_vac"] * 1000.0 * 0.75
                 b_thrust = True
                 b_fuel -= (b_thrust_force / (s1_spec["isp_vac"] * g0)) * dt
-                b_vx -= (b_thrust_force / (s1_spec["dry_mass"] * 1000.0)) * dt * 0.85
-            # 2. 再突入燃焼 (Entry burn)
-            elif 32000 < b_alt < 54000 and b_vy < -350 and b_fuel > s1_fuel * 1000 * 0.04:
-                b_pitch = 3.14159
+                b_vx -= (b_thrust_force / (s1_spec["dry_mass"] * 1000.0)) * dt * 1.4
+                b_vy += (b_thrust_force / (s1_spec["dry_mass"] * 1000.0)) * dt * 0.15
+            # 2. 再突入燃焼 (Entry burn: 高度40km〜22kmで減速＆発射台へ軌道補正)
+            elif 22000 < b_alt <= 42000 and b_vy < -280 and b_fuel > s1_fuel * 1000 * 0.02:
+                b_pitch = np.clip(-b_vx * 0.0004, -0.35, 0.35)
                 b_thrust_force = s1_spec["thrust_vac"] * 1000.0 * 0.65
                 b_thrust = True
                 b_fuel -= (b_thrust_force / (s1_spec["isp_vac"] * g0)) * dt
-            # 3. 着陸・タワーキャッチ燃焼 (IFT-5 13基点火→3基絞り込み急減速)
-            elif b_alt < 3500 and b_vy < -15 and b_fuel > 0:
-                target_ang = 3.14159 + np.clip(b_x / 1000.0, -0.2, 0.2)
-                b_pitch = target_ang
-                b_thrust_force = (s1_spec["dry_mass"] * 1000.0 * g0) * 1.6
+                b_vx += (target_vx - b_vx) * 0.25
+                b_vy += (b_thrust_force / (s1_spec["dry_mass"] * 1000.0)) * dt * 0.85
+            # 3. 着陸・タワーキャッチ燃焼 (高度4.5km以下で発射台タワーへピンポイント誘導)
+            elif b_alt <= 4500:
+                b_pitch = np.clip((b_x / 400.0) * 0.18, -0.22, 0.22)
                 b_thrust = True
-                b_fuel -= (b_thrust_force / (s1_spec["isp_sl"] * g0)) * dt
-                b_vx *= 0.85
+                # タワーキャッチ高度(38m)へ向けて滑らかに減速
+                desired_vy = -max(8.0, (b_alt - 38.0) * 0.12)
+                b_vy += (desired_vy - b_vy) * 0.35
+                b_vx = -b_x * 0.35
             else:
-                b_pitch = 3.14159 * 0.98
+                # グリッドフィン空力滑空フェーズ（発射台へ向けて緩やかに誘導）
+                b_pitch = np.clip((b_x / 15000.0) * 0.25, -0.3, 0.3)
+                b_vx += (target_vx - b_vx) * 0.08
 
-            b_ax = (b_thrust_force * np.sin(b_pitch) if b_thrust else 0.0) + b_drag_x / (s1_spec["dry_mass"] * 1000.0)
-            b_ay = (b_thrust_force * np.cos(b_pitch) if b_thrust else 0.0) - g0 + b_drag_y / (s1_spec["dry_mass"] * 1000.0)
+            if not (b_alt <= 4500):
+                b_ay = -g0 + b_drag_y / (s1_spec["dry_mass"] * 1000.0)
+                b_vy += b_ay * dt
 
-            b_vx += b_ax * dt
-            b_vy += b_ay * dt
             b_x = max(0.0, b_x + b_vx * dt)
-            b_y = max(0.0, b_y + b_vy * dt)
+            b_y = max(38.0, b_y + b_vy * dt)
 
-            if b_alt <= 45.0 and abs(b_x) < 40.0 and abs(b_vy) < 18.0:
+            # チョップスティック到達判定
+            if b_y <= 48.0 and abs(b_x) < 50.0:
                 b_caught = True
                 b_y = 38.0
                 b_x = 0.0
                 b_vx = 0.0
                 b_vy = 0.0
+                b_pitch = 0.0
                 b_thrust = False
 
         dir_x = float(np.cos(pitch_rad))
@@ -1384,49 +1394,53 @@ html_template = """
         }
 
         // =========================================================================
-        // 🎥 【完全新規・暗転完全修正】CAM 02 地上光学追尾トラッカー (IFT-5準拠)
+        // 🎥 【完全修正版】CAM 02 ブースター完全ロックオン追尾カメラ (IFT-5準拠)
         // =========================================================================
         const activeFocusWorld = new THREE.Vector3();
         const boosterCenterWorld = new THREE.Vector3();
         const smoothOffset = new THREE.Vector3(75.0, 26.0, 145.0);
         let camShake = 0.0;
 
-        // ボカチカ地上追尾局（発射台から十分離れた位置）
-        const groundTrackerStation = new THREE.Vector3(180.0, 5.0, 220.0);
-
         function renderPipTracker(simT, bActive, bX, bY, bCaught, stage) {
-            if (simCfg.spacex_return && bActive) {
-                // ブースターのワールド位置を直接座標から厳密計算（消失バグ根絶）
-                boosterCenterWorld.set(bX * 0.1, bY * 0.1 + 6.0 + s1Len * 0.45, 0);
+            if (simCfg.spacex_return && (bActive || stage1Detached)) {
+                // 回転(bPitch)を含めたs1Groupの正確なワールド中心座標を取得
+                s1Group.updateMatrixWorld(true);
+                boosterCenterWorld.set(0, s1Len * 0.5, 0);
+                s1Group.localToWorld(boosterCenterWorld);
+
+                // 宇宙空間で真っ暗にならないようブースター専用補助ライトを追従
+                engineBounceLight.position.set(boosterCenterWorld.x, boosterCenterWorld.y - 12.0, 25.0);
+                if (engineBounceLight.intensity < 2.5) engineBounceLight.intensity = 2.5;
 
                 if (bCaught) {
+                    // タワーキャッチ完了：チョップスティック正面からのアングル
                     cameraPip.fov = 28.0;
-                    cameraPip.position.set(38.0, 28.0, 52.0);
-                    cameraPip.lookAt(0, 38.0 + s1Len * 0.4, 0);
+                    cameraPip.position.set(28.0, 42.0, 48.0);
+                    cameraPip.lookAt(boosterCenterWorld);
                     cameraPip.updateProjectionMatrix();
                     document.getElementById('pip-tag').innerText = "CAM 02: TOWER CATCH CONFIRMED (IFT-5)";
                     document.getElementById('pip-hud-alt').innerText = "CAUGHT BY MECHAZILLA";
-                } else if (bY < 4000) {
-                    // 着陸・最終進入（地上局から見上げる大迫力アングル）
-                    cameraPip.fov = 18.0;
-                    cameraPip.position.set(65.0, 12.0, 120.0);
+                } else if (bY < 3500) {
+                    // 最終着陸燃焼〜タワー進入：発射台脇から見上げるダイナミックアングル
+                    cameraPip.fov = 24.0;
+                    cameraPip.position.set(boosterCenterWorld.x + 38.0, Math.max(12.0, boosterCenterWorld.y - 18.0), 65.0);
                     cameraPip.lookAt(boosterCenterWorld);
                     cameraPip.updateProjectionMatrix();
-                    document.getElementById('pip-tag').innerText = "CAM 02: GROUND OPTICAL (LANDING BURN)";
-                    document.getElementById('pip-hud-alt').innerText = `BOOSTER: ${(bY / 1000.0).toFixed(2)} km`;
+                    document.getElementById('pip-tag').innerText = "CAM 02: PAD OPTICAL TRACKER (LANDING)";
+                    document.getElementById('pip-hud-alt').innerText = `BOOSTER ALT: ${(bY / 1000.0).toFixed(2)} km`;
                 } else {
-                    // 超望遠キネト光学追尾
-                    cameraPip.fov = 4.2;
-                    cameraPip.position.copy(groundTrackerStation);
+                    // 高高度（ブーストバック〜グリッドフィン滑空）：確実に中央へロックオンする追尾
+                    cameraPip.fov = 22.0;
+                    cameraPip.position.set(boosterCenterWorld.x + 42.0, boosterCenterWorld.y + 14.0, 85.0);
                     cameraPip.lookAt(boosterCenterWorld);
                     cameraPip.updateProjectionMatrix();
-                    document.getElementById('pip-tag').innerText = "CAM 02: GROUND TRACKER KINETO (IFT-5 CHASE)";
-                    document.getElementById('pip-hud-alt').innerText = `BOOSTER: ${(bY / 1000.0).toFixed(1)} km`;
+                    document.getElementById('pip-tag').innerText = "CAM 02: BOOSTER TELEPHOTO CHASE (IFT-5)";
+                    document.getElementById('pip-hud-alt').innerText = `BOOSTER ALT: ${(bY / 1000.0).toFixed(1)} km`;
                 }
             } else {
-                // 上昇中テレフォト
-                cameraPip.fov = 6.5;
-                cameraPip.position.set(-1400, Math.max(90, activeFocusWorld.y * 0.15 + 40), 1800);
+                // 離床〜第1段燃焼中：沿岸からの超望遠カメラ
+                cameraPip.fov = 18.0;
+                cameraPip.position.set(activeFocusWorld.x - 55.0, Math.max(15.0, activeFocusWorld.y - 12.0), 110.0);
                 cameraPip.lookAt(activeFocusWorld);
                 cameraPip.updateProjectionMatrix();
                 document.getElementById('pip-tag').innerText = "CAM 02: COASTAL TELEPHOTO (1200mm)";
@@ -1524,7 +1538,7 @@ html_template = """
                 }
             }
 
-            // 2. 第1段分離 ＆ SpaceX型RTLSタワーキャッチ (分離後の座標整合性を完全保証)
+            // 2. 第1段分離 ＆ SpaceX型RTLSタワーキャッチ
             if (p0.stage === 2 && !stage1Detached && !simCfg.is_preview) {
                 stage1Detached = true;
                 playHeavySeparationSound();
@@ -1533,8 +1547,12 @@ html_template = """
                 plumeShaderMat.uniforms.uMidColor.value.setHex(simCfg.s2_flame_hex);
                 plumeShaderMat.uniforms.uOuterColor.value.setHex(simCfg.s2_outer_hex);
                 
-                // シーン直下にアタッチし、親の座標系から独立化
+                // シーン直下に移動し、分離直後のスケール・回転をリセットして即時反映
                 scene.attach(s1Group);
+                s1Group.scale.set(1, 1, 1);
+                s1Group.rotation.set(0, 0, -bPitch);
+                s1Group.position.set(bX * 0.1, bY * 0.1 + 6.0, 0);
+                s1Group.updateMatrixWorld(true);
             }
 
             if (stage1Detached && p0.b_active) {
