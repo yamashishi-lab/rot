@@ -368,7 +368,7 @@ def run_simulation(preview_only=False):
             rcs_cooldown -= dt
         elif (abs(pitch_rate) > 0.06 and alt_km > 0.8) or (alt_km >= 230.0 and pitch_deg > 0.1):
             rcs_cmd = -1.0 if pitch_rate > 0 else 1.0
-            rcs_cooldown = 5.5 # 🎯 修正4: クールダウンを広げてRCS頻度を大幅に下げる
+            rcs_cooldown = 5.5
 
         cur_event = "FLIGHT"
         if v >= 340.0 and not supersonic_called:
@@ -554,7 +554,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 描画テンプレート (6大修正反映版)
+# 📺 HTML / JS 描画テンプレート (CAM 02 横幅フル・縦大きめ・バーバー非干渉・本体スラスターバグ修正)
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -566,13 +566,13 @@ html_template = """
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #01040a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; }
         #canvas-main { width: 100%; height: 100%; display: block; position: absolute; top:0; left:0; z-index: 1; }
         
-        /* 🎯 改善1: CAM 02 の上部テキスト被り解消＆レスポンシブ幅対応 */
+        /* 🎯 ご要望のサイズ：横幅メインウィンドウいっぱい(vw単位)、高さも修正前と同等の大サイズ、上部テキスト非干渉(top: 76px) */
         .pip-container { 
             position: absolute; 
             top: 76px; 
-            right: 16px; 
-            width: min(340px, 42vw); 
-            aspect-ratio: 16 / 9;
+            right: 18px; 
+            width: min(520px, 46vw); 
+            height: 285px; 
             border: 2px solid rgba(56, 189, 248, 0.95); 
             border-radius: 4px; 
             z-index: 60; 
@@ -682,7 +682,7 @@ html_template = """
             canvasPip.style.display = pipVisible ? 'block' : 'none';
             document.getElementById('pip-tag').style.display = pipVisible ? 'block' : 'none';
             document.getElementById('pip-hud-alt').style.display = pipVisible ? 'block' : 'none';
-            pipBox.style.height = pipVisible ? 'auto' : '32px';
+            pipBox.style.height = pipVisible ? '285px' : '32px';
             document.getElementById('pip-hint').innerText = pipVisible ? '[CLICK TO HIDE]' : '[CLICK TO SHOW]';
         });
 
@@ -719,7 +719,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🔊 音響合成システム (🎯 改善4: RCS音量を控えめに半減調整)
+        // 🔊 音響合成システム
         // =========================================================================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let actx = null, subRumble = null, shockCrackle = null, gasHiss = null, boosterRumble = null, boosterCrackle = null;
@@ -826,7 +826,6 @@ html_template = """
             pSrc.start(now + 0.015);
         }
 
-        // 🎯 改善4: RCS音量を 0.42 → 0.16 に下げてうるさくないようにする
         function playRcsPuffSound() {
             if (!actx) return;
             const now = actx.currentTime, dur = 0.07;
@@ -836,7 +835,7 @@ html_template = """
             const src = actx.createBufferSource(); src.buffer = buf;
             const hp = actx.createBiquadFilter(); hp.type = 'bandpass'; hp.frequency.setValueAtTime(3400, now); hp.Q.value = 1.4;
             const g = actx.createGain(); g.gain.setValueAtTime(0.16, now); g.gain.exponentialRampToValueAtTime(0.005, now + dur);
-            src.connect(hp); hp.connect(g); g.connect(actx.destination);
+            src.connect(hp); src.connect(g); g.connect(actx.destination);
             src.start(now);
         }
 
@@ -851,7 +850,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🌍 Three.js シーン ＆ 🎯 改善5: チカチカ防止のカメラ・ジオメトリ階層
+        // 🌍 Three.js シーン ＆ ライティング
         // =========================================================================
         const scene = new THREE.Scene();
         scene.fog = new THREE.FogExp2(0x1a334f, 0.000045);
@@ -863,13 +862,12 @@ html_template = """
         rendererMain.toneMappingExposure = 1.35;
 
         const rendererPip = new THREE.WebGLRenderer({ canvas: canvasPip, antialias: true });
-        rendererPip.setSize(380, 215);
+        rendererPip.setSize(520, 285);
         rendererPip.toneMapping = THREE.ACESFilmicToneMapping;
         rendererPip.toneMappingExposure = 1.45;
 
-        // 🎯 改善5: カメラの near 面を 2.0 に引き上げ、Zファイティング（チカチカ）を完全に排除
         const cameraMain = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 2.0, 75000);
-        const cameraPip = new THREE.PerspectiveCamera(38.0, 380 / 215, 2.0, 75000);
+        const cameraPip = new THREE.PerspectiveCamera(38.0, 520 / 285, 2.0, 75000);
 
         const sunLight = new THREE.DirectionalLight(0xfffaed, 5.0);
         sunLight.position.set(4000, 6000, 3000); scene.add(sunLight);
@@ -905,7 +903,6 @@ html_template = """
         const starMat = new THREE.PointsMaterial({ size: 3.5, color: 0xffffff, transparent: true, opacity: 0.25 });
         scene.add(new THREE.Points(starGeo, starMat));
 
-        // 🎯 改善5: 地面と海のY座標を完全に分離（重なりによるフリッカーを防止）
         const landscapeGroup = new THREE.Group(); scene.add(landscapeGroup);
         const coastPlane = new THREE.Mesh(new THREE.PlaneGeometry(35000, 35000), new THREE.MeshStandardMaterial({ color: 0x162319, roughness: 0.95 }));
         coastPlane.rotation.x = -Math.PI / 2; coastPlane.position.set(-1500, -3.0, 0); landscapeGroup.add(coastPlane);
@@ -919,7 +916,6 @@ html_template = """
         const darkSteelMat = new THREE.MeshStandardMaterial({ color: 0x222a36, metalness: 0.85, roughness: 0.35 });
         const concreteMat = new THREE.MeshStandardMaterial({ color: 0x3d4554, roughness: 0.95 });
         const pipeMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.35, metalness: 0.85 });
-        const trussWireMat = new THREE.MeshBasicMaterial({ color: 0xb91c1c, wireframe: true });
 
         let chopstickGroup = new THREE.Group();
         let armLeftPivot = new THREE.Group();
@@ -932,7 +928,7 @@ html_template = """
 
         if (isStarshipPad) {
             const groundPlate = new THREE.Mesh(new THREE.CylinderGeometry(110, 125, 3.0, 32), concreteMat);
-            groundPlate.position.y = 0.5; pad.add(groundPlate); // 🎯 Y=0.5に配置して地面からクリアランス確保
+            groundPlate.position.y = 0.5; pad.add(groundPlate);
 
             const olmRing = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 4.2, 2.2, 24), darkSteelMat);
             olmRing.position.y = 4.2; pad.add(olmRing);
@@ -1247,7 +1243,6 @@ html_template = """
             pool.push({ sp, active: false, vx: 0, vy: 0, vz: 0, age: 0, maxAge: 1, s0: 1, s1: 5, o: 0.8 });
         }
         let pIdx = 0;
-        // 🎯 改善5: デリュージ煙の最低発生高さを y=3.5 に浮かせ、コンクリート面とのZファイティングを防止
         function emitParticle(x, y, z, vx, vy, vz, s0, s1, life, opacity, hexColor=0xf1f5f9) {
             const p = pool[pIdx]; pIdx = (pIdx + 1) % pool.length;
             p.active = true; p.sp.visible = true;
@@ -1499,7 +1494,8 @@ html_template = """
             }
 
             // =====================================================================
-            // 🎯 改善1 & 3: キャッチ後はブースターRCSを完全ロック ＆ ローカル直角噴射
+            // 🎯 バーナー付近の常時スラスター煙バグを修正：
+            //   「コマンド要求が入った瞬間（cmdFired）」のみ発火させ、常時発生ループを完全に排除
             // =====================================================================
             let rcsActiveHUD = false;
             const cmdFired = (Math.abs(rcsCmd) > 0.2 && Math.abs(prevRcsCmd) <= 0.2);
@@ -1508,20 +1504,15 @@ html_template = """
             for(let rcs of rcsNozzles) {
                 let burst = false;
                 if (!simCfg.is_preview && simT > 0 && !p0.exploded) {
-                    // 🎯 改善3: ブースターがアームにキャッチされたら、第1段ブースターのRCSを完全停止（出っぱなしを防止）
                     if (rcs.isS1 && stage1Detached && p0.b_caught) {
                         burst = false;
                     } else {
+                        // 🎯 修正：常時ランダム発火を廃止し、軌道修正コマンドが入力された瞬間のみに限定
                         if (cmdFired) {
-                            if (rcs.isS1 && !stage1Detached) {
-                                if ((rcs.dir.dx < -0.3 && rcsCmd > 0) || (rcs.dir.dx > 0.3 && rcsCmd < 0)) burst = true;
-                            }
-                            if (!rcs.isS1 && stage1Detached) {
-                                if ((rcs.dir.dx < -0.3 && rcsCmd > 0) || (rcs.dir.dx > 0.3 && rcsCmd < 0)) burst = true;
-                            }
+                            if (rcs.isS1 && !stage1Detached && ((rcs.dir.dx < -0.3 && rcsCmd > 0) || (rcs.dir.dx > 0.3 && rcsCmd < 0))) burst = true;
+                            if (!rcs.isS1 && stage1Detached && ((rcs.dir.dx < -0.3 && rcsCmd > 0) || (rcs.dir.dx > 0.3 && rcsCmd < 0))) burst = true;
                         }
-                        if (alt >= 210.0 && Math.random() < 0.008) burst = true;
-                        if (rcs.isS1 && stage1Detached && p0.b_active && !p0.b_caught && (bY <= 3000) && Math.random() < 0.015) {
+                        if (rcs.isS1 && stage1Detached && p0.b_active && !p0.b_caught && (bY <= 3000) && cmdFired) {
                             burst = true;
                         }
                     }
@@ -1648,18 +1639,14 @@ html_template = """
                 cameraMain.lookAt(activeFocusWorld);
             }
 
-            // =====================================================================
-            // 🎯 改善2: CAM 02 地上固定追尾 ＆ ちょうど良く寄る画角調整
-            // =====================================================================
+            // CAM 02 地上固定追尾
             if (pipVisible) {
                 let targetPos = new THREE.Vector3();
                 if (stage1Detached && p0.b_active) {
                     targetPos.set(bX * 0.1, bY_scaled + s1Len * 0.55, 0);
-                    // カメラ位置は地上の定位置(160, 14, 180)から動かさない
                     cameraPip.position.set(160.0, 14.0, 180.0);
 
                     if (p0.b_caught || bY_scaled <= 90.0) {
-                        // 🎯 キャッチ時：ちょうど良く寄る fov 25.0
                         cameraPip.fov = THREE.MathUtils.lerp(cameraPip.fov, 25.0, 0.1);
                         document.getElementById('pip-tag').innerText = "CAM 02: GROUND OPTICAL (TOWER CATCH)";
                         document.getElementById('pip-hud-alt').innerText = p0.b_caught ? "SUSPENDED (SECURED)" : "FINAL TOUCHDOWN";
