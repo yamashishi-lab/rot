@@ -1,4 +1,5 @@
 import streamlit as st
+import numpy as np
 import json
 import streamlit.components.v1 as components
 
@@ -96,20 +97,19 @@ cfg_payload = {
 cfg_json = json.dumps(cfg_payload)
 
 # =========================================================================
-# 📺 HTML / JS 完全描画テンプレート（リアルタイム物理＆高精度音響エンジン）
+# 📺 HTML / JS 完全描画テンプレート（安全な置換方式）
 # =========================================================================
-html_code = f"""
+html_template = """
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <style>
-        * {{ box-sizing: border-box; }}
-        body, html {{ margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #01040a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; }}
-        #canvas-main {{ width: 100%; height: 100%; display: block; position: absolute; top:0; left:0; z-index: 1; }}
+        * { box-sizing: border-box; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #01040a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; }
+        #canvas-main { width: 100%; height: 100%; display: block; position: absolute; top:0; left:0; z-index: 1; }
         
-        /* 📱 CAM 02 (地上光学追尾局 PiPウィンドウ) */
-        .pip-container {{ 
+        .pip-container { 
             position: absolute; 
             top: 52px; 
             right: 20px; 
@@ -122,9 +122,9 @@ html_code = f"""
             background: #071526; 
             overflow: hidden; 
             cursor: pointer; 
-        }}
-        #canvas-pip {{ width: 100%; height: 100%; display: block; }}
-        .pip-tag {{ 
+        }
+        #canvas-pip { width: 100%; height: 100%; display: block; }
+        .pip-tag { 
             position: absolute; 
             top: 6px; 
             left: 8px; 
@@ -139,8 +139,8 @@ html_code = f"""
             z-index: 65; 
             pointer-events: none; 
             border-left: 2px solid #38bdf8; 
-        }}
-        .pip-alt {{ 
+        }
+        .pip-alt { 
             position: absolute; 
             bottom: 6px; 
             right: 8px; 
@@ -153,10 +153,9 @@ html_code = f"""
             border-radius: 2px; 
             z-index: 65; 
             pointer-events: none; 
-        }}
+        }
 
-        /* 🗺️ 精密軌道マップ */
-        .hud-orbit {{ 
+        .hud-orbit { 
             position: absolute; 
             bottom: 86px; 
             left: 24px; 
@@ -168,22 +167,21 @@ html_code = f"""
             z-index: 50; 
             color: #fff; 
             box-shadow: 0 8px 32px rgba(0,0,0,0.85); 
-        }}
-        #orbit-canvas {{ width: 296px; height: 64px; background: #020617; border-radius: 2px; border: 1px solid rgba(255,255,255,0.08); display: block; margin-top: 4px; }}
+        }
+        #orbit-canvas { width: 296px; height: 64px; background: #020617; border-radius: 2px; border: 1px solid rgba(255,255,255,0.08); display: block; margin-top: 4px; }
 
-        .top-banner {{ position: absolute; top: 0; left: 0; width: 100%; min-height: 42px; background: #020610; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: space-between; padding: 4px 18px; z-index: 20; flex-wrap: wrap; gap: 8px; }}
+        .top-banner { position: absolute; top: 0; left: 0; width: 100%; min-height: 42px; background: #020610; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: space-between; padding: 4px 18px; z-index: 20; flex-wrap: wrap; gap: 8px; }
         
-        .hud-telemetry {{ position: absolute; bottom: 0; left: 0; width: 100%; height: 76px; background: #01040a; border-top: 1px solid rgba(255,255,255,0.12); padding: 8px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 20; pointer-events: none; }}
-        .hud-telemetry > * {{ pointer-events: auto; }}
-        .telemetry-row {{ display: flex; gap: clamp(14px, 2.2vw, 28px); align-items: center; flex-wrap: nowrap; overflow-x: auto; }}
-        .telemetry-item {{ flex-shrink: 0; }}
-        .telemetry-label {{ font-size: 9px; color: #94a3b8; letter-spacing: 1px; }}
-        .telemetry-val {{ color: #fff; font-size: clamp(13px, 1.6vw, 17px); font-weight: 800; font-family: 'Consolas', monospace; }}
+        .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; height: 76px; background: #01040a; border-top: 1px solid rgba(255,255,255,0.12); padding: 8px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 20; pointer-events: none; }
+        .hud-telemetry > * { pointer-events: auto; }
+        .telemetry-row { display: flex; gap: clamp(14px, 2.2vw, 28px); align-items: center; flex-wrap: nowrap; overflow-x: auto; }
+        .telemetry-item { flex-shrink: 0; }
+        .telemetry-label { font-size: 9px; color: #94a3b8; letter-spacing: 1px; }
+        .telemetry-val { color: #fff; font-size: clamp(13px, 1.6vw, 17px); font-weight: 800; font-family: 'Consolas', monospace; }
 
-        .complete-banner {{ display: none; position: absolute; top: 140px; left: 50%; transform: translateX(-50%); background: rgba(6, 78, 59, 0.95); border: 2px solid #10b981; border-radius: 6px; padding: 20px 36px; z-index: 70; text-align: center; box-shadow: 0 0 70px rgba(16, 185, 129, 0.7); }}
+        .complete-banner { display: none; position: absolute; top: 140px; left: 50%; transform: translateX(-50%); background: rgba(6, 78, 59, 0.95); border: 2px solid #10b981; border-radius: 6px; padding: 20px 36px; z-index: 70; text-align: center; box-shadow: 0 0 70px rgba(16, 185, 129, 0.7); }
 
-        /* 🔴 画面内直接起動ボタン */
-        #launch-overlay-btn {{
+        #launch-overlay-btn {
             position: absolute;
             top: 50%;
             left: 50%;
@@ -200,11 +198,11 @@ html_code = f"""
             cursor: pointer;
             z-index: 100;
             transition: all 0.2s ease;
-        }}
-        #launch-overlay-btn:hover {{
+        }
+        #launch-overlay-btn:hover {
             transform: translate(-50%, -50%) scale(1.06);
             box-shadow: 0 0 70px rgba(239, 68, 68, 1.0);
-        }}
+        }
     </style>
 </head>
 <body>
@@ -271,37 +269,34 @@ html_code = f"""
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-    const cfg = {cfg_json};
+    const cfg = __CFG_JSON__;
 
     // --- 音響エンジン (Web Audio API) ---
-    let actx = null, subRumble = null, shockCrackle = null, boosterRumble = null;
+    let actx = null, subRumble = null, boosterRumble = null;
 
-    function initAudio() {{
-        if (!actx) {{
+    function initAudio() {
+        if (!actx) {
             actx = new (window.AudioContext || window.webkitAudioContext)();
             const buf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
             const d = buf.getChannelData(0);
             for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 
-            // 打上げ用メイン低周波
             const rSrc = actx.createBufferSource(); rSrc.buffer = buf; rSrc.loop = true;
             const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 45;
             subRumble = actx.createGain(); subRumble.gain.value = 0.0001;
             rSrc.connect(lp); lp.connect(subRumble); subRumble.connect(actx.destination);
             rSrc.start(0);
 
-            // ブースター帰還専用轟音
             const bSrc = actx.createBufferSource(); bSrc.buffer = buf; bSrc.loop = true;
             const bLp = actx.createBiquadFilter(); bLp.type = 'lowpass'; bLp.frequency.value = 58;
             boosterRumble = actx.createGain(); boosterRumble.gain.value = 0.0001;
             bSrc.connect(bLp); bLp.connect(boosterRumble); boosterRumble.connect(actx.destination);
             bSrc.start(0);
-        }}
+        }
         if (actx.state === 'suspended') actx.resume();
-    }}
+    }
 
-    // 切り離し音（重圧インパルス＋高圧パージ）
-    function playSeparationSound() {{
+    function playSeparationSound() {
         if (!actx) return;
         const now = actx.currentTime;
         const osc = actx.createOscillator();
@@ -313,10 +308,9 @@ html_code = f"""
         g.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
         osc.connect(g); g.connect(actx.destination);
         osc.start(now); osc.stop(now + 0.66);
-    }}
+    }
 
-    // アームキャッチ時破裂音（YouTube 0:49 準拠の乾いたバンッ！）
-    function playCatchPopSound() {{
+    function playCatchPopSound() {
         if (!actx) return;
         const now = actx.currentTime;
         const osc = actx.createOscillator();
@@ -328,7 +322,7 @@ html_code = f"""
         g.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
         osc.connect(g); g.connect(actx.destination);
         osc.start(now); osc.stop(now + 0.065);
-    }}
+    }
 
     // --- Three.js 3D シーン初期化 ---
     const canvasMain = document.getElementById('canvas-main');
@@ -336,36 +330,34 @@ html_code = f"""
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a192f);
 
-    const rendererMain = new THREE.WebGLRenderer({{ canvas: canvasMain, antialias: true }});
+    const rendererMain = new THREE.WebGLRenderer({ canvas: canvasMain, antialias: true });
     rendererMain.setSize(window.innerWidth, window.innerHeight);
     rendererMain.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 
-    const rendererPip = new THREE.WebGLRenderer({{ canvas: canvasPip, antialias: true }});
+    const rendererPip = new THREE.WebGLRenderer({ canvas: canvasPip, antialias: true });
     rendererPip.setSize(360, 205);
     rendererPip.setPixelRatio(1.0);
 
     const cameraMain = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 1.0, 50000);
     const cameraPip = new THREE.PerspectiveCamera(12.0, 360 / 205, 1.0, 50000);
 
-    // ライティング
     const sunLight = new THREE.DirectionalLight(0xfffaed, 4.5);
     sunLight.position.set(3000, 5000, 2000);
     scene.add(sunLight);
     scene.add(new THREE.HemisphereLight(0x90b8d8, 0x1a2636, 1.6));
 
-    // 地面 & 海
-    const coast = new THREE.Mesh(new THREE.PlaneGeometry(30000, 30000), new THREE.MeshStandardMaterial({{ color: 0x18241c, roughness: 0.95 }}));
+    const coast = new THREE.Mesh(new THREE.PlaneGeometry(30000, 30000), new THREE.MeshStandardMaterial({ color: 0x18241c, roughness: 0.95 }));
     coast.rotation.x = -Math.PI / 2;
     coast.position.set(-1000, 0, 0);
     scene.add(coast);
 
-    const ocean = new THREE.Mesh(new THREE.PlaneGeometry(30000, 30000), new THREE.MeshStandardMaterial({{ color: 0x072744, roughness: 0.15, metalness: 0.85 }}));
+    const ocean = new THREE.Mesh(new THREE.PlaneGeometry(30000, 30000), new THREE.MeshStandardMaterial({ color: 0x072744, roughness: 0.15, metalness: 0.85 }));
     ocean.rotation.x = -Math.PI / 2;
     ocean.position.set(15000, -5, 0);
     scene.add(ocean);
 
     // 発射台 & Mechazilla タワー (高さ145m, アーム高さ67.5m)
-    const steelMat = new THREE.MeshStandardMaterial({{ color: 0x222a36, metalness: 0.85, roughness: 0.35 }});
+    const steelMat = new THREE.MeshStandardMaterial({ color: 0x222a36, metalness: 0.85, roughness: 0.35 });
     const tower = new THREE.Mesh(new THREE.BoxGeometry(6.5, 145.0, 6.5), steelMat);
     tower.position.set(-11.5, 72.5, 0);
     scene.add(tower);
@@ -376,14 +368,13 @@ html_code = f"""
     const armPivotR = new THREE.Group(); armPivotR.position.set(-8.2, 67.5, -2.2); scene.add(armPivotR);
     const armR = new THREE.Mesh(new THREE.BoxGeometry(16.0, 2.2, 1.3), steelMat); armR.position.set(8.0, 0, 0); armPivotR.add(armR);
 
-    // 初期状態：アーム格納（オープン）
     armPivotL.rotation.y = -0.75;
     armPivotR.rotation.y = 0.75;
 
     // --- ロケットモデル構築（1 unit = 1m 完全準拠） ---
-    const rocketMat = new THREE.MeshStandardMaterial({{ color: 0xd5dce6, metalness: 0.92, roughness: 0.16 }});
+    const rocketMat = new THREE.MeshStandardMaterial({ color: 0xd5dce6, metalness: 0.92, roughness: 0.16 });
     
-    // 第1段ブースター (長さ70m, 直径9m相当の縮尺比: 長さ24m, 半径1.12m)
+    // 第1段ブースター
     const s1Len = 24.0;
     const booster = new THREE.Group();
     scene.add(booster);
@@ -391,20 +382,18 @@ html_code = f"""
     boosterBody.position.y = s1Len / 2;
     booster.add(boosterBody);
 
-    // ブースター頭部リフティング突起ピン（左右4.4m）
     const catchPins = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 4.4, 16), steelMat);
     catchPins.rotation.z = Math.PI / 2;
     catchPins.position.set(0, s1Len - 0.9, 0);
     booster.add(catchPins);
 
-    // ブースターエンジン火炎
     const flameGeo = new THREE.ConeGeometry(1.8, 18.0, 16);
     flameGeo.translate(0, -9.0, 0);
-    const flameMat = new THREE.MeshBasicMaterial({{ color: 0x60a5fa, transparent: true, opacity: 0.9 }});
+    const flameMat = new THREE.MeshBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.9 });
     const boosterFlame = new THREE.Mesh(flameGeo, flameMat);
     booster.add(boosterFlame);
 
-    // 第2段スターシップ (長さ12m, 半径1.12m)
+    // 第2段スターシップ
     const s2Len = 12.0;
     const ship = new THREE.Group();
     scene.add(ship);
@@ -419,9 +408,9 @@ html_code = f"""
     shipFlame.visible = false;
 
     // RCSスラスターノズル (左右)
-    const rcsL = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.8, 8), new THREE.MeshBasicMaterial({{ color: 0xffffff, transparent: true, opacity: 0 }}));
+    const rcsL = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.8, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }));
     rcsL.position.set(-1.2, s1Len - 1.5, 0); rcsL.rotation.z = Math.PI / 2; booster.add(rcsL);
-    const rcsR = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.8, 8), new THREE.MeshBasicMaterial({{ color: 0xffffff, transparent: true, opacity: 0 }}));
+    const rcsR = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.8, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }));
     rcsR.position.set(1.2, s1Len - 1.5, 0); rcsR.rotation.z = -Math.PI / 2; booster.add(rcsR);
 
     // 初期配置 (発射台OLM上: Y=5.5m)
@@ -437,53 +426,46 @@ html_code = f"""
     let rcsPulseTimer = 0;
     let rcsPulseDir = 0;
 
-    // 飛行物理変数
     let shipX = 0, shipY = 5.5 + s1Len + 2.0, shipVx = 0, shipVy = 0, shipPitch = 90.0;
     let boostX = 0, boostY = 5.5, boostVx = 0, boostVy = 0, boostPitch = 90.0;
 
-    // 起動ボタン
-    document.getElementById('launch-overlay-btn').addEventListener('click', () => {{
+    document.getElementById('launch-overlay-btn').addEventListener('click', () => {
         initAudio();
         document.getElementById('launch-overlay-btn').style.display = 'none';
         isRunning = true;
-    }});
+    });
 
-    // アニメーションループ
     let lastTime = performance.now();
-    function animate(now) {{
+    function animate(now) {
         requestAnimationFrame(animate);
         const dt = Math.min(0.05, (now - lastTime) / 1000.0);
         lastTime = now;
 
-        if (isRunning) {{
-            missionTime += dt * 1.8; // シネマティックスケール（約70秒で完結）
-        }}
+        if (isRunning) {
+            missionTime += dt * 1.8;
+        }
 
         // --- フェーズ別リアルタイム物理シミュレーション ---
-        if (missionTime < 0) {{
-            // カウントダウン
-            document.getElementById('tv-timer').innerText = `T- 00:0${{Math.max(0, Math.ceil(Math.abs(missionTime)))}}.0`;
+        if (missionTime < 0) {
+            const sec = Math.max(0, Math.ceil(Math.abs(missionTime)));
+            document.getElementById('tv-timer').innerText = 'T- 00:0' + sec + '.0';
             if (subRumble && missionTime > -3.5) subRumble.gain.setTargetAtTime(0.8, actx.currentTime, 0.1);
-        }} else if (missionTime < 24.0) {{
-            // 第1段上昇フェーズ (T+0s ~ T+24s)
+        } else if (missionTime < 24.0) {
             const m = Math.floor(missionTime / 60); const s = missionTime % 60;
-            document.getElementById('tv-timer').innerText = `T+ ${{String(m).padStart(2,'0')}}:${{s.toFixed(1).padStart(4,'0')}}`;
+            document.getElementById('tv-timer').innerText = 'T+ ' + String(m).padStart(2,'0') + ':' + s.toFixed(1).padStart(4,'0');
             document.getElementById('tv-stage-badge').innerText = "FIRST STAGE ASCENT";
 
-            // ピッチオーバー誘導 (高度250kmに向けて徐々に傾斜)
             const prog = missionTime / 24.0;
             const targetPitch = 90.0 * (1.0 - Math.pow(prog, 0.75));
-            if (Math.abs(targetPitch - shipPitch) > 0.05) {{
-                // ピッチ角変更時のみ一瞬パルス噴射 (0.1秒)
-                if (rcsPulseTimer <= 0) {{
+            if (Math.abs(targetPitch - shipPitch) > 0.05) {
+                if (rcsPulseTimer <= 0) {
                     rcsPulseTimer = 0.12;
-                    rcsPulseDir = 1; // 右に傾くため左ノズル噴射（反作用）
-                }}
-            }}
+                    rcsPulseDir = 1;
+                }
+            }
             shipPitch = targetPitch;
             boostPitch = targetPitch;
 
-            // 速度・高度積分
             const thrust = 180.0;
             shipVx += Math.cos(shipPitch * Math.PI / 180) * thrust * dt;
             shipVy += (Math.sin(shipPitch * Math.PI / 180) * thrust - 9.8) * dt;
@@ -499,150 +481,142 @@ html_code = f"""
             ship.rotation.z = -(90.0 - shipPitch) * Math.PI / 180;
 
             if (subRumble) subRumble.gain.setTargetAtTime(1.2, actx.currentTime, 0.1);
-        }} else {{
-            // 切り離し後フェーズ (T+24s ~)
-            if (!isStaged) {{
+        } else {
+            if (!isStaged) {
                 isStaged = true;
                 playSeparationSound();
                 shipFlame.visible = true;
                 boosterFlame.visible = false;
                 boostVx = shipVx * 0.2;
-                boostVy = 0.0; // 🎯 切り離し時点から即座に降下開始
-            }}
+                boostVy = 0.0;
+            }
 
             const m = Math.floor(missionTime / 60); const s = missionTime % 60;
-            document.getElementById('tv-timer').innerText = `T+ ${{String(m).padStart(2,'0')}:${{s.toFixed(1).padStart(4,'0')}}`;
+            document.getElementById('tv-timer').innerText = 'T+ ' + String(m).padStart(2,'0') + ':' + s.toFixed(1).padStart(4,'0');
 
             // --- 第2段 (Starship) 軌道投入制御 ---
-            // 高度250kmで真横（ピッチ0度）＆横速7,900m/sで推力停止（SECO）
             const altKm = shipY * 0.001;
-            if (altKm < 250.0) {{
+            if (altKm < 250.0) {
                 shipPitch = Math.max(0.0, 90.0 * (1.0 - (altKm / 250.0)));
-            }} else {{
-                shipPitch = 0.0; // 🎯 完全水平
+            } else {
+                shipPitch = 0.0;
                 shipVy = 0.0;
                 shipY = 250000.0;
-            }}
+            }
 
-            if (shipVx < 7900.0) {{
+            if (shipVx < 7900.0) {
                 const s2Thrust = 160.0;
                 shipVx += Math.cos(shipPitch * Math.PI / 180) * s2Thrust * dt;
                 if (shipPitch > 0) shipVy += (Math.sin(shipPitch * Math.PI / 180) * s2Thrust - 9.8) * dt;
-            }} else {{
-                // 🎯 第一宇宙速度到達で完全SECO
+            } else {
                 shipVx = 7900.0;
                 shipFlame.visible = false;
-            }}
+            }
             shipX += shipVx * dt;
             shipY += shipVy * dt;
             ship.position.set(shipX * 0.1, shipY * 0.1, 0);
             ship.rotation.z = -(90.0 - shipPitch) * Math.PI / 180;
 
             // --- 第1段 (Super Heavy) 帰還 ＆ 宙づりキャッチ制御 ---
-            if (!isCaught) {{
-                // 帰還中：高度降下一貫
+            if (!isCaught) {
                 boostVy -= 14.0 * dt;
-                boostX += (0 - boostX) * 0.08; // 発射台X=0へアライメント
+                boostX += (0 - boostX) * 0.08;
                 boostY += boostVy * dt;
 
-                // 高度3000m以下でランディングバーン
-                if (boostY <= 3000.0 && boostY > 67.5) {{
+                if (boostY <= 3000.0 && boostY > 67.5) {
                     boosterFlame.visible = true;
-                    boostVy += 22.0 * dt; // 減速
-                    boostPitch += (90.0 - boostPitch) * 0.1; // 垂直姿勢復帰
+                    boostVy += 22.0 * dt;
+                    boostPitch += (90.0 - boostPitch) * 0.1;
                     if (boosterRumble) boosterRumble.gain.setTargetAtTime(1.5, actx.currentTime, 0.1);
 
-                    // タワー進入時にアーム展開
-                    if (boostY <= 1500.0) {{
+                    if (boostY <= 1500.0) {
                         armPivotL.rotation.y = THREE.MathUtils.lerp(armPivotL.rotation.y, 0.02, 0.1);
                         armPivotR.rotation.y = THREE.MathUtils.lerp(armPivotR.rotation.y, -0.02, 0.1);
                         document.getElementById('hud-arm').innerText = "DEPLOYED (READY FOR CATCH)";
-                    }}
-                }}
+                    }
+                }
 
-                // 🎯 スイングアーム高さ（67.5m）でピンが引っかかり完全宙づり静止
-                if (boostY <= 67.5) {{
+                if (boostY <= 67.5) {
                     isCaught = true;
-                    boostY = 67.5; // アーム上面で物理固定
+                    boostY = 67.5;
                     boostVx = 0; boostVy = 0; boostPitch = 90.0;
                     boosterFlame.visible = false;
 
-                    // 💥 破裂音（バンッ！）＆轟音即時消音
-                    if (!catchPopDone) {{
+                    if (!catchPopDone) {
                         playCatchPopSound();
                         catchPopDone = true;
-                    }}
+                    }
                     if (boosterRumble) boosterRumble.gain.setTargetAtTime(0.0001, actx.currentTime, 0.05);
 
                     armPivotL.rotation.y = 0.08;
-                    armPivotR.rotation.y = -0.08; // 挟み込み
+                    armPivotR.rotation.y = -0.08;
                     document.getElementById('tv-stage-badge').innerText = "SUSPENDED CATCH SUCCESS";
                     document.getElementById('hud-arm').innerText = "LOCKED";
-                }}
+                }
 
                 booster.position.set(boostX * 0.1, boostY, 0);
                 booster.rotation.z = -(90.0 - boostPitch) * Math.PI / 180;
-            }}
-        }}
+            }
+        }
 
         // --- 一瞬パルスRCS制御 ---
-        if (rcsPulseTimer > 0) {{
+        if (rcsPulseTimer > 0) {
             rcsPulseTimer -= dt;
             if (rcsPulseDir === 1) rcsL.material.opacity = 0.85;
             document.getElementById('hud-rcs').innerText = "GN2 PULSE FIRING";
-        }} else {{
+        } else {
             rcsL.material.opacity = 0.0;
             rcsR.material.opacity = 0.0;
             document.getElementById('hud-rcs').innerText = "STANDBY";
-        }}
+        }
 
         // --- ミッション完了判定 ---
-        if (shipVx >= 7900.0 && isCaught && !isMissionEnded) {{
+        if (shipVx >= 7900.0 && isCaught && !isMissionEnded) {
             isMissionEnded = true;
             document.getElementById('complete-banner').style.display = 'block';
             document.getElementById('tv-stage-badge').innerText = "MISSION SUCCESS - ORBIT & CATCH COMPLETE";
             document.getElementById('webcast-title').innerText = "MISSION COMPLETED";
             if (subRumble) subRumble.gain.setTargetAtTime(0.0001, actx.currentTime, 0.5);
-        }}
+        }
 
         // --- テレメトリ更新 ---
         document.getElementById('tv-spd').innerText = Math.round(shipVx * 3.6).toLocaleString();
         document.getElementById('tv-alt').innerText = (shipY * 0.001).toFixed(1);
-        document.getElementById('pip-hud-alt').innerText = isCaught ? "CAUGHT ON CHOPSTICKS" : `BOOSTER: ${(Math.max(0, boostY) * 0.001).toFixed(2)} km`;
+        document.getElementById('pip-hud-alt').innerText = isCaught ? "CAUGHT ON CHOPSTICKS" : 'BOOSTER: ' + (Math.max(0, boostY) * 0.001).toFixed(2) + ' km';
 
         // --- カメラ制御 ---
-        // メインカメラ：第2段（Starship）をワイド追尾
         cameraMain.position.set((shipX * 0.1) - 65, (shipY * 0.1) + 15, 120);
         cameraMain.lookAt(shipX * 0.1, shipY * 0.1, 0);
 
-        // CAM 02 (PiP)：ブースター（Super Heavy）を完全ロックオン
-        if (isStaged) {{
+        if (isStaged) {
             cameraPip.position.set((boostX * 0.1) + 24, 75, 55);
             cameraPip.lookAt(boostX * 0.1, boostY + 10, 0);
             cameraPip.fov = isCaught ? 24.0 : Math.max(6.0, Math.min(22.0, boostY * 0.08));
             cameraPip.updateProjectionMatrix();
-        }} else {{
+        } else {
             cameraPip.position.set(220, 25, 200);
             cameraPip.lookAt(0, 40, 0);
-        }}
+        }
 
         rendererMain.render(scene, cameraMain);
         rendererPip.render(scene, cameraPip);
-    }}
+    }
 
     requestAnimationFrame(animate);
 
-    window.addEventListener('resize', () => {{
+    window.addEventListener('resize', () => {
         cameraMain.aspect = window.innerWidth / window.innerHeight;
         cameraMain.updateProjectionMatrix();
         rendererMain.setSize(window.innerWidth, window.innerHeight);
-    }});
+    });
     </script>
 </body>
 </html>
 """
 
-components.html(html_code, height=980)
+final_html = html_template.replace("__CFG_JSON__", cfg_json)
+
+components.html(final_html, height=980)
 
 st.markdown("---")
 st.markdown("### 📋 フライトテレメトリ詳細レポート")
