@@ -214,7 +214,7 @@ m3.metric("構造限界動圧 / 耐G", f"{s1_spec['max_q']:.1f} kPa", f"耐G: {s
 m4.metric("ブースター追加推力", f"+{strapon_spec['thrust_add']:.0f} kN", f"基数: {strapon_spec['count']} 基")
 
 # =========================================================================
-# 💥 物理シミュレーション (高度250km水平停止・横速7.9km/s投入＆即時降下RTLS)
+# 💥 物理シミュレーション (高度250km到達時自然軌道維持＆615mタワーキャッチ)
 # =========================================================================
 def run_simulation(preview_only=False):
     if preview_only:
@@ -241,6 +241,9 @@ def run_simulation(preview_only=False):
     wings_attached = bool(wing_spec["wing_id"] != "none")
     strapon_attached = bool(strapon_spec["count"] > 0)
 
+    # 🎯 タワーキャッチ目標高度（JS描画Y=67.5mに完全整合する物理高度：(67.5 - 6.0) / 0.1 = 615m）
+    TOWER_PHYSICAL_CATCH_Y = 615.0
+
     b_x, b_y = 0.0, 0.0
     b_vx, b_vy = 0.0, 0.0
     b_active = False
@@ -252,6 +255,7 @@ def run_simulation(preview_only=False):
     history = []
     fail_reason = None
     prev_pitch_val = 90.0
+    rcs_cooldown = 0.0  # 🎯 RCSパルス用クールダウンタイマー
 
     for cd_step in range(21):
         t_cd = -10.0 + cd_step * 0.5
@@ -269,7 +273,7 @@ def run_simulation(preview_only=False):
     supersonic_called = False
 
     TARGET_ALT_KM = 250.0
-    TARGET_ORBITAL_VX = 7900.0 # 約28,400km/h
+    TARGET_ORBITAL_VX = 7900.0  # 約28,400km/h
 
     for step in range(3500):
         t = float(step * dt)
@@ -281,7 +285,7 @@ def run_simulation(preview_only=False):
         rho = float(1.225 * np.exp(-alt / 7400.0)) if alt < 140000 else 0.0
         q = float(0.5 * rho * (v**2) / 1000.0)
 
-        # 🎯 高度250kmで真横（ピッチ0度）へ固定
+        # 🎯 目標高度での重力ターン制御
         if alt_km < turn_start_alt:
             target_pitch_deg = 90.0
         elif alt_km < TARGET_ALT_KM:
@@ -301,12 +305,16 @@ def run_simulation(preview_only=False):
         pitch_rad = float(np.radians(pitch_deg))
         visual_pitch = float(np.radians(90.0 - pitch_deg))
 
-        # 🎯 姿勢制御ピッチ変化率からRCSパルスフラグを計算（一瞬だけ噴射）
+        # 🎯 修正1: RCS間欠パルス化（クールダウンデッドバンド制御）
         pitch_rate = (pitch_deg - prev_pitch_val) / dt
         prev_pitch_val = pitch_deg
         rcs_cmd = 0.0
-        if abs(pitch_rate) > 0.04 and alt_km > 0.5:
-            rcs_cmd = -1.0 if pitch_rate > 0 else 1.0
+        if rcs_cooldown > 0:
+            rcs_cooldown -= dt
+        else:
+            if abs(pitch_rate) > 0.03 and alt_km > 0.8:
+                rcs_cmd = -1.0 if pitch_rate > 0 else 1.0
+                rcs_cooldown = 1.2  # 1.2秒のクールダウンでパルス化
 
         cur_event = "FLIGHT"
         if v >= 340.0 and not supersonic_called:
@@ -345,7 +353,6 @@ def run_simulation(preview_only=False):
                 if spacex_return_mode and not b_active:
                     b_active = True
                     b_x, b_y = x, y
-                    # 🎯 切り離し時点から即座に落下開始（上向き速度 vy を 0 にし、勝手な上昇を防止）
                     b_vx = vx * 0.20
                     b_vy = 0.0
                     b_pitch = visual_pitch
@@ -379,21 +386,15 @@ def run_simulation(preview_only=False):
                 isp = float(s2_spec["isp_vac"] - (s2_spec["isp_vac"] - s2_spec["isp_sl"]) * atm_factor)
                 thrust_base = float((s2_spec["thrust_vac"] - (s2_spec["thrust_vac"] - s2_spec["thrust_sl"]) * atm_factor) * 1000.0)
 
-                # 🎯 目標速度7,900m/sに達したら推力を完全にゼロ（SECO）にして加速を遮断
+                # 🎯 修正3: 第一宇宙速度に到達したら推力のみを遮断（SECO）。速度や高度は強制固定せず物理自然周回へ
                 speed_error = TARGET_ORBITAL_VX - vx
                 if speed_error <= 0.0:
                     thrust = 0.0
-                    vx = TARGET_ORBITAL_VX
                 elif speed_error < 400.0:
                     throttle = max(0.05, speed_error / 400.0)
                     thrust = thrust_base * throttle
                 else:
                     thrust = thrust_base
-
-                # 🎯 高度250km到達後は鉛直速度を0にし、水平軌道に固定
-                if alt_km >= TARGET_ALT_KM:
-                    vy = 0.0
-                    y = TARGET_ALT_KM * 1000.0
 
                 if thrust / (cur_mass * g0) > max_g_limit_cut:
                     thrust = max_g_limit_cut * cur_mass * g0
@@ -401,7 +402,7 @@ def run_simulation(preview_only=False):
                 mdot = thrust / (isp * g0)
                 fuel_s2_rem -= mdot * dt
 
-        # 🔄 SpaceXブースター帰還（切り離し直後から降下一貫＆スイングアーム67.5mで必ず宙づり停止）
+        # 🔄 SpaceXブースター帰還（修正4: 物理高度615mでスイングアーム高さ67.5mへ正確に着地捕捉）
         if b_active and not b_caught:
             b_alt = b_y
             b_rho = float(1.225 * np.exp(-b_alt / 7400.0)) if b_alt < 140000 else 0.0
@@ -413,11 +414,11 @@ def run_simulation(preview_only=False):
             b_thrust_force = 0.0
             b_thrust = False
 
-            est_time_to_ground = max(3.0, (b_alt - 67.5) / max(150.0, abs(b_vy) + 180.0))
+            est_time_to_ground = max(3.0, (b_alt - TOWER_PHYSICAL_CATCH_Y) / max(150.0, abs(b_vy) + 180.0))
             target_vx = -b_x / est_time_to_ground
 
             if b_alt > 35000 and b_fuel > s1_fuel * 1000 * 0.04:
-                b_pitch = -1.57 # 水平逆噴射
+                b_pitch = -1.57  # ブーストバック逆噴射
                 b_thrust_force = s1_spec["thrust_vac"] * 1000.0 * 0.95
                 b_thrust = True
                 b_fuel -= (b_thrust_force / (s1_spec["isp_vac"] * g0)) * dt
@@ -428,10 +429,10 @@ def run_simulation(preview_only=False):
                 b_thrust = True
                 b_fuel -= (b_thrust_force / (s1_spec["isp_vac"] * g0)) * dt
                 b_vy += (b_thrust_force / (s1_spec["dry_mass"] * 1000.0)) * dt * 0.9
-            elif b_alt <= 3000:
+            elif b_alt <= (TOWER_PHYSICAL_CATCH_Y + 3200.0):
                 b_pitch = np.clip((b_x / 120.0) * 0.10, -0.10, 0.10)
                 b_thrust = True
-                desired_vy = -max(4.0, (b_alt - 67.5) * 0.28)
+                desired_vy = -max(3.0, (b_alt - TOWER_PHYSICAL_CATCH_Y) * 0.26)
                 b_vy += (desired_vy - b_vy) * 0.65
                 b_vx = -b_x * 0.65
             else:
@@ -442,12 +443,12 @@ def run_simulation(preview_only=False):
             b_vy += b_ay * dt
 
             b_x = max(0.0, b_x + b_vx * dt)
-            b_y = max(67.5, b_y + b_vy * dt)
+            b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
 
-            # 🎯 スイングアーム高さ（67.5m）直近でピンが引っかかり完全宙づり静止
-            if b_y <= 68.5 and abs(b_x) < 35.0:
+            # 🎯 物理高度615m付近（JS側描画Y=67.5m）でピンが引っかかり完全宙づり静止
+            if b_y <= (TOWER_PHYSICAL_CATCH_Y + 12.0) and abs(b_x) < 35.0:
                 b_caught = True
-                b_y = 67.5
+                b_y = TOWER_PHYSICAL_CATCH_Y
                 b_x = 0.0
                 b_vx = 0.0
                 b_vy = 0.0
@@ -465,6 +466,7 @@ def run_simulation(preview_only=False):
         lift_x = -wing_lift_force * dir_y
         lift_y = wing_lift_force * dir_x
 
+        # 🎯 地球遠心力と重力の厳密演算
         g_cur = float(g0 * ((R_earth / (R_earth + alt)) ** 2))
         centrifugal_acc = (vx ** 2) / (R_earth + alt)
         grav_y = -cur_mass * (g_cur - centrifugal_acc)
@@ -498,8 +500,8 @@ def run_simulation(preview_only=False):
         x = float(x + vx * dt)
         y = float(max(0.0, y + vy * dt))
 
-        # 🎯 軌道投入完了判定：高度245km以上、横速度7,900m/s（約28,400km/h）到達
-        is_orbit_achieved = bool(alt_km >= 245.0 and vx >= 7890.0)
+        # 🎯 軌道投入完了判定：高度240km以上、横速度7,850m/s到達
+        is_orbit_achieved = bool(alt_km >= 240.0 and vx >= 7850.0)
         cur_event = "ORBIT" if is_orbit_achieved else cur_event
 
         history.append({
@@ -513,11 +515,11 @@ def run_simulation(preview_only=False):
 
         if is_orbit_achieved:
             if not spacex_return_mode or (spacex_return_mode and b_caught):
-                for orbit_step in range(12):
+                for orbit_step in range(20):
                     t_orb = t + (orbit_step + 1) * dt
                     x_orb = x + vx * (orbit_step + 1) * dt
                     history.append({
-                        "t": t_orb, "x": x_orb, "y": TARGET_ALT_KM * 1000.0, "alt": TARGET_ALT_KM, "v": TARGET_ORBITAL_VX, "q": 0.0, "g": 0.0,
+                        "t": t_orb, "x": x_orb, "y": y, "alt": alt_km, "v": v, "q": 0.0, "g": 0.0,
                         "stage": 2, "fairing": False, "wings": wings_attached,
                         "strapon": False, "exploded": False, "explosion_type": "NONE", "thrust": False,
                         "pitch": visual_pitch, "mach": mach, "event": "ORBIT", "rcs_cmd": 0.0,
@@ -827,7 +829,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🔊 音響合成システム（完全アクティベート＆実写音響）
+        // 🔊 音響合成システム
         // =========================================================================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let actx = null, subRumble = null, shockCrackle = null, gasHiss = null;
@@ -865,7 +867,6 @@ html_template = """
                 hSrc.connect(hp); hp.connect(gasHiss); gasHiss.connect(actx.destination);
                 hSrc.start(0);
 
-                // 🎯 ブースター帰還時ラプター逆噴射専用轟音
                 const bSrc = actx.createBufferSource(); bSrc.buffer = buf; bSrc.loop = true;
                 const bLp = actx.createBiquadFilter(); bLp.type = 'lowpass'; bLp.frequency.value = 52; bLp.Q.value = 4.5;
                 boosterRumble = actx.createGain(); boosterRumble.gain.value = 0.0001;
@@ -881,7 +882,7 @@ html_template = """
             window.addEventListener(evt, () => { ensureAudioActive(); });
         });
 
-        // 💥 【実写級切り離し音】重厚インパルス爆縮 ＋ パシュウウ高圧パージ
+        // 💥 【実写級切り離し音】低域インパルス爆縮 ＋ 鋭い金属ラッチ解除＋高圧パージ
         function playHeavySeparationSound() {
             ensureAudioActive();
             if (!actx) return;
@@ -890,34 +891,47 @@ html_template = """
             const osc = actx.createOscillator();
             const oscGain = actx.createGain();
             osc.type = 'triangle';
-            osc.frequency.setValueAtTime(140, now);
-            osc.frequency.exponentialRampToValueAtTime(18, now + 0.65);
-            oscGain.gain.setValueAtTime(2.6, now);
-            oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.70);
+            osc.frequency.setValueAtTime(160, now);
+            osc.frequency.exponentialRampToValueAtTime(16, now + 0.70);
+            oscGain.gain.setValueAtTime(3.2, now);
+            oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
             osc.connect(oscGain);
             oscGain.connect(actx.destination);
             osc.start(now);
-            osc.stop(now + 0.72);
+            osc.stop(now + 0.76);
 
-            const noiseBuf = actx.createBuffer(1, Math.floor(actx.sampleRate * 0.5), actx.sampleRate);
+            // 金属解除クランク音
+            const clankOsc = actx.createOscillator();
+            const clankGain = actx.createGain();
+            clankOsc.type = 'sawtooth';
+            clankOsc.frequency.setValueAtTime(820, now);
+            clankOsc.frequency.exponentialRampToValueAtTime(110, now + 0.08);
+            clankGain.gain.setValueAtTime(1.8, now);
+            clankGain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+            clankOsc.connect(clankGain);
+            clankGain.connect(actx.destination);
+            clankOsc.start(now);
+            clankOsc.stop(now + 0.1);
+
+            const noiseBuf = actx.createBuffer(1, Math.floor(actx.sampleRate * 0.7), actx.sampleRate);
             const nd = noiseBuf.getChannelData(0);
-            for(let i=0; i<nd.length; i++) nd[i] = (Math.random() * 2 - 1) * Math.exp(-i / (actx.sampleRate * 0.10));
+            for(let i=0; i<nd.length; i++) nd[i] = (Math.random() * 2 - 1) * Math.exp(-i / (actx.sampleRate * 0.12));
             const nSrc = actx.createBufferSource();
             nSrc.buffer = noiseBuf;
             const nFilter = actx.createBiquadFilter();
             nFilter.type = 'bandpass';
-            nFilter.frequency.setValueAtTime(450, now);
-            nFilter.Q.value = 2.0;
+            nFilter.frequency.setValueAtTime(520, now);
+            nFilter.Q.value = 2.5;
             const nGain = actx.createGain();
-            nGain.gain.setValueAtTime(2.0, now);
-            nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+            nGain.gain.setValueAtTime(2.6, now);
+            nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
             nSrc.connect(nFilter);
             nFilter.connect(nGain);
             nGain.connect(actx.destination);
             nSrc.start(now);
         }
 
-        // 💥 【動画0:49準拠：エンジン停止時の鋭い乾いた破裂音（バンッ！）】
+        // 💥 エンジン停止時の乾いた破裂音（バンッ！）
         function playFirecrackerSnapSound() {
             ensureAudioActive();
             if (!actx) return;
@@ -1029,13 +1043,12 @@ html_template = """
         landscapeGroup.add(oceanMesh);
 
         // =========================================================================
-        // 🏗️ 発射台 ＆ スイングアーム機構
+        // 🏗️ 発射台 ＆ スイングアーム機構 (高さ67.5m)
         // =========================================================================
         const pad = new THREE.Group();
         scene.add(pad);
 
         const isSaturnPad = (simCfg.s1_mat === 'saturn' || simCfg.s1_mat === 'al');
-
         const darkSteelMat = new THREE.MeshStandardMaterial({ color: 0x222a36, metalness: 0.85, roughness: 0.35 });
         const concreteMat = new THREE.MeshStandardMaterial({ color: 0x475161, roughness: 0.95 });
         const towerColorMat = isSaturnPad 
@@ -1107,9 +1120,6 @@ html_template = """
             });
         }
 
-        // =========================================================================
-        // 🔥 ノズルバーナーコーン生成
-        // =========================================================================
         function createFlameTexture() {
             const cvs = document.createElement('canvas'); cvs.width = 64; cvs.height = 256;
             const ctx = cvs.getContext('2d');
@@ -1200,13 +1210,12 @@ html_template = """
         }
 
         // =========================================================================
-        // 🚀 ロケット本体 ＆ 独立ブースターモデル構築（消滅バグ完全根絶）
+        // 🚀 ロケット本体 ＆ 独立ブースターモデル構築
         // =========================================================================
         const rocket = new THREE.Group();
         rocket.position.y = 6.0;
         scene.add(rocket);
 
-        // 🎯 ブースター専用グループ（最初からscene直下に配置してスケール崩れを完全防止）
         const s1Group = new THREE.Group();
         scene.add(s1Group);
 
@@ -1229,7 +1238,6 @@ html_template = """
             s1Group.add(ring);
         }
 
-        // 🎯 ブースター頭部リフティング突起ピン（左右4.4m幅でスイングアーム上面に合致）
         const catchPins = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 4.4, 16), darkSteelMat);
         catchPins.rotation.z = Math.PI / 2;
         catchPins.position.set(0, s1Len - 0.9, 0);
@@ -1263,6 +1271,7 @@ html_template = """
                 const wingShape = new THREE.Shape();
                 wingShape.moveTo(0, 0);
                 wingShape.lineTo(side * 4.8, -1.8);
+                wingShape.lineTo(side * 4.2, -6.5);
                 wingShape.lineTo(side * 4.2, -6.5);
                 wingShape.lineTo(0, -5.2);
                 const deltaMesh = new THREE.Mesh(new THREE.ShapeGeometry(wingShape), s1Mat);
@@ -1360,7 +1369,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🛰️ 【作用反作用厳密化】4象限パルスRCSスラスター
+        // 🛰️ 4象限パルスRCSスラスター
         // =========================================================================
         const rcsNozzles = [];
         const rcsDirs = [
@@ -1426,7 +1435,7 @@ html_template = """
         const cloudTex = createCloudTexture();
         const sparkTex = createSparkTexture();
 
-        const P_MAX = 500;
+        const P_MAX = 600;
         const pool = [];
         const pGroup = new THREE.Group(); scene.add(pGroup);
         for(let i=0; i<P_MAX; i++) {
@@ -1523,7 +1532,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🎥 CAM 02 地上固定光学トラッキング（動画準拠の完全再構築）
+        // 🎥 CAM 02 地上固定光学トラッキング
         // =========================================================================
         const groundTrackerStationPos = new THREE.Vector3(220.0, 18.0, 200.0);
         const towerCloseupPos = new THREE.Vector3(20.0, 70.0, 32.0);
@@ -1546,10 +1555,10 @@ html_template = """
                     document.getElementById('pip-tag').innerText = "CAM 02: MECHAZILLA (CHOPSTICKS SECURED)";
                     document.getElementById('pip-hud-alt').innerText = "SUSPENDED ON ARMS (ENGINES OFF)";
                 } else if (bYScaled <= 400.0) {
-                    if (bYScaled <= 30.0) {
-                        const blend = Math.max(0.0, Math.min(1.0, (30.0 - bYScaled) / 30.0));
-                        desiredCamPos = new THREE.Vector3().lerpVectors(groundTrackerStationPos, towerCloseupPos, blend * 0.9);
-                        targetFov = 18.0 + (bYScaled / 30.0) * 8.0;
+                    if (bYScaled <= 75.0) {
+                        const blend = Math.max(0.0, Math.min(1.0, (75.0 - bYScaled) / 50.0));
+                        desiredCamPos = new THREE.Vector3().lerpVectors(groundTrackerStationPos, towerCloseupPos, blend * 0.95);
+                        targetFov = 20.0 + (bYScaled / 75.0) * 8.0;
                     } else {
                         desiredCamPos = groundTrackerStationPos;
                         targetFov = Math.max(5.5, Math.min(22.0, (dist / 18.0)));
@@ -1640,7 +1649,6 @@ html_template = """
 
             const dRangeKm = (rx * 10.0) / 1000.0;
 
-            // 🎯 ロケット本体（第2段/オービター）の姿勢・座標更新
             rocket.position.set(rx, ry + 6.0, 0);
             rocket.rotation.z = -pitch;
             rocket.updateMatrixWorld(true);
@@ -1694,19 +1702,29 @@ html_template = """
                 }
             }
 
-            // 2. 🎯 第1段ブースター分離 ＆ リアルな独立キネマティクス（消滅ゼロ保証）
+            // 2. 🎯 修正2: ホットステージングの描写と音響（円環状ガスパージ噴射）
             const isSeparated = (p0.stage === 2 || p0.b_active);
             if (isSeparated && !stage1Detached && !simCfg.is_preview) {
                 stage1Detached = true;
                 playHeavySeparationSound();
-                camShake = 0.35;
+                camShake = 0.65;
                 s1NozzleTips.forEach(t => { t.plume.visible = false; });
                 s2NozzleTips.forEach(t => { t.plume.visible = true; });
+
+                // ホットステージング段間からの360度リング状ガスパージ
+                for(let i=0; i<36; i++) {
+                    const ang = (i / 36) * Math.PI * 2;
+                    emitParticle(
+                        rx + Math.cos(ang) * 1.6, ry + 6.0 + s1Len, Math.sin(ang) * 1.6,
+                        Math.cos(ang) * 16.0, -4.0, Math.sin(ang) * 16.0,
+                        2.5, 18.0, 50, 0.92, 0xf1f5f9
+                    );
+                }
             }
 
             // スイングアーム動的開閉（タワー進入時に展開）
             if (simCfg.spacex_return) {
-                if (stage1Detached && bY <= 2500) {
+                if (stage1Detached && bY <= 4000) {
                     armLeftPivot.rotation.y = THREE.MathUtils.lerp(armLeftPivot.rotation.y, 0.02, 0.08);
                     armRightPivot.rotation.y = THREE.MathUtils.lerp(armRightPivot.rotation.y, -0.02, 0.08);
                     document.getElementById('hud-arm').innerText = "DEPLOYED (READY FOR CATCH)";
@@ -1719,17 +1737,15 @@ html_template = """
                 }
             }
 
-            // 🎯 【座標スケール修正】ブースターの座標スケールを 0.1 倍に完全に統一
+            // 🎯 修正4: ブースターの座標スケールを 0.1 倍し、スイングアーム高さ 67.5 に厳密固定
             const bY_scaled = (bY * 0.1) + 6.0;
 
             if (stage1Detached) {
                 s1Group.visible = true;
-                // 突起ピンがアーム（Y=67.5m）に合致するよう物理固定
                 s1Group.position.set(bX * 0.1, bY_scaled, 0);
                 s1Group.rotation.set(0, 0, -bPitch);
                 s1Group.updateMatrixWorld(true);
 
-                // 🎯 ブースター帰還時エンジン音（ランディングバーン）制御
                 if (actx && boosterRumble) {
                     if (p0.b_thrust && !p0.b_caught && bY <= 3500) {
                         boosterRumble.gain.setTargetAtTime(1.6, actx.currentTime, 0.1);
@@ -1738,7 +1754,6 @@ html_template = """
                     }
                 }
 
-                // 🎯 アームキャッチ成功の瞬間（宙づり静止＆破裂音）
                 if (p0.b_caught) {
                     armLeftPivot.rotation.y = 0.06;
                     armRightPivot.rotation.y = -0.06;
@@ -1748,7 +1763,7 @@ html_template = """
                     if (!catchPopPlayed) {
                         playFirecrackerSnapSound();
                         catchPopPlayed = true;
-                        camShake = 0.40;
+                        camShake = 0.45;
                     }
                     s1NozzleTips.forEach(t => { t.plume.visible = false; });
                 } else if (p0.b_thrust) {
@@ -1768,7 +1783,6 @@ html_template = """
                     s1NozzleTips.forEach(t => { t.plume.visible = false; });
                 }
             } else {
-                // 切り離し前はロケット本体に完全同期
                 s1Group.visible = true;
                 s1Group.position.set(rx, ry + 6.0, 0);
                 s1Group.rotation.z = -pitch;
@@ -1834,7 +1848,7 @@ html_template = """
                 engineBounceLight.intensity = 0.0;
             }
 
-            // 5. 🎯 【完全修正】姿勢制御時のみ一瞬パルス噴射するRCSスラスター（出っぱなし完全防止）
+            // 5. 🎯 修正1: 一瞬だけパルス噴射するRCSスラスター
             let rcsActiveHUD = false;
             const isFiringRcs = Math.abs(rcsCommand) > 0.2;
             const boosterApproachTune = stage1Detached && p0.b_active && !p0.b_caught && (bY <= 3000);
@@ -1842,7 +1856,6 @@ html_template = """
             for(let rcs of rcsNozzles) {
                 let firePulse = false;
 
-                // 🎯 姿勢変化の瞬間だけ一瞬パルス噴射（反作用方向へ噴射）
                 if (!simCfg.is_preview && simT > -0.5 && !p0.exploded) {
                     if (rcs.isS1 && !stage1Detached && isFiringRcs) {
                         if (rcs.dir.id === "+Pitch" && rcsCommand > 0.2) firePulse = true;
@@ -1853,7 +1866,7 @@ html_template = """
                     }
                 }
 
-                if (rcs.isS1 && boosterApproachTune && (Math.random() < 0.20)) {
+                if (rcs.isS1 && boosterApproachTune && (Math.random() < 0.15)) {
                     firePulse = true;
                 }
 
@@ -2029,7 +2042,7 @@ html_template = """
             document.getElementById('tv-q').innerText   = q.toFixed(1);
             document.getElementById('tv-g').innerText   = accG.toFixed(1);
 
-            // 🏁 ミッション完了判定（高度250km・28,400km/h 軌道投入 ＆ ブースター宙づり回収）
+            // 🏁 ミッション完了判定（高度240km超・28,400km/h 軌道投入 ＆ ブースター宙づり回収）
             const isOrbitAchieved = (p0.event === "ORBIT");
             const isCatchComplete = p0.b_caught || (!simCfg.spacex_return);
 
@@ -2094,4 +2107,3 @@ if launch_clicked:
         st.error(f"⚠️ **ミッション異常終了 (RUD)**: {error_msg}")
     else:
         st.success("🎉 **ミッション完全成功 (Starship LEO Insertion & Super Heavy Mechazilla Catch)**: 第1段ブースターのタワーキャッチおよび第2段の軌道投入シーケンスが設計通り正常に推移しました。")
-
