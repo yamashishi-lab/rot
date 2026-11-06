@@ -827,7 +827,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🔊 音響合成システム（確実な起動＆実写音響）
+        // 🔊 音響合成システム（完全アクティベート＆実写音響）
         // =========================================================================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let actx = null, subRumble = null, shockCrackle = null, gasHiss = null;
@@ -1363,7 +1363,6 @@ html_template = """
         // 🛰️ 【作用反作用厳密化】4象限パルスRCSスラスター
         // =========================================================================
         const rcsNozzles = [];
-        // 🎯 機首を右（+Pitch）へ倒すには上部ノズルは「左側（-X方向）」へ噴射して反作用を得る
         const rcsDirs = [
             { id: "+Pitch", dx: -1, dy:  0, dz:  0, rotZ:  Math.PI / 2 },
             { id: "-Pitch", dx:  1, dy:  0, dz:  0, rotZ: -Math.PI / 2 },
@@ -1538,7 +1537,6 @@ html_template = """
             let targetFov = 10.0;
 
             if (isBoosterMode) {
-                // 🎯 縮尺を合わせた正しいブースター実体位置を完全追尾
                 targetPos.set(bX * 0.1, bYScaled, 0);
                 const dist = groundTrackerStationPos.distanceTo(targetPos);
 
@@ -1721,8 +1719,7 @@ html_template = """
                 }
             }
 
-            // 🎯 【致命的バグの完全修正】ブースターの座標スケールを 0.1 倍に完全に統一
-            // これによりブースターが透明・画面外に消滅していた現象を100%解決
+            // 🎯 【座標スケール修正】ブースターの座標スケールを 0.1 倍に完全に統一
             const bY_scaled = (bY * 0.1) + 6.0;
 
             if (stage1Detached) {
@@ -1871,7 +1868,6 @@ html_template = """
                         0.6, 3.2, 8, 0.85, 0xf0f9ff, true
                     );
                 } else {
-                    // 噴射が終われば即座に完全消滅
                     rcs.intensity *= 0.35;
                 }
 
