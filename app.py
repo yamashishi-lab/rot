@@ -631,8 +631,7 @@ html_template = """
             bottom: 86px; 
             left: 24px; 
             width: 320px; 
-            background: rgba(3, 7, 18, 0.88); 
-            backdrop-filter: blur(16px); 
+            background: rgba(3, 7, 18, 0.94); 
             border: 1px solid rgba(255, 255, 255, 0.16); 
             border-radius: 4px; 
             padding: 8px 12px; 
@@ -642,16 +641,17 @@ html_template = """
         }
         #orbit-canvas { width: 296px; height: 64px; background: #020617; border-radius: 2px; border: 1px solid rgba(255,255,255,0.08); display: block; margin-top: 4px; }
 
-        .top-banner { position: absolute; top: 0; left: 0; width: 100%; min-height: 42px; background: rgba(2, 6, 16, 0.94); backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: space-between; padding: 4px 18px; z-index: 20; flex-wrap: wrap; gap: 8px; }
+        .top-banner { position: absolute; top: 0; left: 0; width: 100%; min-height: 42px; background: rgba(2, 6, 16, 0.95); display: flex; align-items: center; justify-content: space-between; padding: 4px 18px; z-index: 20; flex-wrap: wrap; gap: 8px; }
         
-        .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; height: 76px; background: rgba(2, 6, 16, 0.92); backdrop-filter: blur(12px); padding: 8px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 20; pointer-events: none; }
+        /* 画面下部チカチカ・点滅防止：backdrop-filterを除去し確実なソリッド描画を適用 */
+        .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; height: 76px; background: #020610; border-top: 1px solid rgba(255,255,255,0.12); padding: 8px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 20; pointer-events: none; }
         .hud-telemetry > * { pointer-events: auto; }
         .telemetry-row { display: flex; gap: clamp(14px, 2.2vw, 28px); align-items: center; flex-wrap: nowrap; overflow-x: auto; }
         .telemetry-item { flex-shrink: 0; }
         .telemetry-label { font-size: 9px; color: #94a3b8; letter-spacing: 1px; }
         .telemetry-val { color: #fff; font-size: clamp(13px, 1.6vw, 17px); font-weight: 800; font-family: 'Consolas', monospace; }
 
-        .rud-banner { display: none; position: absolute; top: 150px; left: 50%; transform: translateX(-50%); background: rgba(120, 10, 10, 0.94); backdrop-filter: blur(16px); border: 2px solid #ef4444; border-radius: 4px; padding: 16px 28px; z-index: 70; text-align: center; box-shadow: 0 0 60px rgba(239, 68, 68, 0.7); }
+        .rud-banner { display: none; position: absolute; top: 150px; left: 50%; transform: translateX(-50%); background: rgba(120, 10, 10, 0.95); border: 2px solid #ef4444; border-radius: 4px; padding: 16px 28px; z-index: 70; text-align: center; box-shadow: 0 0 60px rgba(239, 68, 68, 0.7); }
     </style>
 </head>
 <body>
@@ -842,7 +842,6 @@ html_template = """
             if (!actx) return;
             const now = actx.currentTime;
 
-            // 1. 低周波インパルス（空気爆縮・ドォン音）
             const osc = actx.createOscillator();
             const oscGain = actx.createGain();
             osc.type = 'triangle';
@@ -855,7 +854,6 @@ html_template = """
             osc.start(now);
             osc.stop(now + 0.66);
 
-            // 2. パイロボルト点火ノイズ（破裂クラック音）
             const noiseBuf = actx.createBuffer(1, Math.floor(actx.sampleRate * 0.4), actx.sampleRate);
             const nd = noiseBuf.getChannelData(0);
             for(let i=0; i<nd.length; i++) nd[i] = (Math.random() * 2 - 1) * Math.exp(-i / (actx.sampleRate * 0.08));
@@ -873,7 +871,6 @@ html_template = """
             nGain.connect(actx.destination);
             nSrc.start(now);
 
-            // 3. メカニカルラッチ解放クリック（高域）
             const clickOsc = actx.createOscillator();
             const clickGain = actx.createGain();
             clickOsc.type = 'sine';
@@ -894,7 +891,7 @@ html_template = """
         scene.background = new THREE.Color(0x020813);
 
         const rendererMain = new THREE.WebGLRenderer({ 
-            canvas: canvasMain, antialias: true, powerPreference: "default"
+            canvas: canvasMain, antialias: true, powerPreference: "default", depth: true
         });
         rendererMain.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
         rendererMain.setSize(window.innerWidth, window.innerHeight);
@@ -902,15 +899,16 @@ html_template = """
         rendererMain.toneMappingExposure = 1.35;
 
         const rendererPip = new THREE.WebGLRenderer({ 
-            canvas: canvasPip, antialias: true, powerPreference: "default"
+            canvas: canvasPip, antialias: true, powerPreference: "default", depth: true
         });
         rendererPip.setPixelRatio(1.0);
         rendererPip.setSize(360, 205);
         rendererPip.toneMapping = THREE.ACESFilmicToneMapping;
         rendererPip.toneMappingExposure = 1.45;
 
-        const cameraMain = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 1.0, 500000);
-        const cameraPip = new THREE.PerspectiveCamera(10.0, 360 / 205, 1.0, 500000);
+        // ニアプレーンを0.5m、ファープレーンを広げてZ-バッファ解像度を大幅に改善（チラつき根本排除）
+        const cameraMain = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.5, 300000);
+        const cameraPip = new THREE.PerspectiveCamera(10.0, 360 / 205, 0.5, 300000);
 
         const sunLight = new THREE.DirectionalLight(0xfffaed, 5.8);
         sunLight.position.set(12000, 18000, 10000);
@@ -922,12 +920,12 @@ html_template = """
         const engineBounceLight = new THREE.PointLight(simCfg.flame_hex, 0.0, 800, 2.2);
         scene.add(engineBounceLight);
 
-        // CAM 02 専用追尾補助ライト（宇宙背景でもブースターの金属ボディを絶対に見失わない）
-        const pipTrackingSpot = new THREE.DirectionalLight(0xffffff, 2.8);
+        // CAM 02 専用追尾補助ライト
+        const pipTrackingSpot = new THREE.DirectionalLight(0xffffff, 3.2);
         scene.add(pipTrackingSpot);
 
         // スカイドーム
-        const skyDomeGeo = new THREE.SphereGeometry(450000, 24, 16);
+        const skyDomeGeo = new THREE.SphereGeometry(260000, 24, 16);
         const skyDomeMat = new THREE.MeshBasicMaterial({ color: 0x0a1c30, side: THREE.BackSide, depthWrite: false });
         const skyDome = new THREE.Mesh(skyDomeGeo, skyDomeMat);
         scene.add(skyDome);
@@ -935,7 +933,7 @@ html_template = """
         const starGeo = new THREE.BufferGeometry();
         const starPos = new Float32Array(2000 * 3);
         for(let i=0; i<2000*3; i+=3) {
-            const rad = 420000;
+            const rad = 250000;
             const u = Math.random(), v = Math.random();
             const th = u * 2.0 * Math.PI, ph = Math.acos(2.0 * v - 1.0);
             starPos[i] = rad * Math.sin(ph) * Math.cos(th);
@@ -946,24 +944,24 @@ html_template = """
         const starMat = new THREE.PointsMaterial({ size: 2.0, color: 0xffffff, transparent: true, opacity: 0.25 });
         scene.add(new THREE.Points(starGeo, starMat));
 
-        // 沿岸ランドスケープ
+        // 沿岸ランドスケープ（地面と海のY座標を明確に分離してZ-Fightingによる画面下部チカチカを根絶）
         const landscapeGroup = new THREE.Group();
         scene.add(landscapeGroup);
 
         const coastPlane = new THREE.Mesh(
-            new THREE.PlaneGeometry(120000, 120000),
+            new THREE.PlaneGeometry(80000, 80000),
             new THREE.MeshStandardMaterial({ color: 0x141f16, roughness: 0.95 })
         );
         coastPlane.rotation.x = -Math.PI / 2;
-        coastPlane.position.set(-2500, -2.0, 0);
+        coastPlane.position.set(-2500, -1.0, 0);
         landscapeGroup.add(coastPlane);
 
         const oceanMesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(160000, 160000), 
+            new THREE.PlaneGeometry(120000, 120000), 
             new THREE.MeshStandardMaterial({ color: 0x031d33, roughness: 0.1, metalness: 0.9 })
         );
         oceanMesh.rotation.x = -Math.PI / 2;
-        oceanMesh.position.set(22000, -3.2, 0);
+        oceanMesh.position.set(22000, -8.0, 0); // 海面を十分に下げて地面とのZ衝突を完全回避
         landscapeGroup.add(oceanMesh);
 
         // 発射台 Pad 39A ＆ Mechazilla キャッチタワー
@@ -974,7 +972,7 @@ html_template = """
         const goldFoilMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.95, roughness: 0.2 });
 
         const groundPlate = new THREE.Mesh(new THREE.CylinderGeometry(110, 125, 3.0, 32), concreteMat);
-        groundPlate.position.y = 0.0;
+        groundPlate.position.y = 0.5;
         pad.add(groundPlate);
 
         const olmRing = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 4.2, 2.2, 24), darkSteelMat);
@@ -1280,7 +1278,6 @@ html_template = """
         // 🛰️ 【方向修正時のみ一瞬噴射】4象限パルスRCSスラスター（作用・反作用厳密化）
         // =========================================================================
         const rcsNozzles = [];
-        // 機体を時計回りに回転させたい（+Pitch/機首を右へ倒す）場合、機体上部スラスターは「左側（-X）」へ噴射して右への反作用トルクを得る
         const rcsDirs = [
             { id: "+Pitch", dx: -1, dy:  0, dz:  0, rotZ:  Math.PI / 2 },
             { id: "-Pitch", dx:  1, dy:  0, dz:  0, rotZ: -Math.PI / 2 },
@@ -1317,7 +1314,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 💨 パーティクルプール（発射台巨大水蒸気雲・白煙・火花・RCS霧完全復活）
+        // 💨 パーティクルプール（チラつき防止・深度ソート適正化）
         // =========================================================================
         function createCloudTexture() {
             const c = document.createElement('canvas'); c.width = 128; c.height = 128;
@@ -1344,7 +1341,7 @@ html_template = """
         const cloudTex = createCloudTexture();
         const sparkTex = createSparkTexture();
 
-        const P_MAX = 1000;
+        const P_MAX = 700;
         const pool = [];
         const pGroup = new THREE.Group(); scene.add(pGroup);
         for(let i=0; i<P_MAX; i++) {
@@ -1356,14 +1353,14 @@ html_template = """
         function emitParticle(x, y, z, vx, vy, vz, s0, s1, life, opacity, hexColor, additive=false) {
             const p = pool[pIdx]; pIdx = (pIdx + 1) % P_MAX;
             p.active = true; p.sp.visible = true;
-            p.sp.position.set(x, y, z);
+            p.sp.position.set(x, Math.max(0.8, y), z);
             p.vx = vx; p.vy = vy; p.vz = vz;
             p.age = 0; p.maxAge = life; p.s0 = s0; p.s1 = s1; p.o = opacity;
             p.sp.material.color.setHex(hexColor);
             p.sp.material.blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
         }
 
-        const SPARK_MAX = 350;
+        const SPARK_MAX = 250;
         const sparkPool = [];
         const sparkGroup = new THREE.Group(); scene.add(sparkGroup);
         for(let i=0; i<SPARK_MAX; i++) {
@@ -1375,7 +1372,7 @@ html_template = """
         function emitNozzleSpark(x, y, z, vx, vy, vz, size, life, hexCol) {
             const s = sparkPool[sIdx]; sIdx = (sIdx + 1) % SPARK_MAX;
             s.active = true; s.sp.visible = true;
-            s.sp.position.set(x, y, z);
+            s.sp.position.set(x, Math.max(0.8, y), z);
             s.vx = vx; s.vy = vy; s.vz = vz;
             s.age = 0; s.maxAge = life; s.size = size;
             s.sp.scale.set(size, size * 1.8, 1);
@@ -1446,12 +1443,13 @@ html_template = """
         }
 
         // =========================================================================
-        // 🎥 【完全改修】CAM 02 地上固定光学トラッキング望遠鏡（発射台戻るまで完璧に追跡）
+        // 🎥 【完全改修】CAM 02 地上固定光学トラッキング望遠鏡（分離後ブースター完全追尾）
         // =========================================================================
-        // ボカチカ沿岸の地上局位置（発射台からX方向+240m, Z方向+280m, 地上高度12m）
-        const groundTrackerStationPos = new THREE.Vector3(240.0, 12.0, 280.0);
-        // タワー近接監視カメラ位置（タワーキャッチ時の劇的アングル用）
-        const towerCloseupPos = new THREE.Vector3(35.0, 42.0, 48.0);
+        // 地上光学追尾ステーション（発射台からX方向+260m, Z方向+240m, 地上高度14m）
+        const groundTrackerStationPos = new THREE.Vector3(260.0, 14.0, 240.0);
+        // タワー正面近接トラッカー（IFT-5タワーキャッチ捕捉アングル）
+        const towerCloseupPos = new THREE.Vector3(22.0, 42.0, 44.0);
+
         const boosterWorldPos = new THREE.Vector3();
         const currentPipCamPos = new THREE.Vector3().copy(groundTrackerStationPos);
         const currentPipLookTarget = new THREE.Vector3();
@@ -1461,42 +1459,44 @@ html_template = """
             let desiredCamPos = groundTrackerStationPos;
             let targetFov = 10.0;
 
-            if (simCfg.spacex_return && (bActive || stage1Detached)) {
-                // ブースター中心座標を取得
+            // SpaceX RTLSモードかつ切り離し発生以降は100%確実にブースター（s1Group）を完全追従
+            if (simCfg.spacex_return && (stage1Detached || bActive || stage === 2)) {
                 s1Group.updateMatrixWorld(true);
+                // ブースターの中央重心位置をワールド座標系で抽出
                 targetPos.set(0, s1Len * 0.5, 0);
                 s1Group.localToWorld(targetPos);
 
                 const dist = groundTrackerStationPos.distanceTo(targetPos);
 
                 if (bCaught) {
-                    // タワーキャッチ完了：タワー近接アングルへ滑らかに遷移して固定捕捉
+                    // タワーキャッチ完了時：Mechazilla正面近接アングルへ滑らかにスイッチして静止ロック
                     desiredCamPos = towerCloseupPos;
-                    targetFov = 24.0;
-                    document.getElementById('pip-tag').innerText = "CAM 02: MECHAZILLA TOWER CHOPSTICKS";
-                    document.getElementById('pip-hud-alt').innerText = "STATUS: BOOSTER CAPTURED";
+                    targetFov = 26.0;
+                    document.getElementById('pip-tag').innerText = "CAM 02: MECHAZILLA TOWER (CATCH CONFIRMED)";
+                    document.getElementById('pip-hud-alt').innerText = "SUPER HEAVY: SECURED";
                 } else if (bY <= 4500) {
-                    // 最終着陸燃焼〜タワー進入：地上局からの超高解像度ズーム、着地寸前は追尾安定化
-                    const towerProximity = Math.max(0.0, Math.min(1.0, (4500.0 - bY) / 4500.0));
-                    // 最終高度500m以下ではタワー近接カメラと地上局カメラのハイブリッドブレンド
-                    if (bY <= 500) {
-                        desiredCamPos = new THREE.Vector3().lerpVectors(groundTrackerStationPos, towerCloseupPos, (500.0 - bY) / 500.0 * 0.7);
-                        targetFov = 14.0 + (bY / 500.0) * 8.0;
+                    // 最終着陸燃焼〜タワー進入フェーズ（地上追尾局がブースターの下降とタワー位置を完璧に捉える）
+                    if (bY <= 400) {
+                        const blend = Math.max(0.0, Math.min(1.0, (400.0 - bY) / 400.0));
+                        desiredCamPos = new THREE.Vector3().lerpVectors(groundTrackerStationPos, towerCloseupPos, blend * 0.85);
+                        targetFov = 16.0 + (bY / 400.0) * 10.0;
                     } else {
                         desiredCamPos = groundTrackerStationPos;
-                        targetFov = Math.max(4.5, Math.min(22.0, (dist / 18.0)));
+                        targetFov = Math.max(5.0, Math.min(24.0, (dist / 16.0)));
                     }
-                    document.getElementById('pip-tag').innerText = "CAM 02: RTLS TERMINAL GUIDANCE (LANDING)";
+                    document.getElementById('pip-tag').innerText = "CAM 02: GROUND OPTICAL (LANDING BURN)";
                     document.getElementById('pip-hud-alt').innerText = `BOOSTER ALT: ${(bY / 1000.0).toFixed(2)} km`;
                 } else {
-                    // 上空でのブーストバック〜大気圏再突入（RTLSアプローチ）
+                    // 上空でのブーストバック反転〜大気圏降下中：超望遠オプティカルトラッカーで捕捉
                     desiredCamPos = groundTrackerStationPos;
-                    targetFov = Math.max(1.5, Math.min(8.5, (dist / 140.0)));
-                    document.getElementById('pip-tag').innerText = "CAM 02: GROUND KINETO TRACKER (RTLS INBOUND)";
+                    targetFov = Math.max(1.8, Math.min(9.0, (dist / 130.0)));
+                    document.getElementById('pip-tag').innerText = "CAM 02: KINETO TRACKER (SUPER HEAVY RTLS)";
                     document.getElementById('pip-hud-alt').innerText = `BOOSTER ALT: ${(bY / 1000.0).toFixed(1)} km`;
                 }
             } else {
+                // 切り離し前：発射台上のロケット全体を地上望遠鏡で追跡
                 targetPos.copy(mainRocketPos);
+                targetPos.y += s1Len * 0.5;
                 desiredCamPos = groundTrackerStationPos;
                 const dist = groundTrackerStationPos.distanceTo(mainRocketPos);
                 targetFov = Math.max(4.0, Math.min(26.0, (dist / 18.0)));
@@ -1504,13 +1504,13 @@ html_template = """
                 document.getElementById('pip-hud-alt').innerText = `ALT: ${(mainRocketPos.y * 0.01).toFixed(1)} km`;
             }
 
-            // カメラ位置＆注視点をスムーズに補間追従
-            currentPipCamPos.lerp(desiredCamPos, 0.08);
-            currentPipLookTarget.lerp(targetPos, 0.15);
+            // カメラ位置および注視点を滑らかにLerp補間（カクつき・ロストを完全防止）
+            currentPipCamPos.lerp(desiredCamPos, 0.1);
+            currentPipLookTarget.lerp(targetPos, 0.2);
 
             cameraPip.position.copy(currentPipCamPos);
             cameraPip.lookAt(currentPipLookTarget);
-            cameraPip.fov = cameraPip.fov + (targetFov - cameraPip.fov) * 0.08;
+            cameraPip.fov = cameraPip.fov + (targetFov - cameraPip.fov) * 0.1;
             cameraPip.updateProjectionMatrix();
 
             // CAM 02 専用追尾スポットライトを対象物へ照射
@@ -1587,7 +1587,6 @@ html_template = """
             rocket.updateMatrixWorld(true);
 
             starMat.opacity = Math.min(0.95, Math.max(0.02, (alt - 15.0) / 60.0));
-            // メインカメラ用の空色（高度上昇に伴い漆黒へ）
             skyDomeMat.color.setHex((alt > 65.0) ? 0x020815 : 0x0a1c30);
 
             const ux = Math.sin(pitch), uy = Math.cos(pitch);
@@ -1603,7 +1602,6 @@ html_template = """
                     b.detached = true;
                     b.tips.forEach(t => { t.plume.visible = false; });
 
-                    // ワールド座標系に正確にバインド
                     const worldPos = new THREE.Vector3();
                     const worldQuat = new THREE.Quaternion();
                     b.mesh.getWorldPosition(worldPos);
@@ -1617,11 +1615,9 @@ html_template = """
                     const outZ = Math.sin(b.angle);
                     const sepP = simCfg.sep_thrust;
 
-                    // コロリョフ・クロス/SpaceX LRB準拠：外側へ押し出されつつ進行方向慣性＋わずかな後方減速
                     b.vx = ux * (vel * 0.088) + perpX * outX * (4.2 * sepP);
                     b.vy = uy * (vel * 0.088) + perpY * outX * (4.2 * sepP) - (1.5 * sepP);
                     b.vz = outZ * (4.2 * sepP);
-                    // ノーズが外側へ倒れ込む回転モーメント
                     b.rx = outZ * (0.85 * sepP);
                     b.rz = -outX * (0.85 * sepP);
                 }
@@ -1631,7 +1627,6 @@ html_template = """
                     b.mesh.position.x += b.vx * 0.016;
                     b.mesh.position.y += b.vy * 0.016;
                     b.mesh.position.z += b.vz * 0.016;
-                    // 重力および空気抵抗による自然な弾道落下
                     b.vy -= 9.80665 * 0.016 * 0.85;
                     b.vx *= 0.998;
                     b.vz *= 0.998;
@@ -1640,7 +1635,7 @@ html_template = """
                 }
             }
 
-            // 2. 第1段分離 ＆ SpaceX型RTLSタワーキャッチ
+            // 2. 第1段ホットステージング分離 ＆ SpaceX型RTLSタワーキャッチ
             if (p0.stage === 2 && !stage1Detached && !simCfg.is_preview) {
                 stage1Detached = true;
                 playHeavySeparationSound();
@@ -1672,7 +1667,6 @@ html_template = """
                     s1NozzleTips.forEach(t => {
                         t.plume.visible = isLandingBurn ? t.isCenter : true;
                     });
-                    // 着陸逆噴射時の煙
                     if (bY <= 1500 && Math.random() < 0.6) {
                         s1Group.localToWorld(tempTipPos.set(0, 0, 0));
                         emitParticle(
@@ -1728,7 +1722,6 @@ html_template = """
                         );
                     }
 
-                    // 低高度飛行中の大気中航跡白煙
                     if (ry < 35.0 && Math.random() < 0.25) {
                         emitParticle(
                             tempTipPos.x + (Math.random()-0.5)*3.0, tempTipPos.y - 2.0, tempTipPos.z + (Math.random()-0.5)*3.0,
@@ -1746,7 +1739,7 @@ html_template = """
                 engineBounceLight.intensity = 0.0;
             }
 
-            // 5. 【方向修正時のみ一瞬噴射】4象限パルスRCS（作用・反作用の物理法則に合致）
+            // 5. 【方向修正時のみ一瞬噴射】4象限パルスRCS
             let rcsActiveHUD = false;
             const rcsDelta = Math.abs(rcsCommand - prevRcsCmdVal);
             prevRcsCmdVal = rcsCommand;
@@ -1793,21 +1786,19 @@ html_template = """
             document.getElementById('hud-rcs').innerText = rcsActiveHUD ? "GN2 PULSE FIRING" : "STANDBY (DEADBAND OK)";
             document.getElementById('hud-rcs').style.color = rcsActiveHUD ? "#34d399" : "#38bdf8";
 
-            // 6. 【完全復活】発射台消音注水デリュージ・巨大水蒸気雲・白煙
+            // 6. 発射台消音注水デリュージ・水蒸気雲・白煙
             if (simT < 0.0) {
                 const sec = Math.ceil(Math.abs(simT));
                 document.getElementById('tv-timer').innerText = simCfg.is_preview ? "PAD INSPECTION" : `T- 00:0${sec}.0`;
 
-                // タンクベントガス
                 emitParticle(rx + 1.25, ry + 6.0 + s1Len * 0.85, 0, 0.25, 0.05, 0, 0.9, 4.2, 45, 0.4, 0xffffff);
 
-                // T-5秒〜: 水冷デリュージ開始（猛烈な水蒸気粒子噴射）
                 if (simT >= -5.0 && !p0.exploded && !simCfg.is_preview) {
                     document.getElementById('hud-deluge').innerText = "WATER DELUGE ACTIVE";
                     document.getElementById('hud-deluge').style.color = "#34d399";
                     if (gasHiss && actx) gasHiss.gain.setTargetAtTime(0.55, actx.currentTime, 0.2);
 
-                    for(let i=0; i<8; i++) {
+                    for(let i=0; i<6; i++) {
                         const side = (Math.random() - 0.5) * 16.0;
                         emitParticle(
                             rx + side, 1.2, (Math.random() - 0.5) * 16.0,
@@ -1817,7 +1808,6 @@ html_template = """
                     }
                 }
 
-                // エンジン先行点火スパーク
                 if (simT >= -simCfg.ignition_lead && !p0.exploded && !simCfg.is_preview) {
                     for(let tObj of s1NozzleTips) {
                         tObj.node.getWorldPosition(tempTipPos);
@@ -1829,10 +1819,9 @@ html_template = """
                     }
                 }
 
-                // T-3秒〜離床: 発射台全体を覆い尽くす巨大水蒸気爆発
                 if (simT >= -3.0 && !p0.exploded && !simCfg.is_preview) {
-                    camShake = 0.35;
-                    for(let i=0; i<12; i++) {
+                    camShake = 0.25;
+                    for(let i=0; i<8; i++) {
                         const ang = Math.random() * Math.PI * 2;
                         const dist = 3.0 + Math.random() * 8.0;
                         emitParticle(
@@ -1853,10 +1842,9 @@ html_template = """
                     if (gasHiss) gasHiss.gain.setTargetAtTime(0.18 * atm, actx.currentTime, 1.0);
                 }
 
-                // リフトオフ直後の地面直撃水蒸気プルーム
                 if (simT < 6.0) {
-                    camShake = 0.45;
-                    for(let i=0; i<10; i++) {
+                    camShake = 0.35;
+                    for(let i=0; i<6; i++) {
                         const ang = Math.random() * Math.PI * 2;
                         const dist = 4.0 + Math.random() * 10.0;
                         emitParticle(
@@ -1965,7 +1953,7 @@ html_template = """
             // メインカメラレンダリング
             rendererMain.render(scene, cameraMain);
 
-            // CAM 02 地上固定光学トラッカー描画（完全独立環境下でブースター帰還まで完全追跡）
+            // CAM 02 地上固定光学トラッカー描画（切り離し後ブースター完全追尾）
             if (pipVisible) {
                 renderGroundOpticalTracker(p0.b_active, bX, bY, p0.b_caught, p0.stage, rocket.position);
             }
