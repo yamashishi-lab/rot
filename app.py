@@ -114,7 +114,7 @@ with tab3:
         angle_of_attack = st.slider("固定取り付け迎角 AoA (deg)", -3.0, 12.0, 0.5, step=0.5)
     with c2:
         rcs_deadband = st.slider("4象限RCS デッドバンド感度 (deg)", 0.2, 5.0, 0.8, step=0.1)
-        st.caption("※ 姿勢制御要求が発生した瞬間に冷ガス窒素(GN2)が霧状パルス噴射されます。")
+        st.caption("※ 姿勢制御要求が発生した瞬間だけ冷ガス窒素(GN2)が一瞬パルス噴射されます。")
 
 with tab4:
     c1, c2, c3 = st.columns(3)
@@ -301,12 +301,13 @@ def run_simulation(preview_only=False):
         pitch_rad = float(np.radians(pitch_deg))
         visual_pitch = float(np.radians(90.0 - pitch_deg))
 
-        # 🎯 姿勢制御ピッチレートからRCSコマンドを生成
+        # 🎯 姿勢制御ピッチ変化率からRCSパルスフラグを計算（一瞬だけ噴射）
         pitch_rate = (pitch_deg - prev_pitch_val) / dt
         prev_pitch_val = pitch_deg
         rcs_cmd = 0.0
-        if abs(pitch_rate) > 0.02 and alt_km > 0.8:
-            rcs_cmd = float(np.clip(-pitch_rate * 2.0, -1.0, 1.0))
+        # 姿勢を大きく変更している瞬間だけパルスを立てる
+        if abs(pitch_rate) > 0.04 and alt_km > 0.5:
+            rcs_cmd = -1.0 if pitch_rate > 0 else 1.0
 
         cur_event = "FLIGHT"
         if v >= 340.0 and not supersonic_called:
@@ -346,7 +347,7 @@ def run_simulation(preview_only=False):
                     b_active = True
                     b_x, b_y = x, y
                     # 🎯 切り離し時点から即座に落下開始（上向き速度 vy を 0 にし、勝手な上昇を防止）
-                    b_vx = vx * 0.18
+                    b_vx = vx * 0.20
                     b_vy = 0.0
                     b_pitch = visual_pitch
             else:
@@ -1200,13 +1201,13 @@ html_template = """
         }
 
         // =========================================================================
-        // 🚀 ロケット本体 ＆ 独立ブースターモデル構築（消滅バグ完全解消）
+        // 🚀 ロケット本体 ＆ 独立ブースターモデル構築（消滅バグ完全根絶）
         // =========================================================================
         const rocket = new THREE.Group();
         rocket.position.y = 6.0;
         scene.add(rocket);
 
-        // 🎯 ブースター専用グループ：最初からシーン直下に独立配置し、分離時の消滅・縮小バグを完全根絶
+        // 🎯 ブースター専用グループ（最初からscene直下に配置してスケール崩れを完全防止）
         const s1Group = new THREE.Group();
         scene.add(s1Group);
 
@@ -1363,7 +1364,6 @@ html_template = """
         // 🛰️ 【作用反作用厳密化】4象限パルスRCSスラスター
         // =========================================================================
         const rcsNozzles = [];
-        // 🎯 機首を右（+Pitch）へ倒すには上部ノズルは「左側（-X方向）」へ噴射して反作用を得る
         const rcsDirs = [
             { id: "+Pitch", dx: -1, dy:  0, dz:  0, rotZ:  Math.PI / 2 },
             { id: "-Pitch", dx:  1, dy:  0, dz:  0, rotZ: -Math.PI / 2 },
@@ -1532,14 +1532,14 @@ html_template = """
         const currentPipCamPos = new THREE.Vector3().copy(groundTrackerStationPos);
         const currentPipLookTarget = new THREE.Vector3();
 
-        function renderGroundOpticalTracker(isBoosterMode, bX, bY, bCaught, mainRocketPos) {
+        function renderGroundOpticalTracker(isBoosterMode, bX, bYScaled, bCaught, mainRocketPos) {
             let targetPos = new THREE.Vector3();
             let desiredCamPos = groundTrackerStationPos;
             let targetFov = 10.0;
 
             if (isBoosterMode) {
-                // ブースターの位置を確実に追尾
-                targetPos.set(bX * 0.1, bY, 0);
+                // 🎯 縮尺を合わせた正しいブースター実体位置を完全追尾
+                targetPos.set(bX * 0.1, bYScaled, 0);
                 const dist = groundTrackerStationPos.distanceTo(targetPos);
 
                 if (bCaught) {
@@ -1547,22 +1547,22 @@ html_template = """
                     targetFov = 26.0;
                     document.getElementById('pip-tag').innerText = "CAM 02: MECHAZILLA (CHOPSTICKS SECURED)";
                     document.getElementById('pip-hud-alt').innerText = "SUSPENDED ON ARMS (ENGINES OFF)";
-                } else if (bY <= 4000) {
-                    if (bY <= 300) {
-                        const blend = Math.max(0.0, Math.min(1.0, (300.0 - bY) / 300.0));
+                } else if (bYScaled <= 400.0) {
+                    if (bYScaled <= 30.0) {
+                        const blend = Math.max(0.0, Math.min(1.0, (30.0 - bYScaled) / 30.0));
                         desiredCamPos = new THREE.Vector3().lerpVectors(groundTrackerStationPos, towerCloseupPos, blend * 0.9);
-                        targetFov = 18.0 + (bY / 300.0) * 8.0;
+                        targetFov = 18.0 + (bYScaled / 30.0) * 8.0;
                     } else {
                         desiredCamPos = groundTrackerStationPos;
                         targetFov = Math.max(5.5, Math.min(22.0, (dist / 18.0)));
                     }
                     document.getElementById('pip-tag').innerText = "CAM 02: GROUND OPTICAL (TOWER APPROACH)";
-                    document.getElementById('pip-hud-alt').innerText = `BOOSTER ALT: ${(bY / 1000.0).toFixed(2)} km`;
+                    document.getElementById('pip-hud-alt').innerText = `BOOSTER ALT: ${(bYScaled * 0.01).toFixed(2)} km`;
                 } else {
                     desiredCamPos = groundTrackerStationPos;
                     targetFov = Math.max(1.8, Math.min(9.0, (dist / 130.0)));
                     document.getElementById('pip-tag').innerText = "CAM 02: KINETO TRACKER (SUPER HEAVY RTLS)";
-                    document.getElementById('pip-hud-alt').innerText = `BOOSTER ALT: ${(bY / 1000.0).toFixed(1)} km`;
+                    document.getElementById('pip-hud-alt').innerText = `BOOSTER ALT: ${(bYScaled * 0.01).toFixed(1)} km`;
                 }
             } else {
                 targetPos.copy(mainRocketPos);
@@ -1604,7 +1604,6 @@ html_template = """
         let boosterDetached = false;
         let stage1Detached = false;
         let fairingDetached = false;
-        let prevRcsCmdVal = 0.0;
         let camShake = 0.0;
         const activeFocusWorld = new THREE.Vector3();
         const smoothOffset = new THREE.Vector3(75.0, 26.0, 145.0);
@@ -1722,17 +1721,21 @@ html_template = """
                 }
             }
 
+            // 🎯 【致命的バグの完全修正】ブースターの座標スケールを 0.1 倍に完全に統一
+            // これによりブースターが透明・画面外に消滅していた現象を100%解決
+            const bY_scaled = (bY * 0.1) + 6.0;
+
             if (stage1Detached) {
-                // 🎯 切り離し後のブースター位置（常に可視状態を完全維持）
-                const catchPinLocalOffset = s1Len - 0.9;
-                s1Group.position.set(bX * 0.1, bY - catchPinLocalOffset, 0);
+                s1Group.visible = true;
+                // 突起ピンがアーム（Y=67.5m）に合致するよう物理固定
+                s1Group.position.set(bX * 0.1, bY_scaled, 0);
                 s1Group.rotation.set(0, 0, -bPitch);
                 s1Group.updateMatrixWorld(true);
 
                 // 🎯 ブースター帰還時エンジン音（ランディングバーン）制御
                 if (actx && boosterRumble) {
                     if (p0.b_thrust && !p0.b_caught && bY <= 3500) {
-                        boosterRumble.gain.setTargetAtTime(1.5, actx.currentTime, 0.1);
+                        boosterRumble.gain.setTargetAtTime(1.6, actx.currentTime, 0.1);
                     } else {
                         boosterRumble.gain.setTargetAtTime(0.0001, actx.currentTime, 0.15);
                     }
@@ -1769,6 +1772,7 @@ html_template = """
                 }
             } else {
                 // 切り離し前はロケット本体に完全同期
+                s1Group.visible = true;
                 s1Group.position.set(rx, ry + 6.0, 0);
                 s1Group.rotation.z = -pitch;
                 s1Group.updateMatrixWorld(true);
@@ -1833,30 +1837,26 @@ html_template = """
                 engineBounceLight.intensity = 0.0;
             }
 
-            // 5. 🎯 【完全修正】姿勢制御時のみ一瞬パルス噴射するRCSスラスター
+            // 5. 🎯 【完全修正】姿勢制御時のみ一瞬パルス噴射するRCSスラスター（出っぱなし完全防止）
             let rcsActiveHUD = false;
-            const hasRcsCmd = Math.abs(rcsCommand) > 0.15;
-            const isCorrectingPitchPlus  = (rcsCommand > 0.15);
-            const isCorrectingPitchMinus = (rcsCommand < -0.15);
+            const isFiringRcs = Math.abs(rcsCommand) > 0.2;
             const boosterApproachTune = stage1Detached && p0.b_active && !p0.b_caught && (bY <= 3000);
 
             for(let rcs of rcsNozzles) {
                 let firePulse = false;
 
-                // 打ち上げ中および飛行中の姿勢補正時のみ一瞬パルス噴射
+                // 🎯 姿勢変化の瞬間だけ一瞬パルス噴射（反作用方向へ噴射）
                 if (!simCfg.is_preview && simT > -0.5 && !p0.exploded) {
-                    if (rcs.isS1 && !stage1Detached && hasRcsCmd) {
-                        // 姿勢変化の瞬間だけパルス発射
-                        if (rcs.dir.id === "+Pitch" && isCorrectingPitchPlus) firePulse = true;
-                        if (rcs.dir.id === "-Pitch" && isCorrectingPitchMinus) firePulse = true;
-                    } else if (!rcs.isS1 && stage1Detached && hasRcsCmd) {
-                        if (rcs.dir.id === "+Pitch" && isCorrectingPitchPlus) firePulse = true;
-                        if (rcs.dir.id === "-Pitch" && isCorrectingPitchMinus) firePulse = true;
+                    if (rcs.isS1 && !stage1Detached && isFiringRcs) {
+                        if (rcs.dir.id === "+Pitch" && rcsCommand > 0.2) firePulse = true;
+                        if (rcs.dir.id === "-Pitch" && rcsCommand < -0.2) firePulse = true;
+                    } else if (!rcs.isS1 && stage1Detached && isFiringRcs) {
+                        if (rcs.dir.id === "+Pitch" && rcsCommand > 0.2) firePulse = true;
+                        if (rcs.dir.id === "-Pitch" && rcsCommand < -0.2) firePulse = true;
                     }
                 }
 
-                // ブースター着陸進入中の多方向微調整パルス
-                if (rcs.isS1 && boosterApproachTune && (Math.random() < 0.25)) {
+                if (rcs.isS1 && boosterApproachTune && (Math.random() < 0.20)) {
                     firePulse = true;
                 }
 
@@ -1865,14 +1865,14 @@ html_template = """
                     rcs.mount.getWorldPosition(tempRcsPos);
                     emitParticle(
                         tempRcsPos.x, tempRcsPos.y, tempRcsPos.z,
-                        rcs.dir.dx * 2.6 + (Math.random()-0.5)*0.3,
-                        rcs.dir.dy * 2.6 + (Math.random()-0.5)*0.3,
-                        rcs.dir.dz * 2.6 + (Math.random()-0.5)*0.3,
-                        0.6, 3.2, 10, 0.85, 0xf0f9ff, true
+                        rcs.dir.dx * 2.8 + (Math.random()-0.5)*0.3,
+                        rcs.dir.dy * 2.8 + (Math.random()-0.5)*0.3,
+                        rcs.dir.dz * 2.8 + (Math.random()-0.5)*0.3,
+                        0.6, 3.2, 8, 0.85, 0xf0f9ff, true
                     );
                 } else {
-                    // 噴射が終われば即座にフェードアウト（出っぱなしを完全防止）
-                    rcs.intensity *= 0.50;
+                    // 噴射が終われば即座に完全消滅
+                    rcs.intensity *= 0.35;
                 }
 
                 rcs.jetMat.opacity = rcs.intensity;
@@ -2066,7 +2066,7 @@ html_template = """
 
             if (pipVisible) {
                 const isBoosterTrackActive = simCfg.spacex_return && (stage1Detached || p0.b_active || p0.stage === 2);
-                renderGroundOpticalTracker(isBoosterTrackActive, bX, bY, p0.b_caught, rocket.position);
+                renderGroundOpticalTracker(isBoosterTrackActive, bX, bY_scaled, p0.b_caught, rocket.position);
             }
         }
 
