@@ -554,7 +554,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 描画テンプレート (CAM 02 横幅フル・縦大きめ・バーバー非干渉・本体スラスターバグ修正)
+# 📺 HTML / JS 描画テンプレート (CAM 02 フル幅・折たたみ完全連動・黒画面バグ修正)
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -566,10 +566,10 @@ html_template = """
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #01040a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; }
         #canvas-main { width: 100%; height: 100%; display: block; position: absolute; top:0; left:0; z-index: 1; }
         
-        /* 🎯 ご要望のサイズ：横幅メインウィンドウいっぱい(100vwから左右マージン引いた幅)、高さ修正前の大サイズ、上部テキスト非干渉(top: 76px) */
+        /* 🎯 ご要望のサイズ：横幅メインウィンドウいっぱい(左右各18pxマージン)、上部テキストに被らない限界の高さ(top: 50px)、高さ295px */
         .pip-container { 
             position: absolute; 
-            top: 76px; 
+            top: 50px; 
             left: 18px; 
             right: 18px; 
             width: calc(100vw - 36px); 
@@ -581,6 +581,7 @@ html_template = """
             background: #071526; 
             overflow: hidden; 
             cursor: pointer; 
+            transition: height 0.25s ease;
         }
         #canvas-pip { width: 100%; height: 100%; display: block; }
         .pip-tag { position: absolute; top: 6px; left: 12px; font-size: 10px; font-weight: 800; color: #fff; background: rgba(15, 23, 42, 0.94); padding: 3px 8px; border-radius: 2px; letter-spacing: 1px; font-family: monospace; z-index: 65; pointer-events: none; border-left: 2px solid #38bdf8; }
@@ -678,11 +679,10 @@ html_template = """
         let isMissionEnded = false, catchPopPlayed = false, pipVisible = true;
         let landingSonicBoomPlayed = false;
         const pipBox = document.getElementById('pip-box');
-        
-        // 🎯 カンバスの解像度を動的コンテナ幅に連動
+
         function resizePipRenderer() {
-            if (pipBox) {
-                const w = pipBox.clientWidth || 800;
+            if (pipBox && pipVisible) {
+                const w = pipBox.clientWidth || window.innerWidth - 36;
                 const h = pipBox.clientHeight || 295;
                 rendererPip.setSize(w, h);
                 cameraPip.aspect = w / h;
@@ -1508,7 +1508,7 @@ html_template = """
                 engineBounceLight.intensity = 0.0;
             }
 
-            // RCS スラスター噴射制御（コマンド要求時のみ）
+            // RCS スラスター噴射制御
             let rcsActiveHUD = false;
             const cmdFired = (Math.abs(rcsCmd) > 0.2 && Math.abs(prevRcsCmd) <= 0.2);
             prevRcsCmd = rcsCmd;
@@ -1730,20 +1730,19 @@ html_template = """
                 rudBanner.style.display = 'block';
                 rudDesc.innerText = failMessage || "機体過負荷による空中分解";
             }
+        }
 
+        requestAnimationFrame(animate);
+
+        window.addEventListener('resize', () => {
+            cameraMain.aspect = window.innerWidth / window.innerHeight;
+            cameraMain.updateProjectionMatrix();
+            rendererMain.setSize(window.innerWidth, window.innerHeight);
+            resizePipRenderer();
+        });
     } catch(err) {
         console.error("Simulation Render Error:", err);
     }
-    }
-
-    requestAnimationFrame(animate);
-
-    window.addEventListener('resize', () => {
-        cameraMain.aspect = window.innerWidth / window.innerHeight;
-        cameraMain.updateProjectionMatrix();
-        rendererMain.setSize(window.innerWidth, window.innerHeight);
-        resizePipRenderer();
-    });
     </script>
 </body>
 </html>
