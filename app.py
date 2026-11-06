@@ -795,7 +795,7 @@ html_template = """
             }
         }
 
-        // 🔊 音響合成
+        // 🔊 音響合成（リアル・パイロ＆分離重低音インパルス）
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let actx = null, subRumble = null, shockCrackle = null, gasHiss = null;
         function initAudio() {
@@ -837,18 +837,54 @@ html_template = """
             window.addEventListener(evt, () => { initAudio(); }, { once: true });
         });
 
+        // 💥 【実機準拠】パイロ点火＋空気衝撃＋重爆圧サウンド
         function playHeavySeparationSound() {
             if (!actx) return;
             const now = actx.currentTime;
-            const subOsc = actx.createOscillator();
-            const subGain = actx.createGain();
-            subOsc.type = 'sine';
-            subOsc.frequency.setValueAtTime(80, now);
-            subOsc.frequency.exponentialRampToValueAtTime(22, now + 0.45);
-            subGain.gain.setValueAtTime(2.2, now);
-            subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
-            subOsc.connect(subGain); subGain.connect(actx.destination);
-            subOsc.start(now); subOsc.stop(now + 0.56);
+
+            // 1. 低周波インパルス（空気爆縮・ドォン音）
+            const osc = actx.createOscillator();
+            const oscGain = actx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(140, now);
+            osc.frequency.exponentialRampToValueAtTime(18, now + 0.6);
+            oscGain.gain.setValueAtTime(1.8, now);
+            oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+            osc.connect(oscGain);
+            oscGain.connect(actx.destination);
+            osc.start(now);
+            osc.stop(now + 0.66);
+
+            // 2. パイロボルト点火ノイズ（破裂クラック音）
+            const noiseBuf = actx.createBuffer(1, Math.floor(actx.sampleRate * 0.4), actx.sampleRate);
+            const nd = noiseBuf.getChannelData(0);
+            for(let i=0; i<nd.length; i++) nd[i] = (Math.random() * 2 - 1) * Math.exp(-i / (actx.sampleRate * 0.08));
+            const nSrc = actx.createBufferSource();
+            nSrc.buffer = noiseBuf;
+            const nFilter = actx.createBiquadFilter();
+            nFilter.type = 'bandpass';
+            nFilter.frequency.setValueAtTime(450, now);
+            nFilter.Q.value = 2.0;
+            const nGain = actx.createGain();
+            nGain.gain.setValueAtTime(1.5, now);
+            nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+            nSrc.connect(nFilter);
+            nFilter.connect(nGain);
+            nGain.connect(actx.destination);
+            nSrc.start(now);
+
+            // 3. メカニカルラッチ解放クリック（高域）
+            const clickOsc = actx.createOscillator();
+            const clickGain = actx.createGain();
+            clickOsc.type = 'sine';
+            clickOsc.frequency.setValueAtTime(1800, now);
+            clickOsc.frequency.exponentialRampToValueAtTime(220, now + 0.06);
+            clickGain.gain.setValueAtTime(0.7, now);
+            clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+            clickOsc.connect(clickGain);
+            clickGain.connect(actx.destination);
+            clickOsc.start(now);
+            clickOsc.stop(now + 0.08);
         }
 
         // =========================================================================
@@ -1241,14 +1277,15 @@ html_template = """
         }
 
         // =========================================================================
-        // 🛰️ 【方向修正時のみ一瞬噴射】4象限パルスRCSスラスター
+        // 🛰️ 【方向修正時のみ一瞬噴射】4象限パルスRCSスラスター（作用・反作用厳密化）
         // =========================================================================
         const rcsNozzles = [];
+        // 機体を時計回りに回転させたい（+Pitch/機首を右へ倒す）場合、機体上部スラスターは「左側（-X）」へ噴射して右への反作用トルクを得る
         const rcsDirs = [
-            { id: "+Pitch", dx:  1, dy:  0, dz:  0, rotZ: -Math.PI / 2 },
-            { id: "-Pitch", dx: -1, dy:  0, dz:  0, rotZ:  Math.PI / 2 },
-            { id: "+Yaw",   dx:  0, dy:  0, dz:  1, rotX:  Math.PI / 2 },
-            { id: "-Yaw",   dx:  0, dy:  0, dz: -1, rotX: -Math.PI / 2 }
+            { id: "+Pitch", dx: -1, dy:  0, dz:  0, rotZ:  Math.PI / 2 },
+            { id: "-Pitch", dx:  1, dy:  0, dz:  0, rotZ: -Math.PI / 2 },
+            { id: "+Yaw",   dx:  0, dy:  0, dz: -1, rotX: -Math.PI / 2 },
+            { id: "-Yaw",   dx:  0, dy:  0, dz:  1, rotX:  Math.PI / 2 }
         ];
 
         const rcsConeGeo = new THREE.ConeGeometry(0.42, 2.6, 12, 1, true);
@@ -1409,58 +1446,79 @@ html_template = """
         }
 
         // =========================================================================
-        // 🎥 【魔改造】CAM 02 地上固定光学トラッキング望遠鏡（完全独立環境＆ロックオン）
+        // 🎥 【完全改修】CAM 02 地上固定光学トラッキング望遠鏡（発射台戻るまで完璧に追跡）
         // =========================================================================
         // ボカチカ沿岸の地上局位置（発射台からX方向+240m, Z方向+280m, 地上高度12m）
         const groundTrackerStationPos = new THREE.Vector3(240.0, 12.0, 280.0);
+        // タワー近接監視カメラ位置（タワーキャッチ時の劇的アングル用）
+        const towerCloseupPos = new THREE.Vector3(35.0, 42.0, 48.0);
         const boosterWorldPos = new THREE.Vector3();
+        const currentPipCamPos = new THREE.Vector3().copy(groundTrackerStationPos);
+        const currentPipLookTarget = new THREE.Vector3();
 
         function renderGroundOpticalTracker(bActive, bX, bY, bCaught, stage, mainRocketPos) {
-            cameraPip.position.copy(groundTrackerStationPos);
+            let targetPos = new THREE.Vector3();
+            let desiredCamPos = groundTrackerStationPos;
+            let targetFov = 10.0;
 
             if (simCfg.spacex_return && (bActive || stage1Detached)) {
+                // ブースター中心座標を取得
                 s1Group.updateMatrixWorld(true);
-                boosterWorldPos.set(0, s1Len * 0.5, 0);
-                s1Group.localToWorld(boosterWorldPos);
+                targetPos.set(0, s1Len * 0.5, 0);
+                s1Group.localToWorld(targetPos);
 
-                cameraPip.lookAt(boosterWorldPos);
+                const dist = groundTrackerStationPos.distanceTo(targetPos);
 
-                // CAM 02 専用追尾スポットライトをブースター直近へ照射
-                pipTrackingSpot.position.set(boosterWorldPos.x + 100, boosterWorldPos.y + 120, boosterWorldPos.z + 100);
-                pipTrackingSpot.target.position.copy(boosterWorldPos);
-                pipTrackingSpot.target.updateMatrixWorld();
-
-                const dist = groundTrackerStationPos.distanceTo(boosterWorldPos);
                 if (bCaught) {
-                    cameraPip.fov = 18.0;
-                    document.getElementById('pip-tag').innerText = "CAM 02: GROUND (MECHAZILLA CATCH)";
-                    document.getElementById('pip-hud-alt').innerText = "CAUGHT BY CHOPSTICKS";
-                } else if (bY < 4500) {
-                    // 最終着陸燃焼〜タワー進入：地上から完璧にアップでロックオン
-                    cameraPip.fov = Math.max(6.0, Math.min(24.0, (dist / 14.0)));
-                    document.getElementById('pip-tag').innerText = "CAM 02: GROUND OPTICAL (LANDING BURN)";
+                    // タワーキャッチ完了：タワー近接アングルへ滑らかに遷移して固定捕捉
+                    desiredCamPos = towerCloseupPos;
+                    targetFov = 24.0;
+                    document.getElementById('pip-tag').innerText = "CAM 02: MECHAZILLA TOWER CHOPSTICKS";
+                    document.getElementById('pip-hud-alt').innerText = "STATUS: BOOSTER CAPTURED";
+                } else if (bY <= 4500) {
+                    // 最終着陸燃焼〜タワー進入：地上局からの超高解像度ズーム、着地寸前は追尾安定化
+                    const towerProximity = Math.max(0.0, Math.min(1.0, (4500.0 - bY) / 4500.0));
+                    // 最終高度500m以下ではタワー近接カメラと地上局カメラのハイブリッドブレンド
+                    if (bY <= 500) {
+                        desiredCamPos = new THREE.Vector3().lerpVectors(groundTrackerStationPos, towerCloseupPos, (500.0 - bY) / 500.0 * 0.7);
+                        targetFov = 14.0 + (bY / 500.0) * 8.0;
+                    } else {
+                        desiredCamPos = groundTrackerStationPos;
+                        targetFov = Math.max(4.5, Math.min(22.0, (dist / 18.0)));
+                    }
+                    document.getElementById('pip-tag').innerText = "CAM 02: RTLS TERMINAL GUIDANCE (LANDING)";
                     document.getElementById('pip-hud-alt').innerText = `BOOSTER ALT: ${(bY / 1000.0).toFixed(2)} km`;
                 } else {
-                    // 超望遠オプティカルトラッカー：上空から発射台へ戻ってくるブースターを完全追尾
-                    cameraPip.fov = Math.max(1.8, Math.min(10.0, (dist / 120.0)));
-                    document.getElementById('pip-tag').innerText = "CAM 02: GROUND KINETO TRACKER (RTLS)";
+                    // 上空でのブーストバック〜大気圏再突入（RTLSアプローチ）
+                    desiredCamPos = groundTrackerStationPos;
+                    targetFov = Math.max(1.5, Math.min(8.5, (dist / 140.0)));
+                    document.getElementById('pip-tag').innerText = "CAM 02: GROUND KINETO TRACKER (RTLS INBOUND)";
                     document.getElementById('pip-hud-alt').innerText = `BOOSTER ALT: ${(bY / 1000.0).toFixed(1)} km`;
                 }
             } else {
-                cameraPip.lookAt(mainRocketPos);
-                pipTrackingSpot.position.set(mainRocketPos.x + 100, mainRocketPos.y + 120, mainRocketPos.z + 100);
-                pipTrackingSpot.target.position.copy(mainRocketPos);
-                pipTrackingSpot.target.updateMatrixWorld();
-
+                targetPos.copy(mainRocketPos);
+                desiredCamPos = groundTrackerStationPos;
                 const dist = groundTrackerStationPos.distanceTo(mainRocketPos);
-                cameraPip.fov = Math.max(4.0, Math.min(26.0, (dist / 18.0)));
+                targetFov = Math.max(4.0, Math.min(26.0, (dist / 18.0)));
                 document.getElementById('pip-tag').innerText = "CAM 02: GROUND OPTICAL (PAD 39A)";
                 document.getElementById('pip-hud-alt').innerText = `ALT: ${(mainRocketPos.y * 0.01).toFixed(1)} km`;
             }
 
+            // カメラ位置＆注視点をスムーズに補間追従
+            currentPipCamPos.lerp(desiredCamPos, 0.08);
+            currentPipLookTarget.lerp(targetPos, 0.15);
+
+            cameraPip.position.copy(currentPipCamPos);
+            cameraPip.lookAt(currentPipLookTarget);
+            cameraPip.fov = cameraPip.fov + (targetFov - cameraPip.fov) * 0.08;
             cameraPip.updateProjectionMatrix();
 
-            // ⚠️ 重要：CAM 02レンダリング時は地上スカイの青み・昼光色を強制適用（背景ブラックアウト防止）
+            // CAM 02 専用追尾スポットライトを対象物へ照射
+            pipTrackingSpot.position.set(currentPipLookTarget.x + 80, currentPipLookTarget.y + 100, currentPipLookTarget.z + 80);
+            pipTrackingSpot.target.position.copy(currentPipLookTarget);
+            pipTrackingSpot.target.updateMatrixWorld();
+
+            // CAM 02レンダリング時は地上スカイの青み・昼光色を強制適用（背景ブラックアウト防止）
             const prevSkyColor = skyDomeMat.color.getHex();
             const prevAmbientIntensity = skyAmbient.intensity;
             skyDomeMat.color.setHex(0x1a3a60);
@@ -1535,22 +1593,37 @@ html_template = """
             const ux = Math.sin(pitch), uy = Math.cos(pitch);
             const perpX = Math.cos(pitch), perpY = -Math.sin(pitch);
 
-            // 1. 外部ブースター分離
+            // 1. 外部ブースター分離（自然な切り離し・落下アニメーション）
             if (!p0.strapon && !boosterDetached && boosterUnits.length > 0 && !simCfg.is_preview) {
                 boosterDetached = true;
                 playHeavySeparationSound();
+                camShake = 0.25;
+
                 for(let b of boosterUnits) {
                     b.detached = true;
                     b.tips.forEach(t => { t.plume.visible = false; });
+
+                    // ワールド座標系に正確にバインド
+                    const worldPos = new THREE.Vector3();
+                    const worldQuat = new THREE.Quaternion();
+                    b.mesh.getWorldPosition(worldPos);
+                    b.mesh.getWorldQuaternion(worldQuat);
+
                     scene.attach(b.mesh);
+                    b.mesh.position.copy(worldPos);
+                    b.mesh.quaternion.copy(worldQuat);
+
                     const outX = Math.cos(b.angle);
                     const outZ = Math.sin(b.angle);
                     const sepP = simCfg.sep_thrust;
-                    b.vx = ux * (vel * 0.068) + perpX * outX * (3.8 * sepP);
-                    b.vy = uy * (vel * 0.068) + perpY * outX * (3.8 * sepP) - 2.5;
-                    b.vz = outZ * (3.8 * sepP);
-                    b.rx = outZ * 0.85;
-                    b.rz = -outX * 0.85;
+
+                    // コロリョフ・クロス/SpaceX LRB準拠：外側へ押し出されつつ進行方向慣性＋わずかな後方減速
+                    b.vx = ux * (vel * 0.088) + perpX * outX * (4.2 * sepP);
+                    b.vy = uy * (vel * 0.088) + perpY * outX * (4.2 * sepP) - (1.5 * sepP);
+                    b.vz = outZ * (4.2 * sepP);
+                    // ノーズが外側へ倒れ込む回転モーメント
+                    b.rx = outZ * (0.85 * sepP);
+                    b.rz = -outX * (0.85 * sepP);
                 }
             }
             if (boosterDetached) {
@@ -1558,7 +1631,10 @@ html_template = """
                     b.mesh.position.x += b.vx * 0.016;
                     b.mesh.position.y += b.vy * 0.016;
                     b.mesh.position.z += b.vz * 0.016;
-                    b.vy -= 9.8 * 0.016 * 0.9;
+                    // 重力および空気抵抗による自然な弾道落下
+                    b.vy -= 9.80665 * 0.016 * 0.85;
+                    b.vx *= 0.998;
+                    b.vz *= 0.998;
                     b.mesh.rotation.x += b.rx * 0.016;
                     b.mesh.rotation.z += b.rz * 0.016;
                 }
@@ -1568,6 +1644,7 @@ html_template = """
             if (p0.stage === 2 && !stage1Detached && !simCfg.is_preview) {
                 stage1Detached = true;
                 playHeavySeparationSound();
+                camShake = 0.3;
                 s1NozzleTips.forEach(t => { t.plume.visible = false; });
                 s2NozzleTips.forEach(t => { t.plume.visible = true; });
                 
@@ -1669,7 +1746,7 @@ html_template = """
                 engineBounceLight.intensity = 0.0;
             }
 
-            // 5. 【方向修正時のみ一瞬噴射】4象限パルスRCS
+            // 5. 【方向修正時のみ一瞬噴射】4象限パルスRCS（作用・反作用の物理法則に合致）
             let rcsActiveHUD = false;
             const rcsDelta = Math.abs(rcsCommand - prevRcsCmdVal);
             prevRcsCmdVal = rcsCommand;
