@@ -26,7 +26,7 @@ PROPELLANTS = {
     },
     "超極低温スラッシュ・ハイドロロックス (LH2 / LOX) [H3 / SLS]": {
         "base_isp_sl": 385, "base_isp_vac": 468, "base_thrust": 1450, "density": 0.34, 
-        "flame_hex": 0xfbcfe8, "outer_hex": 0xbe185d, "spark_hex": 0xffffff, "risk": 0.01, "type": "hydro"
+        "flame_hex": 0xfbcfe8, "outer_hex": 0be185d, "spark_hex": 0xffffff, "risk": 0.01, "type": "hydro"
     },
     "【猛毒】四酸化二窒素 ＋ UDMH (N2O4 / UDMH) [Proton]": {
         "base_isp_sl": 288, "base_isp_vac": 322, "base_thrust": 2100, "density": 1.26, 
@@ -214,7 +214,7 @@ m3.metric("構造限界動圧 / 耐G", f"{s1_spec['max_q']:.1f} kPa", f"耐G: {s
 m4.metric("ブースター追加推力", f"+{strapon_spec['thrust_add']:.0f} kN", f"基数: {strapon_spec['count']} 基")
 
 # =========================================================================
-# 💥 物理シミュレーション (高度200km〜、秒速7.9km横向き投入 ＆ 超高速アームキャッチ)
+# 💥 物理シミュレーション
 # =========================================================================
 def run_simulation(preview_only=False):
     if preview_only:
@@ -278,14 +278,13 @@ def run_simulation(preview_only=False):
         rho = float(1.225 * np.exp(-alt / 7400.0)) if alt < 140000 else 0.0
         q = float(0.5 * rho * (v**2) / 1000.0)
 
-        # 🎯 軌道プロファイル：垂直→斜め上昇、高度200km到達時にピッチ0度（完全水平・横向き）へ姿勢変更
         if alt_km < turn_start_alt:
             target_pitch_deg = 90.0
         elif alt_km < 200.0:
             prog = (alt_km - turn_start_alt) / (200.0 - turn_start_alt)
             target_pitch_deg = 90.0 * (1.0 - (prog ** turn_exponent))
         else:
-            target_pitch_deg = 0.0 # 完全な横向き（水平加速モード）
+            target_pitch_deg = 0.0
 
         extra_pitch_deflection = 0.0
         wing_lift_force = 0.0
@@ -339,7 +338,6 @@ def run_simulation(preview_only=False):
                 if spacex_return_mode and not b_active:
                     b_active = True
                     b_x, b_y = x, y
-                    # 超高速反転ブーストバック
                     b_vx, b_vy = vx * 0.35, vy * 0.70
                     b_pitch = visual_pitch
             else:
@@ -378,7 +376,6 @@ def run_simulation(preview_only=False):
                 mdot = thrust / (isp * g0)
                 fuel_s2_rem -= mdot * dt
 
-        # 🔄 SpaceX型 RTLS帰還（超高速帰還＆アーム高67.5mで突起ピンによる宙づり静止）
         if b_active and not b_caught:
             b_alt = b_y
             b_rho = float(1.225 * np.exp(-b_alt / 7400.0)) if b_alt < 140000 else 0.0
@@ -390,7 +387,6 @@ def run_simulation(preview_only=False):
             b_thrust_force = 0.0
             b_thrust = False
 
-            # 帰還時間を劇的に短縮する高速ガイダンス
             est_time_to_ground = max(3.5, b_alt / max(180.0, abs(b_vy) + 240.0))
             target_vx = -b_x / est_time_to_ground
 
@@ -423,12 +419,11 @@ def run_simulation(preview_only=False):
                 b_vy += b_ay * dt
 
             b_x = max(0.0, b_x + b_vx * dt)
-            b_y = max(67.5, b_y + b_vy * dt) # 絶対に67.5m未満（地面）には落ちない
+            b_y = max(67.5, b_y + b_vy * dt)
 
-            # アーム高さ（67.5m）到達かつタワー直近で確実にキャッチ＆宙づり静止
             if b_y <= 69.0 and abs(b_x) < 30.0:
                 b_caught = True
-                b_y = 67.5 # アームに頭部ピンが引っかかり完全に宙づり
+                b_y = 67.5
                 b_x = 0.0
                 b_vx = 0.0
                 b_vy = 0.0
@@ -479,7 +474,6 @@ def run_simulation(preview_only=False):
         x = float(x + vx * dt)
         y = float(max(0.0, y + vy * dt))
 
-        # 🎯 軌道投入判定：高度200km以上かつ横速度7,900m/s（約28,400km/h）到達
         is_orbit_achieved = bool(alt_km >= 200.0 and vx >= 7900.0 and abs(vy) < 250.0)
         cur_event = "ORBIT" if is_orbit_achieved else cur_event
 
@@ -492,7 +486,6 @@ def run_simulation(preview_only=False):
             "b_x": float(b_x), "b_y": float(b_y), "b_active": b_active, "b_pitch": float(b_pitch), "b_thrust": b_thrust, "b_caught": b_caught
         })
 
-        # 軌道投入完了判定（SpaceX回収モード時はブースターキャッチ完了も確認）
         if is_orbit_achieved:
             if not spacex_return_mode or (spacex_return_mode and b_caught):
                 for orbit_step in range(12):
@@ -562,7 +555,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 完全描画テンプレート（動的発射台・アーム開閉・破裂音・宙づり固定版）
+# 📺 HTML / JS 完全描画テンプレート（暗転バグ完全解消版）
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -871,12 +864,10 @@ html_template = """
             osc.stop(now + 0.71);
         }
 
-        // 💥 【改修】爆竹が1個鳴った様な鋭い乾いた破裂音（Snap Firecracker Pop）
         function playFirecrackerSnapSound() {
             if (!actx) return;
             const now = actx.currentTime;
 
-            // 鋭い高域インパクト（爆竹の最初のパチッ・バン音）
             const osc = actx.createOscillator();
             const gain = actx.createGain();
             osc.type = 'square';
@@ -887,7 +878,6 @@ html_template = """
             osc.connect(gain); gain.connect(actx.destination);
             osc.start(now); osc.stop(now + 0.07);
 
-            // 乾いたホワイトノイズ破裂（余韻なし）
             const noiseBuf = actx.createBuffer(1, Math.floor(actx.sampleRate * 0.12), actx.sampleRate);
             const nd = noiseBuf.getChannelData(0);
             for(let i=0; i<nd.length; i++) nd[i] = (Math.random() * 2 - 1) * Math.exp(-i / (actx.sampleRate * 0.015));
@@ -904,14 +894,13 @@ html_template = """
         }
 
         // =========================================================================
-        // 🌍 Three.js シーン ＆ 環境ライティング
+        // 🌍 Three.js シーン ＆ 環境ライティング（暗転防止：標準適正クリッピング）
         // =========================================================================
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x020813);
+        scene.background = new THREE.Color(0x0a192f);
 
         const rendererMain = new THREE.WebGLRenderer({ 
-            canvas: canvasMain, antialias: true, powerPreference: "high-performance",
-            logarithmicDepthBuffer: true
+            canvas: canvasMain, antialias: true, powerPreference: "high-performance"
         });
         rendererMain.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
         rendererMain.setSize(window.innerWidth, window.innerHeight);
@@ -919,40 +908,40 @@ html_template = """
         rendererMain.toneMappingExposure = 1.35;
 
         const rendererPip = new THREE.WebGLRenderer({ 
-            canvas: canvasPip, antialias: true, powerPreference: "default",
-            logarithmicDepthBuffer: true
+            canvas: canvasPip, antialias: true, powerPreference: "default"
         });
         rendererPip.setPixelRatio(1.0);
         rendererPip.setSize(360, 205);
         rendererPip.toneMapping = THREE.ACESFilmicToneMapping;
         rendererPip.toneMappingExposure = 1.45;
 
-        const cameraMain = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 2.0, 200000);
-        const cameraPip = new THREE.PerspectiveCamera(10.0, 360 / 205, 2.0, 200000);
+        // 暗転・消滅を防ぐ安定した視野クリッピング
+        const cameraMain = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.5, 60000);
+        const cameraPip = new THREE.PerspectiveCamera(10.0, 360 / 205, 0.5, 60000);
 
-        const sunLight = new THREE.DirectionalLight(0xfffaed, 5.8);
-        sunLight.position.set(12000, 18000, 10000);
+        const sunLight = new THREE.DirectionalLight(0xfffaed, 5.0);
+        sunLight.position.set(4000, 6000, 3000);
         scene.add(sunLight);
 
-        const skyAmbient = new THREE.HemisphereLight(0x78a4c8, 0x0d141e, 1.4);
+        const skyAmbient = new THREE.HemisphereLight(0x90b8d8, 0x1a2636, 1.8);
         scene.add(skyAmbient);
 
-        const engineBounceLight = new THREE.PointLight(simCfg.flame_hex, 0.0, 800, 2.2);
+        const engineBounceLight = new THREE.PointLight(simCfg.flame_hex, 0.0, 500, 2.0);
         scene.add(engineBounceLight);
 
-        const pipTrackingSpot = new THREE.DirectionalLight(0xffffff, 3.2);
+        const pipTrackingSpot = new THREE.DirectionalLight(0xffffff, 3.5);
         scene.add(pipTrackingSpot);
 
-        // スカイドーム
-        const skyDomeGeo = new THREE.SphereGeometry(180000, 24, 16);
-        const skyDomeMat = new THREE.MeshBasicMaterial({ color: 0x0a1c30, side: THREE.BackSide, depthWrite: false });
+        // スカイドーム（暗転防止のためカメラファープレーン内に収まる適正半径35,000）
+        const skyDomeGeo = new THREE.SphereGeometry(35000, 24, 16);
+        const skyDomeMat = new THREE.MeshBasicMaterial({ color: 0x142842, side: THREE.BackSide, depthWrite: false });
         const skyDome = new THREE.Mesh(skyDomeGeo, skyDomeMat);
         scene.add(skyDome);
 
         const starGeo = new THREE.BufferGeometry();
-        const starPos = new Float32Array(2000 * 3);
-        for(let i=0; i<2000*3; i+=3) {
-            const rad = 170000;
+        const starPos = new Float32Array(1500 * 3);
+        for(let i=0; i<1500*3; i+=3) {
+            const rad = 32000;
             const u = Math.random(), v = Math.random();
             const th = u * 2.0 * Math.PI, ph = Math.acos(2.0 * v - 1.0);
             starPos[i] = rad * Math.sin(ph) * Math.cos(th);
@@ -960,7 +949,7 @@ html_template = """
             starPos[i+2] = rad * Math.cos(ph);
         }
         starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-        const starMat = new THREE.PointsMaterial({ size: 2.0, color: 0xffffff, transparent: true, opacity: 0.25 });
+        const starMat = new THREE.PointsMaterial({ size: 3.0, color: 0xffffff, transparent: true, opacity: 0.25 });
         scene.add(new THREE.Points(starGeo, starMat));
 
         // 沿岸ランドスケープ
@@ -968,19 +957,19 @@ html_template = """
         scene.add(landscapeGroup);
 
         const coastPlane = new THREE.Mesh(
-            new THREE.PlaneGeometry(60000, 60000),
-            new THREE.MeshStandardMaterial({ color: 0x141f16, roughness: 0.95 })
+            new THREE.PlaneGeometry(25000, 25000),
+            new THREE.MeshStandardMaterial({ color: 0x1a281e, roughness: 0.95 })
         );
         coastPlane.rotation.x = -Math.PI / 2;
-        coastPlane.position.set(-2500, -0.5, 0);
+        coastPlane.position.set(-1500, -0.5, 0);
         landscapeGroup.add(coastPlane);
 
         const oceanMesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(80000, 80000), 
-            new THREE.MeshStandardMaterial({ color: 0x031d33, roughness: 0.1, metalness: 0.9 })
+            new THREE.PlaneGeometry(35000, 35000), 
+            new THREE.MeshStandardMaterial({ color: 0x072744, roughness: 0.15, metalness: 0.85 })
         );
         oceanMesh.rotation.x = -Math.PI / 2;
-        oceanMesh.position.set(22000, -12.0, 0);
+        oceanMesh.position.set(12000, -6.0, 0);
         landscapeGroup.add(oceanMesh);
 
         // =========================================================================
@@ -989,13 +978,12 @@ html_template = """
         const pad = new THREE.Group();
         scene.add(pad);
 
-        const isStarshipPad = (simCfg.s1_mat === 'ss');
         const isSaturnPad = (simCfg.s1_mat === 'saturn' || simCfg.s1_mat === 'al');
 
-        const darkSteelMat = new THREE.MeshStandardMaterial({ color: 0x181e28, metalness: 0.9, roughness: 0.3 });
-        const concreteMat = new THREE.MeshStandardMaterial({ color: 0x333b47, roughness: 0.95 });
+        const darkSteelMat = new THREE.MeshStandardMaterial({ color: 0x222a36, metalness: 0.85, roughness: 0.35 });
+        const concreteMat = new THREE.MeshStandardMaterial({ color: 0x475161, roughness: 0.95 });
         const towerColorMat = isSaturnPad 
-            ? new THREE.MeshStandardMaterial({ color: 0xb91c1c, metalness: 0.6, roughness: 0.4 }) // サターン/SLS赤トラス
+            ? new THREE.MeshStandardMaterial({ color: 0xb91c1c, metalness: 0.6, roughness: 0.4 })
             : darkSteelMat;
 
         const groundPlate = new THREE.Mesh(new THREE.CylinderGeometry(110, 125, 3.0, 32), concreteMat);
@@ -1036,7 +1024,7 @@ html_template = """
         armRight.position.set(8.0, 0, 0);
         armRightPivot.add(armRight);
 
-        // 初期状態：打ち上げ前は発射台から外側に格納（オープン）
+        // 初期状態：格納状態（オープン退避）
         armLeftPivot.rotation.y = -0.75;
         armRightPivot.rotation.y = 0.75;
 
@@ -1186,7 +1174,6 @@ html_template = """
             s1Group.add(ring);
         }
 
-        // 🎯 ブースター頭部のリフティング突起ピン（左右4.4m幅でアーム上に確実に引っかかる）
         const catchPins = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 4.4, 16), darkSteelMat);
         catchPins.rotation.z = Math.PI / 2;
         catchPins.position.set(0, s1Len - 0.9, 0);
@@ -1288,7 +1275,7 @@ html_template = """
         const payloadGroup = new THREE.Group();
         payloadGroup.position.y = s2Len + 1.8;
         s2Group.add(payloadGroup);
-        const satBus = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 2.4, 16), goldFoilMat);
+        const satBus = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 2.4, 16), new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.95, roughness: 0.2 }));
         payloadGroup.add(satBus);
 
         const fairingHalves = [];
@@ -1662,16 +1649,13 @@ html_template = """
                 scene.attach(s1Group);
             }
 
-            // 🎯 スイングアームのリアル開閉制御（打ち上げ前/飛行中は格納、接近時に展開キャッチ）
             if (simCfg.spacex_return) {
                 if (stage1Detached && bY <= 2500) {
-                    // ブースターが上空から接近：アームを前に出して挟み込み準備
                     armLeftPivot.rotation.y = THREE.MathUtils.lerp(armLeftPivot.rotation.y, 0.02, 0.08);
                     armRightPivot.rotation.y = THREE.MathUtils.lerp(armRightPivot.rotation.y, -0.02, 0.08);
                     document.getElementById('hud-arm').innerText = "DEPLOYED (READY FOR CATCH)";
                     document.getElementById('hud-arm').style.color = "#34d399";
                 } else {
-                    // 発射時や上空飛行中は格納（オープン退避）
                     armLeftPivot.rotation.y = THREE.MathUtils.lerp(armLeftPivot.rotation.y, -0.75, 0.05);
                     armRightPivot.rotation.y = THREE.MathUtils.lerp(armRightPivot.rotation.y, 0.75, 0.05);
                     document.getElementById('hud-arm').innerText = "STOWED CLEAR";
@@ -1680,27 +1664,21 @@ html_template = """
             }
 
             if (stage1Detached) {
-                // 🎯 ブースター頭部ピンがアーム上面（Y=67.5m）に引っかかるよう配置
-                // s1Body下端ノズルは地面（Y=0）から約50m以上浮いた完全宙づり状態
                 s1Group.position.set(bX * 0.1, (bY - s1Len + 1.2) * 0.1 + 6.0, 0);
                 s1Group.rotation.set(0, 0, -bPitch);
                 s1Group.updateMatrixWorld(true);
 
-                // アームキャッチ成功の瞬間
                 if (p0.b_caught) {
-                    // アームが突起ピンを挟み込んでロック
                     armLeftPivot.rotation.y = 0.06;
                     armRightPivot.rotation.y = -0.06;
                     document.getElementById('tv-stage-badge').innerText = "SUSPENDED CATCH SUCCESS";
                     document.getElementById('tv-stage-badge').style.color = "#38bdf8";
 
-                    // 💥 爆竹が1個鳴った様な「バンッ！」という乾いた破裂音
                     if (!catchPopPlayed) {
                         playFirecrackerSnapSound();
                         catchPopPlayed = true;
                         camShake = 0.25;
                     }
-                    // エンジン即時完全遮断
                     s1NozzleTips.forEach(t => { t.plume.visible = false; });
                 } else if (p0.b_thrust) {
                     const isLandingBurn = (bY <= 3500);
@@ -1977,7 +1955,7 @@ html_template = """
             document.getElementById('tv-q').innerText   = q.toFixed(1);
             document.getElementById('tv-g').innerText   = accG.toFixed(1);
 
-            // 🏁 【改修】ミッション完了条件：軌道投入（28,400km/h以上）かつ ブースターアーム回収
+            // 🏁 ミッション完了判定（軌道投入 28,400km/h ＆ ブースター回収）
             const isOrbitAchieved = (p0.event === "ORBIT");
             const isCatchComplete = p0.b_caught || (!simCfg.spacex_return);
 
