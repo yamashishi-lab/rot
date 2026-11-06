@@ -768,7 +768,7 @@ html_template = """
                     const hSrc = actx.createBufferSource(); hSrc.buffer = buf; hSrc.loop = true;
                     const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2400;
                     gasHiss = actx.createGain(); gasHiss.gain.value = 0.0001;
-                    hSrc.connect(hp); hp.connect(gasHiss); gasHiss.connect(actx.destination);
+                    hSrc.connect(hp); hSrc.connect(gasHiss); gasHiss.connect(actx.destination);
                     hSrc.start(0);
 
                     const bSrc = actx.createBufferSource(); bSrc.buffer = buf; bSrc.loop = true;
@@ -1705,7 +1705,7 @@ html_template = """
                 if (canComplete && !isMissionEnded) {
                     completeBanner.style.display = 'block';
                     if (simCfg.spacex_return) {
-                        document.getElementById('complete-desc').innerText = "LEO INSERTION & SUPER HEAY TOWER CATCH ACHIEVED";
+                        document.getElementById('complete-desc').innerText = "LEO INSERTION & SUPER HEAVY TOWER CATCH ACHIEVED";
                         document.getElementById('complete-sub').innerText = "Booster suspended on Mechazilla chopsticks. Orbiter in circular orbit.";
                     } else {
                         document.getElementById('complete-desc').innerText = "FIRST COSMIC VELOCITY (28,400 km/h) NOMINAL INSERTION";
@@ -1732,6 +1732,7 @@ html_template = """
                 }
             }
 
+            // 🎯 メインアニメーションループを確実に開始
             requestAnimationFrame(animate);
 
             window.addEventListener('resize', () => {
