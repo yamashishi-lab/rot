@@ -281,7 +281,7 @@ def run_simulation(preview_only=False):
         rho = float(1.225 * np.exp(-alt / 7400.0)) if alt < 140000 else 0.0
         q = float(0.5 * rho * (v**2) / 1000.0)
 
-        # 🎯 高度250kmで真横（ピッチ0度）へ強制固定し、鉛直上昇を遮断
+        # 🎯 高度250kmで真横（ピッチ0度）へ固定
         if alt_km < turn_start_alt:
             target_pitch_deg = 90.0
         elif alt_km < TARGET_ALT_KM:
@@ -301,13 +301,12 @@ def run_simulation(preview_only=False):
         pitch_rad = float(np.radians(pitch_deg))
         visual_pitch = float(np.radians(90.0 - pitch_deg))
 
+        # 🎯 姿勢制御ピッチレートからRCSコマンドを生成
         pitch_rate = (pitch_deg - prev_pitch_val) / dt
         prev_pitch_val = pitch_deg
-        
-        # 🎯 打ち上げ中の姿勢制御・ピッチ変化時にRCSパルスコマンドを確実に生成
-        rcs_cmd = float(np.clip(-pitch_rate * 0.65, -1.0, 1.0))
-        if alt_km > 1.0 and abs(pitch_rate) > 0.05:
-            rcs_cmd = 0.6 if pitch_rate > 0 else -0.6
+        rcs_cmd = 0.0
+        if abs(pitch_rate) > 0.02 and alt_km > 0.8:
+            rcs_cmd = float(np.clip(-pitch_rate * 2.0, -1.0, 1.0))
 
         cur_event = "FLIGHT"
         if v >= 340.0 and not supersonic_called:
@@ -346,8 +345,8 @@ def run_simulation(preview_only=False):
                 if spacex_return_mode and not b_active:
                     b_active = True
                     b_x, b_y = x, y
-                    # 🎯 切り離し時点から即座に落下開始（上向き速度 vy を 0 にリセットし、勝手な上昇を防止）
-                    b_vx = vx * 0.20
+                    # 🎯 切り離し時点から即座に落下開始（上向き速度 vy を 0 にし、勝手な上昇を防止）
+                    b_vx = vx * 0.18
                     b_vy = 0.0
                     b_pitch = visual_pitch
             else:
@@ -380,10 +379,10 @@ def run_simulation(preview_only=False):
                 isp = float(s2_spec["isp_vac"] - (s2_spec["isp_vac"] - s2_spec["isp_sl"]) * atm_factor)
                 thrust_base = float((s2_spec["thrust_vac"] - (s2_spec["thrust_vac"] - s2_spec["thrust_sl"]) * atm_factor) * 1000.0)
 
-                # 🎯 目標速度7,900m/sに達したら推力を完全に絞り、加速し続けないように制御
+                # 🎯 目標速度7,900m/sに達したら推力を完全にゼロ（SECO）にして加速を遮断
                 speed_error = TARGET_ORBITAL_VX - vx
                 if speed_error <= 0.0:
-                    thrust = 0.0 # 第一宇宙速度到達でエンジン完全停止
+                    thrust = 0.0
                     vx = TARGET_ORBITAL_VX
                 elif speed_error < 400.0:
                     throttle = max(0.05, speed_error / 400.0)
@@ -391,7 +390,7 @@ def run_simulation(preview_only=False):
                 else:
                     thrust = thrust_base
 
-                # 高度250km到達後は鉛直速度を0にし、水平軌道に固定
+                # 🎯 高度250km到達後は鉛直速度を0にし、水平軌道に固定
                 if alt_km >= TARGET_ALT_KM:
                     vy = 0.0
                     y = TARGET_ALT_KM * 1000.0
@@ -439,7 +438,6 @@ def run_simulation(preview_only=False):
                 b_pitch = np.clip((b_x / 4000.0) * 0.2, -0.25, 0.25)
                 b_vx += (target_vx - b_vx) * 0.25
 
-            # 常に重力で落下
             b_ay = -g0 + b_drag_y / (s1_spec["dry_mass"] * 1000.0)
             b_vy += b_ay * dt
 
@@ -829,7 +827,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🔊 音響合成システム
+        // 🔊 音響合成システム（完全アクティベート＆実写音響）
         // =========================================================================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let actx = null, subRumble = null, shockCrackle = null, gasHiss = null;
@@ -867,8 +865,9 @@ html_template = """
                 hSrc.connect(hp); hp.connect(gasHiss); gasHiss.connect(actx.destination);
                 hSrc.start(0);
 
+                // 🎯 ブースター帰還時ラプター逆噴射専用轟音
                 const bSrc = actx.createBufferSource(); bSrc.buffer = buf; bSrc.loop = true;
-                const bLp = actx.createBiquadFilter(); bLp.type = 'lowpass'; bLp.frequency.value = 55; bLp.Q.value = 4.0;
+                const bLp = actx.createBiquadFilter(); bLp.type = 'lowpass'; bLp.frequency.value = 52; bLp.Q.value = 4.5;
                 boosterRumble = actx.createGain(); boosterRumble.gain.value = 0.0001;
                 bSrc.connect(bLp); bLp.connect(boosterRumble); boosterRumble.connect(actx.destination);
                 bSrc.start(0);
@@ -918,7 +917,7 @@ html_template = """
             nSrc.start(now);
         }
 
-        // 💥 【動画準拠：エンジン停止時の乾いた鋭い破裂音（バンッ！）】
+        // 💥 【動画0:49準拠：エンジン停止時の鋭い乾いた破裂音（バンッ！）】
         function playFirecrackerSnapSound() {
             ensureAudioActive();
             if (!actx) return;
@@ -1201,11 +1200,15 @@ html_template = """
         }
 
         // =========================================================================
-        // 🚀 ロケット本体モデル構築
+        // 🚀 ロケット本体 ＆ 独立ブースターモデル構築（消滅バグ完全解消）
         // =========================================================================
         const rocket = new THREE.Group();
         rocket.position.y = 6.0;
         scene.add(rocket);
+
+        // 🎯 ブースター専用グループ：最初からシーン直下に独立配置し、分離時の消滅・縮小バグを完全根絶
+        const s1Group = new THREE.Group();
+        scene.add(s1Group);
 
         const s1Mat = getRealisticMaterial(simCfg.s1_mat, false);
         const s2Mat = getRealisticMaterial(simCfg.s2_mat, true);
@@ -1214,9 +1217,6 @@ html_template = """
         const interLen = 2.2;
         const s2Len = simCfg.s2_len;
         const s2BaseY = s1Len + interLen;
-
-        const s1Group = new THREE.Group();
-        rocket.add(s1Group);
 
         const s1Body = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.12, s1Len, 32), s1Mat);
         s1Body.position.y = s1Len / 2;
@@ -1308,7 +1308,7 @@ html_template = """
                 buildFullDetailedEngineCluster(bUnit, 1, 0, 1.0, localTips, 24.0, simCfg.flame_hex);
                 localTips.forEach(t => boosterNozzleTips.push(t));
 
-                rocket.add(bUnit);
+                s1Group.add(bUnit);
                 boosterUnits.push({
                     mesh: bUnit, angle: angle, baseX: bx, baseZ: bz,
                     detached: false, vx: 0, vy: 0, vz: 0, rx: 0, rz: 0, bLen: bLen, tips: localTips
@@ -1360,9 +1360,10 @@ html_template = """
         }
 
         // =========================================================================
-        // 🛰️ 4象限パルスRCSスラスター
+        // 🛰️ 【作用反作用厳密化】4象限パルスRCSスラスター
         // =========================================================================
         const rcsNozzles = [];
+        // 🎯 機首を右（+Pitch）へ倒すには上部ノズルは「左側（-X方向）」へ噴射して反作用を得る
         const rcsDirs = [
             { id: "+Pitch", dx: -1, dy:  0, dz:  0, rotZ:  Math.PI / 2 },
             { id: "-Pitch", dx:  1, dy:  0, dz:  0, rotZ: -Math.PI / 2 },
@@ -1489,7 +1490,7 @@ html_template = """
             octx.lineWidth = 1.5;
             octx.stroke();
 
-            const karmanY = groundY - (100.0 / 220.0) * 42.0;
+            const karmanY = groundY - (100.0 / 250.0) * 42.0;
             octx.setLineDash([3, 4]);
             octx.beginPath();
             octx.moveTo(startX, karmanY);
@@ -1523,10 +1524,10 @@ html_template = """
         }
 
         // =========================================================================
-        // 🎥 CAM 02 地上固定光学トラッキング（アームキャッチ完全追従）
+        // 🎥 CAM 02 地上固定光学トラッキング（動画準拠の完全再構築）
         // =========================================================================
-        const groundTrackerStationPos = new THREE.Vector3(260.0, 14.0, 240.0);
-        const towerCloseupPos = new THREE.Vector3(24.0, 70.0, 36.0);
+        const groundTrackerStationPos = new THREE.Vector3(220.0, 18.0, 200.0);
+        const towerCloseupPos = new THREE.Vector3(20.0, 70.0, 32.0);
 
         const currentPipCamPos = new THREE.Vector3().copy(groundTrackerStationPos);
         const currentPipLookTarget = new THREE.Vector3();
@@ -1537,12 +1538,13 @@ html_template = """
             let targetFov = 10.0;
 
             if (isBoosterMode) {
-                targetPos.set(bX * 0.1, bY * 0.1, 0);
+                // ブースターの位置を確実に追尾
+                targetPos.set(bX * 0.1, bY, 0);
                 const dist = groundTrackerStationPos.distanceTo(targetPos);
 
                 if (bCaught) {
                     desiredCamPos = towerCloseupPos;
-                    targetFov = 28.0;
+                    targetFov = 26.0;
                     document.getElementById('pip-tag').innerText = "CAM 02: MECHAZILLA (CHOPSTICKS SECURED)";
                     document.getElementById('pip-hud-alt').innerText = "SUSPENDED ON ARMS (ENGINES OFF)";
                 } else if (bY <= 4000) {
@@ -1641,6 +1643,7 @@ html_template = """
 
             const dRangeKm = (rx * 10.0) / 1000.0;
 
+            // 🎯 ロケット本体（第2段/オービター）の姿勢・座標更新
             rocket.position.set(rx, ry + 6.0, 0);
             rocket.rotation.z = -pitch;
             rocket.updateMatrixWorld(true);
@@ -1651,7 +1654,7 @@ html_template = """
             const ux = Math.sin(pitch), uy = Math.cos(pitch);
             const perpX = Math.cos(pitch), perpY = -Math.sin(pitch);
 
-            // 1. 外部ブースター分離（ゆっくり離れて落ちていく本物仕様）
+            // 1. 外部ストラップオンブースター分離
             if (!p0.strapon && !boosterDetached && boosterUnits.length > 0 && !simCfg.is_preview) {
                 boosterDetached = true;
                 playHeavySeparationSound();
@@ -1694,18 +1697,17 @@ html_template = """
                 }
             }
 
-            // 2. 第1段分離 ＆ スイングアーム動的開閉キャッチ
+            // 2. 🎯 第1段ブースター分離 ＆ リアルな独立キネマティクス（消滅ゼロ保証）
             const isSeparated = (p0.stage === 2 || p0.b_active);
             if (isSeparated && !stage1Detached && !simCfg.is_preview) {
                 stage1Detached = true;
                 playHeavySeparationSound();
-                camShake = 0.3;
+                camShake = 0.35;
                 s1NozzleTips.forEach(t => { t.plume.visible = false; });
                 s2NozzleTips.forEach(t => { t.plume.visible = true; });
-                scene.attach(s1Group);
             }
 
-            // スイングアーム開閉
+            // スイングアーム動的開閉（タワー進入時に展開）
             if (simCfg.spacex_return) {
                 if (stage1Detached && bY <= 2500) {
                     armLeftPivot.rotation.y = THREE.MathUtils.lerp(armLeftPivot.rotation.y, 0.02, 0.08);
@@ -1721,7 +1723,7 @@ html_template = """
             }
 
             if (stage1Detached) {
-                // 🎯 突起ピン（s1Len - 0.9）がスイングアーム上面（Y=67.5m）にガチッと引っかかるよう正確にオフセット
+                // 🎯 切り離し後のブースター位置（常に可視状態を完全維持）
                 const catchPinLocalOffset = s1Len - 0.9;
                 s1Group.position.set(bX * 0.1, bY - catchPinLocalOffset, 0);
                 s1Group.rotation.set(0, 0, -bPitch);
@@ -1730,13 +1732,13 @@ html_template = """
                 // 🎯 ブースター帰還時エンジン音（ランディングバーン）制御
                 if (actx && boosterRumble) {
                     if (p0.b_thrust && !p0.b_caught && bY <= 3500) {
-                        boosterRumble.gain.setTargetAtTime(1.4, actx.currentTime, 0.1);
+                        boosterRumble.gain.setTargetAtTime(1.5, actx.currentTime, 0.1);
                     } else {
                         boosterRumble.gain.setTargetAtTime(0.0001, actx.currentTime, 0.15);
                     }
                 }
 
-                // 🎯 アームキャッチ成功の瞬間（宙づり静止＆乾いた破裂音）
+                // 🎯 アームキャッチ成功の瞬間（宙づり静止＆破裂音）
                 if (p0.b_caught) {
                     armLeftPivot.rotation.y = 0.06;
                     armRightPivot.rotation.y = -0.06;
@@ -1746,7 +1748,7 @@ html_template = """
                     if (!catchPopPlayed) {
                         playFirecrackerSnapSound();
                         catchPopPlayed = true;
-                        camShake = 0.35;
+                        camShake = 0.40;
                     }
                     s1NozzleTips.forEach(t => { t.plume.visible = false; });
                 } else if (p0.b_thrust) {
@@ -1765,6 +1767,11 @@ html_template = """
                 } else {
                     s1NozzleTips.forEach(t => { t.plume.visible = false; });
                 }
+            } else {
+                // 切り離し前はロケット本体に完全同期
+                s1Group.position.set(rx, ry + 6.0, 0);
+                s1Group.rotation.z = -pitch;
+                s1Group.updateMatrixWorld(true);
             }
 
             // 3. フェアリング分離
@@ -1788,7 +1795,7 @@ html_template = """
                 }
             }
 
-            // 4. メイン火炎
+            // 4. メインエンジン火炎
             if (p0.thrust && !p0.exploded && !simCfg.is_preview) {
                 const activeTips = (p0.stage === 1) ? s1NozzleTips : s2NozzleTips;
                 if (p0.stage === 1 && !boosterDetached) activeTips.push(...boosterNozzleTips);
@@ -1826,33 +1833,30 @@ html_template = """
                 engineBounceLight.intensity = 0.0;
             }
 
-            // 5. 【完全復活】多方向微調整RCS（打ち上げ時の姿勢制御パルス＆帰還時微調整）
+            // 5. 🎯 【完全修正】姿勢制御時のみ一瞬パルス噴射するRCSスラスター
             let rcsActiveHUD = false;
-            const rcsDelta = Math.abs(rcsCommand - prevRcsCmdVal);
-            prevRcsCmdVal = rcsCommand;
-
-            const isCorrectingPitchPlus  = (rcsCommand > 0.08);
-            const isCorrectingPitchMinus = (rcsCommand < -0.08);
+            const hasRcsCmd = Math.abs(rcsCommand) > 0.15;
+            const isCorrectingPitchPlus  = (rcsCommand > 0.15);
+            const isCorrectingPitchMinus = (rcsCommand < -0.15);
             const boosterApproachTune = stage1Detached && p0.b_active && !p0.b_caught && (bY <= 3000);
 
             for(let rcs of rcsNozzles) {
                 let firePulse = false;
 
-                // 打ち上げ中および飛行中のRCSパルス噴射
+                // 打ち上げ中および飛行中の姿勢補正時のみ一瞬パルス噴射
                 if (!simCfg.is_preview && simT > -0.5 && !p0.exploded) {
-                    if (rcs.isS1 && !stage1Detached) {
+                    if (rcs.isS1 && !stage1Detached && hasRcsCmd) {
+                        // 姿勢変化の瞬間だけパルス発射
                         if (rcs.dir.id === "+Pitch" && isCorrectingPitchPlus) firePulse = true;
                         if (rcs.dir.id === "-Pitch" && isCorrectingPitchMinus) firePulse = true;
-                        // 離床直後のロール・ヨー制御パルス
-                        if (simT < 8.0 && Math.random() < 0.25) firePulse = true;
-                    } else if (!rcs.isS1 && stage1Detached) {
+                    } else if (!rcs.isS1 && stage1Detached && hasRcsCmd) {
                         if (rcs.dir.id === "+Pitch" && isCorrectingPitchPlus) firePulse = true;
                         if (rcs.dir.id === "-Pitch" && isCorrectingPitchMinus) firePulse = true;
                     }
                 }
 
-                // ブースター着陸進入中の多方向姿勢安定パルス
-                if (rcs.isS1 && boosterApproachTune && (Math.random() < 0.32)) {
+                // ブースター着陸進入中の多方向微調整パルス
+                if (rcs.isS1 && boosterApproachTune && (Math.random() < 0.25)) {
                     firePulse = true;
                 }
 
@@ -1861,20 +1865,21 @@ html_template = """
                     rcs.mount.getWorldPosition(tempRcsPos);
                     emitParticle(
                         tempRcsPos.x, tempRcsPos.y, tempRcsPos.z,
-                        rcs.dir.dx * 2.4 + (Math.random()-0.5)*0.4,
-                        rcs.dir.dy * 2.4 + (Math.random()-0.5)*0.4,
-                        rcs.dir.dz * 2.4 + (Math.random()-0.5)*0.4,
-                        0.5, 3.2, 14, 0.8, 0xf0f9ff, true
+                        rcs.dir.dx * 2.6 + (Math.random()-0.5)*0.3,
+                        rcs.dir.dy * 2.6 + (Math.random()-0.5)*0.3,
+                        rcs.dir.dz * 2.6 + (Math.random()-0.5)*0.3,
+                        0.6, 3.2, 10, 0.85, 0xf0f9ff, true
                     );
                 } else {
-                    rcs.intensity *= 0.65;
+                    // 噴射が終われば即座にフェードアウト（出っぱなしを完全防止）
+                    rcs.intensity *= 0.50;
                 }
 
                 rcs.jetMat.opacity = rcs.intensity;
                 if (rcs.intensity > 0.15) rcsActiveHUD = true;
             }
 
-            document.getElementById('hud-rcs').innerText = rcsActiveHUD ? "GN2 ACTIVE (MULTI-AXIS TUNE)" : "STANDBY (DEADBAND OK)";
+            document.getElementById('hud-rcs').innerText = rcsActiveHUD ? "GN2 PULSE FIRING" : "STANDBY (DEADBAND OK)";
             document.getElementById('hud-rcs').style.color = rcsActiveHUD ? "#34d399" : "#38bdf8";
 
             // 6. 発射台消音注水デリュージ
