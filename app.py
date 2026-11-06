@@ -569,8 +569,9 @@ html_template = """
         .pip-container { 
             position: absolute; 
             top: 56px; 
-            right: 18px; 
+            right: 6px; 
             width: 420px; 
+            max-width: calc(100vw - 12px);
             height: 240px; 
             border: 2px solid rgba(56, 189, 248, 0.95); 
             border-radius: 6px; 
@@ -682,8 +683,8 @@ html_template = """
             function resizePipRenderer() {
                 if (pipBox && pipVisible) {
                     const w = pipBox.clientWidth || 420;
-                    const h = pipBox.clientHeight || 240;
-                    rendererPip.setSize(w, h);
+                    const h = 240;
+                    rendererPip.setSize(w, h, false);
                     cameraPip.aspect = w / h;
                     cameraPip.updateProjectionMatrix();
                 }
@@ -692,12 +693,20 @@ html_template = """
 
             pipBox.addEventListener('click', () => {
                 pipVisible = !pipVisible;
-                canvasPip.style.display = pipVisible ? 'block' : 'none';
+                canvasPip.style.visibility = pipVisible ? 'visible' : 'hidden';
                 document.getElementById('pip-tag').style.display = pipVisible ? 'block' : 'none';
                 document.getElementById('pip-hud-alt').style.display = pipVisible ? 'block' : 'none';
                 pipBox.style.height = pipVisible ? '240px' : '32px';
                 document.getElementById('pip-hint').innerText = pipVisible ? '[CLICK TO HIDE]' : '[CLICK TO SHOW]';
-                setTimeout(resizePipRenderer, 50);
+                
+                if (pipVisible) {
+                    resizePipRenderer();
+                    rendererPip.render(scene, cameraPip);
+                    setTimeout(() => {
+                        resizePipRenderer();
+                        rendererPip.render(scene, cameraPip);
+                    }, 260);
+                }
             });
 
             function speakCallout(text) {
