@@ -89,7 +89,7 @@ FAIRINGS = {
 }
 
 # =========================================================================
-# 🚀 プリセットセレクター（リアル系＋ミサイル＋ジョーク枠）
+# 🚀 プリセットセレクター
 # =========================================================================
 PRESETS = {
     "🌟 カスタム構成 (自由設定)": None,
@@ -347,14 +347,14 @@ def run_simulation(preview_only=False):
         rho = float(1.225 * np.exp(-alt / 7400.0)) if alt < 140000 else 0.0
         q = float(0.5 * rho * (v**2) / 1000.0)
 
-        # 🎯 軌道到達手前（高度230km以上）でスラスターで真横（ピッチ0度）へ完全に傾ける
+        # 軌道到達手前（高度230km以上）でスラスターにより真横（ピッチ0度）へ姿勢ロック
         if alt_km < turn_start_alt:
             target_pitch_deg = 90.0
         elif alt_km < 230.0:
             prog = (alt_km - turn_start_alt) / (230.0 - turn_start_alt)
             target_pitch_deg = 90.0 * (1.0 - (prog ** turn_exponent))
         else:
-            target_pitch_deg = 0.0 # 完全水平ロック
+            target_pitch_deg = 0.0
 
         wing_lift_force = 0.0
         if wings_attached and alt_km < 50.0 and rho > 0.003:
@@ -403,7 +403,6 @@ def run_simulation(preview_only=False):
                 if spacex_return_mode and not b_active:
                     b_active = True
                     b_x, b_y = x, y
-                    # 🎯 改善2: 切り離し後勝手に上昇させず、即座に下向き(-45m/s)に落下開始させ、発射台へ戻る横速度を付与
                     b_vy = -45.0
                     b_vx = -(b_x / 55.0)
                     b_pitch = 0.20
@@ -434,7 +433,7 @@ def run_simulation(preview_only=False):
                 if thrust / (cur_mass * g0) > max_g_limit_cut: thrust = max_g_limit_cut * cur_mass * g0
                 fuel_s2_rem -= (thrust / (isp * g0)) * dt
 
-        # 🔄 ブースターRTLS帰還（IFT-5動画準拠：即時降下・斜めバンク進入・13基→3基点火・ピンキャッチ）
+        # 🔄 ブースターRTLS帰還（即時降下・斜めバンク進入・13基→3基点火・ピンキャッチ）
         if b_active and not b_caught:
             b_alt = b_y
             b_rho = float(1.225 * np.exp(-b_alt / 7400.0)) if b_alt < 140000 else 0.0
@@ -453,7 +452,6 @@ def run_simulation(preview_only=False):
                 b_fuel -= (b_force / (s1_spec["isp_vac"] * g0)) * dt
                 b_vy += (b_force / (s1_spec["dry_mass"] * 1000.0)) * dt * 0.9
             elif b_alt <= (TOWER_PHYSICAL_CATCH_Y + 3600.0):
-                # 🎯 IFT-5動画再現：高度3.6kmから沖合より斜めにバンク進入し、アーム上で垂直に戻す
                 rem_h = max(0.0, b_alt - TOWER_PHYSICAL_CATCH_Y)
                 b_thrust = True
                 b_x = rem_h * 0.16
@@ -505,7 +503,6 @@ def run_simulation(preview_only=False):
         vx, vy = float(vx + ax * dt), float(vy + ay * dt)
         x, y = float(x + vx * dt), float(max(0.0, y + vy * dt))
 
-        # 🎯 第一宇宙速度（約7,850m/s以上）かつ高度230km以上で軌道投入成功
         is_orbit_achieved = bool(alt_km >= 230.0 and vx >= 7850.0)
 
         history.append({
@@ -533,7 +530,6 @@ def run_simulation(preview_only=False):
 
 st.markdown("<div id='launch-viewport'></div>", unsafe_allow_html=True)
 
-# 🎯 改善6: ボタン名称のシンプル固定化
 cb1, cb2 = st.columns([3, 1])
 with cb1:
     launch_clicked = st.button("🔴 4K LIVE中継：ローンチ・シーケンス開始", use_container_width=True, type="primary")
@@ -711,7 +707,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🔊 音響合成システム (重低音轟音・バリバリ音・実写級衝撃音・圧縮空気パルス音)
+        // 🔊 音響合成システム
         // =========================================================================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let actx = null, subRumble = null, shockCrackle = null, gasHiss = null, boosterRumble = null;
@@ -758,7 +754,6 @@ html_template = """
         }
         ['click', 'touchstart', 'mousedown', 'keydown'].forEach(evt => window.addEventListener(evt, ensureAudioActive));
 
-        // 🎯 修正3: 実写級の重厚なメカニカル分離音
         function playHeavySeparationSound() {
             ensureAudioActive();
             if (!actx) return;
@@ -793,7 +788,6 @@ html_template = """
             pSrc.start(now + 0.015);
         }
 
-        // 🎯 修正2: 冷ガスRCSの極短パルス音（プシュッ！）
         function playRcsPuffSound() {
             if (!actx) return;
             const now = actx.currentTime, dur = 0.08;
@@ -818,7 +812,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🌍 Three.js シーン ＆ 環境ライティング
+        // 🌍 Three.js シーン ＆ ライティング
         // =========================================================================
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x0a192f);
@@ -867,9 +861,7 @@ html_template = """
         const oceanMesh = new THREE.Mesh(new THREE.PlaneGeometry(35000, 35000), new THREE.MeshStandardMaterial({ color: 0x072744, roughness: 0.15, metalness: 0.85 }));
         oceanMesh.rotation.x = -Math.PI / 2; oceanMesh.position.set(12000, -6.0, 0); landscapeGroup.add(oceanMesh);
 
-        // =========================================================================
-        // 🏗️ 発射台 ＆ スイングアーム (Mechazilla: 高さ67.5m)
-        // =========================================================================
+        // 発射台 ＆ スイングアーム (Mechazilla: 高さ67.5m)
         const pad = new THREE.Group(); scene.add(pad);
         const isSaturnPad = (simCfg.s1_mat === 'saturn' || simCfg.s1_mat === 'al');
         const darkSteelMat = new THREE.MeshStandardMaterial({ color: 0x222a36, metalness: 0.85, roughness: 0.35 });
@@ -897,9 +889,7 @@ html_template = """
         armRight.position.set(8.0, 0, 0); armRightPivot.add(armRight);
         armLeftPivot.rotation.y = -0.75; armRightPivot.rotation.y = 0.75;
 
-        // =========================================================================
-        // 🚀 リアル造形ロケットモデル構築（鉛筆感完全払拭＆特殊機体対応）
-        // =========================================================================
+        // ロケット構造
         function getRealisticMaterial(matId) {
             let col = 0xd5dce6, m = 0.92, r = 0.16;
             if (matId === 'al') { col = 0xc2410c; m = 0.15; r = 0.65; }
@@ -935,27 +925,23 @@ html_template = """
         const s1Len = simCfg.s1_len, s2Len = simCfg.s2_len;
         const s1Mat = getRealisticMaterial(simCfg.s1_mat), s2Mat = getRealisticMaterial(simCfg.s2_mat);
 
-        // 🎯 改善3: 胴体ディテール（六角柱ペンシル or 円柱＋縦配管フィードライン）
         const isPencilRocket = (simCfg.s1_mat === 'pencil');
         const s1Segments = isPencilRocket ? 6 : 32;
         const s1Body = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.12, s1Len, s1Segments), s1Mat);
         s1Body.position.y = s1Len / 2; s1Group.add(s1Body);
 
         if (!isPencilRocket && simCfg.s1_mat !== 'baguette') {
-            // 縦配管（LOX/メタンフィードパイプ）
             const feedPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, s1Len * 0.92, 12), pipeMat);
             feedPipe.position.set(1.14, s1Len * 0.48, 0); s1Group.add(feedPipe);
             const feedPipe2 = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, s1Len * 0.85, 12), pipeMat);
             feedPipe2.position.set(-1.14, s1Len * 0.45, 0); s1Group.add(feedPipe2);
 
-            // リブ補強リング
             for(let ry = 2.5; ry < s1Len; ry += 3.8) {
                 const ring = new THREE.Mesh(new THREE.TorusGeometry(1.125, 0.015, 6, 24), darkSteelMat);
                 ring.rotation.x = Math.PI / 2; ring.position.y = ry; s1Group.add(ring);
             }
         }
 
-        // 🎯 修正4: Z軸方向（左右アーム方向）へ突き出すゴールド色キャッチピン
         const catchPins = new THREE.Mesh(
             new THREE.CylinderGeometry(0.26, 0.26, 3.8, 16),
             new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.9, roughness: 0.25 })
@@ -1007,7 +993,6 @@ html_template = """
         const s1EpsScale = 0.75 + (simCfg.s1_eps / 70.0) * 0.75;
         buildFullDetailedEngineCluster(s1Group, simCfg.s1_eng, 0.0, s1EpsScale, s1NozzleTips, 28.0, simCfg.flame_hex);
 
-        // 空力翼 / グリッドフィン / ミサイルフィン
         const wingsGroup = new THREE.Group(); s1Group.add(wingsGroup);
         const aoaRad = (simCfg.aoa * Math.PI) / 180.0;
         if (simCfg.wing_id === 'grid') {
@@ -1040,7 +1025,6 @@ html_template = """
             }
         }
 
-        // ストラップオンブースター
         const boosterUnits = [];
         if (simCfg.strapon_count > 0 && simCfg.strapon_type !== 'none') {
             const isSRB = (simCfg.strapon_type === 'srb'), isSoyuz = (simCfg.strapon_type === 'soyuz');
@@ -1064,7 +1048,6 @@ html_template = """
             }
         }
 
-        // 🎯 改善3: 段間トラスリング（ホットステージング排気スリット部）
         const interStage = new THREE.Group();
         interStage.position.y = s1Len;
         s1Group.add(interStage);
@@ -1073,12 +1056,10 @@ html_template = """
         const trussWire = new THREE.Mesh(new THREE.CylinderGeometry(1.125, 1.125, 2.2, 12, 3, true), trussWireMat);
         trussWire.position.y = 1.1; interStage.add(trussWire);
 
-        // 第2段本体
         const s2Group = new THREE.Group(); s2Group.position.y = s1Len + 2.2; rocket.add(s2Group);
         const s2Body = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.12, s2Len, s1Segments), s2Mat);
         s2Body.position.y = s2Len / 2; s2Group.add(s2Body);
 
-        // 🎯 改善3: Starship片面耐熱黒タイル（ヒートシールド）
         if (simCfg.s2_mat === 'ss') {
             const heatShield = new THREE.Mesh(
                 new THREE.CylinderGeometry(1.128, 1.128, s2Len, 24, 1, true, 0, Math.PI),
@@ -1096,7 +1077,6 @@ html_template = """
         const satBus = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 2.4, 16), new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.95, roughness: 0.2 }));
         payloadGroup.add(satBus);
 
-        // 🎯 改善3: 先端ノーズコーン・オジブ曲線流線型
         const fairingHalves = [];
         if (simCfg.fairing_shape === 'abort_tower') {
             const cap = new THREE.Mesh(new THREE.ConeGeometry(1.14, 2.8, 24), s2Mat); cap.position.y = s2Len + 1.4; s2Group.add(cap);
@@ -1126,7 +1106,6 @@ html_template = """
             }
         }
 
-        // 🎯 修正2: 4象限冷ガスRCSスラスター
         const rcsDirs = [{ id: "+Pitch", dx: -1 }, { id: "-Pitch", dx: 1 }, { id: "+Yaw", dz: -1 }, { id: "-Yaw", dz: 1 }];
         const rcsNozzles = [];
         function addRcsCluster(parent, yPos, isS1) {
@@ -1141,7 +1120,7 @@ html_template = """
         addRcsCluster(s2Group, s2Len - 0.7, false);
 
         // =========================================================================
-        // 💨 パーティクルプール (水蒸気・エンジン白煙・火花)
+        // 💨 パーティクルプール
         // =========================================================================
         function createCloudTex() {
             const c = document.createElement('canvas'); c.width = 128; c.height = 128;
@@ -1154,8 +1133,7 @@ html_template = """
         function createSparkTex() {
             const c = document.createElement('canvas'); c.width = 32; c.height = 32;
             const g = c.getContext('2d').createRadialGradient(16,16,1, 16,16,15);
-            g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.4, 'rgba(255,220,120,0.95)');
-            g.addColorStop(1, 'rgba(255,40,0,0)');
+            g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.4, 'rgba(255,220,120,0.95)'); g.addColorStop(1, 'rgba(255,40,0,0)');
             c.getContext('2d').fillStyle = g; c.getContext('2d').fillRect(0,0,32,32);
             return new THREE.CanvasTexture(c);
         }
@@ -1258,7 +1236,7 @@ html_template = """
             const ux = Math.sin(pitch), uy = Math.cos(pitch);
             const perpX = Math.cos(pitch), perpY = -Math.sin(pitch);
 
-            // 🎯 修正1 & 2: サイドブースター切り離し時に上昇せず下へ自然落下
+            // 🎯 JS 構文エラーを解消：コメントを // に修正
             if (!p0.strapon && !boosterDetached && boosterUnits.length > 0 && !simCfg.is_preview) {
                 boosterDetached = true;
                 playHeavySeparationSound();
@@ -1270,7 +1248,7 @@ html_template = """
                     const outX = Math.cos(b.angle), outZ = Math.sin(b.angle);
                     const sepP = simCfg.sep_thrust;
                     b.vx = perpX * outX * (1.2 * sepP);
-                    b.vy = -2.5 * sepP; # 最初から下向き初速で離脱
+                    b.vy = -2.5 * sepP; // 下向き初速で離脱
                     b.vz = outZ * (1.2 * sepP);
                     b.rx = outZ * 0.18; b.rz = -outX * 0.18;
                 }
@@ -1280,7 +1258,7 @@ html_template = """
                     b.mesh.position.x += b.vx * 0.016;
                     b.mesh.position.y += b.vy * 0.016;
                     b.mesh.position.z += b.vz * 0.016;
-                    b.vy -= 1.8 * 0.016; # 重力落下
+                    b.vy -= 1.8 * 0.016; // 重力落下
                     b.mesh.rotation.x += b.rx * 0.016;
                     b.mesh.rotation.z += b.rz * 0.016;
                 }
@@ -1304,7 +1282,7 @@ html_template = """
                 }
             }
 
-            // 🎯 修正4: スイングアーム（チョップスティック）のリアルタイム開閉制御
+            // スイングアーム（チョップスティック）
             const bY_scaled = (bY * 0.1) + 6.0;
             if (simCfg.spacex_return) {
                 if (p0.b_caught) {
@@ -1330,7 +1308,7 @@ html_template = """
                 }
             }
 
-            // 🎯 修正4: ブースター降下中および13基→3基点火切り替え
+            // ブースター降下中および13基→3基点火切り替え
             if (stage1Detached) {
                 s1Group.visible = true;
                 s1Group.position.set(bX * 0.1, bY_scaled, 0);
@@ -1408,7 +1386,7 @@ html_template = """
                 engineBounceLight.intensity = 0.0;
             }
 
-            // 🎯 修正2: 軌道修正時のみ一瞬プシュッと飛び出す霧状RCS
+            // RCS スラスター
             let rcsActiveHUD = false;
             const cmdFired = (Math.abs(rcsCmd) > 0.2 && Math.abs(prevRcsCmd) <= 0.2);
             prevRcsCmd = rcsCmd;
@@ -1443,13 +1421,12 @@ html_template = """
             document.getElementById('hud-rcs').innerText = rcsActiveHUD ? "PULSE FIRING" : "STANDBY (DEADBAND OK)";
             document.getElementById('hud-rcs').style.color = rcsActiveHUD ? "#34d399" : "#38bdf8";
 
-            // 🎯 修正1: 発射台注水デリュージ・重低音・白煙パーティクル完全復活
+            // 注水デリュージ・先行点火・排煙
             if (simT < 0.0) {
                 const sec = Math.ceil(Math.abs(simT));
                 document.getElementById('tv-timer').innerText = simCfg.is_preview ? "PAD INSPECTION" : `T- 00:0${sec}.0`;
                 emitParticle(rx + 1.25, ry + 6.0 + s1Len * 0.85, 0, 0.25, 0.05, 0, 0.9, 4.2, 45, 0.4, 0xffffff);
 
-                // 水冷デリュージ噴流 (T-5.0秒から大量放出)
                 if (simT >= -5.0 && !p0.exploded && !simCfg.is_preview) {
                     if (gasHiss && actx) gasHiss.gain.setTargetAtTime(0.55, actx.currentTime, 0.2);
                     for(let i=0; i<8; i++) {
@@ -1458,7 +1435,6 @@ html_template = """
                     }
                 }
 
-                // 先行点火開始（T-3.8sから火花＆重低音立ち上がり）
                 if (simT >= -simCfg.ignition_lead && !p0.exploded && !simCfg.is_preview) {
                     if (actx) {
                         if (subRumble) subRumble.gain.setTargetAtTime(1.1, actx.currentTime, 0.3);
@@ -1470,7 +1446,6 @@ html_template = """
                     }
                 }
 
-                // 点火後の爆煙立ち込め (T-3.0秒〜0秒)
                 if (simT >= -3.0 && !p0.exploded && !simCfg.is_preview) {
                     camShake = 0.28;
                     for(let i=0; i<10; i++) {
@@ -1493,7 +1468,6 @@ html_template = """
                     if (gasHiss) gasHiss.gain.setTargetAtTime(0.18 * atm, actx.currentTime, 1.0);
                 }
 
-                // 離床直後の地面激突白煙 (T+0〜6秒)
                 if (simT < 6.0) {
                     camShake = 0.38;
                     for(let i=0; i<8; i++) {
@@ -1508,7 +1482,7 @@ html_template = """
                 }
             }
 
-            // パーティクル更新
+            // パーティクル位置更新
             for(let p of pool) {
                 if (!p.active) continue;
                 p.age++;
@@ -1593,7 +1567,7 @@ html_template = """
             document.getElementById('tv-q').innerText   = q.toFixed(1);
             document.getElementById('tv-g').innerText   = accG.toFixed(1);
 
-            // 🎯 修正5: ミッション成功判定（SpaceX ONなら両方成功、OFFなら軌道到達のみで即完了）
+            // ミッション成功判定
             const isOrbit = (p0.event === "ORBIT");
             const canComplete = simCfg.spacex_return ? (isOrbit && p0.b_caught) : isOrbit;
 
