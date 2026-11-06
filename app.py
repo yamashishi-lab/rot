@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 st.title("🚀 Orbital Architect Ultra")
-st.caption("※ 4K実写級：IFT-5タワーキャッチ地上完全追尾・リアル霧状パルスRCS・黒線完全除去版")
+st.caption("※ 4K実写級：IFT-5タワーキャッチ地上完全追尾・リアル霧状パルスRCS・スケール完全統一版")
 
 # =========================================================================
 # 🔬 推進剤・材料・空力パーツ・ブースターデータベース
@@ -216,17 +216,7 @@ m4.metric("ブースター追加推力", f"+{strapon_spec['thrust_add']:.0f} kN"
 # =========================================================================
 # 💥 物理シミュレーション (高度250km水平停止・横速7.9km/s投入＆即時降下RTLS)
 # =========================================================================
-def run_simulation(preview_only=False):
-    if preview_only:
-        return [{
-            "t": -10.0, "x": 0.0, "y": 0.0, "alt": 0.0, "v": 0.0,
-            "q": 0.0, "g": 1.0, "stage": 1, "fairing": True, "wings": bool(wing_spec["wing_id"] != "none"),
-            "strapon": bool(strapon_spec["count"] > 0), "exploded": False, "explosion_type": "NONE",
-            "thrust": False, "pitch": 0.0, "mach": 0.0, "event": "PREVIEW",
-            "rcs_cmd": 0.0,
-            "b_x": 0.0, "b_y": 0.0, "b_active": False, "b_pitch": 0.0, "b_thrust": False, "b_caught": False
-        }], None
-
+def run_simulation():
     dt = 0.5
     g0 = 9.80665
     R_earth = 6371000.0
@@ -269,7 +259,7 @@ def run_simulation(preview_only=False):
     supersonic_called = False
 
     TARGET_ALT_KM = 250.0
-    TARGET_ORBITAL_VX = 7900.0 # 約28,400km/h
+    TARGET_ORBITAL_VX = 7900.0
 
     for step in range(3500):
         t = float(step * dt)
@@ -417,7 +407,7 @@ def run_simulation(preview_only=False):
             target_vx = -b_x / est_time_to_ground
 
             if b_alt > 35000 and b_fuel > s1_fuel * 1000 * 0.04:
-                b_pitch = -1.57 # 水平逆噴射
+                b_pitch = -1.57
                 b_thrust_force = s1_spec["thrust_vac"] * 1000.0 * 0.95
                 b_thrust = True
                 b_fuel -= (b_thrust_force / (s1_spec["isp_vac"] * g0)) * dt
@@ -530,23 +520,12 @@ def run_simulation(preview_only=False):
 
     return history, fail_reason
 
-st.markdown("<div id='launch-viewport'></div>", unsafe_allow_html=True)
-
-btn_label = "🔴 4K中継：Starship & Super Heavy タワーキャッチ開始" if spacex_return_mode else "🔴 4K中継：軌道投入シミュレーション開始"
-
-cb1, cb2 = st.columns([3, 1])
-with cb1:
-    launch_clicked = st.button(btn_label, use_container_width=True, type="primary")
-with cb2:
-    st.caption("※ 上のタブで設定変更すると発射台上のロケットが即座に3D更新されます。")
-
-traj_data, error_msg = run_simulation(preview_only=(not launch_clicked))
+traj_data, error_msg = run_simulation()
 
 s1_len_scaled = float(np.clip(12.0 + (s1_fuel / 4500.0) * 15.0, 11.0, 27.0))
 s2_len_scaled = float(np.clip(6.0 + (s2_fuel / 1200.0) * 8.0, 5.5, 14.0))
 
 rocket_visual_cfg = {
-    "is_preview": bool(not launch_clicked),
     "s1_mat": s1_spec["mat_id"],
     "s2_mat": s2_spec["mat_id"],
     "s1_cyc": s1_spec["cyc_id"],
@@ -580,7 +559,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 完全描画テンプレート
+# 📺 HTML / JS 完全描画テンプレート（スケール統一＆独立オブジェクト版）
 # =========================================================================
 html_template = """
 <!DOCTYPE html>
@@ -678,10 +657,36 @@ html_template = """
         .rud-banner { display: none; position: absolute; top: 150px; left: 50%; transform: translateX(-50%); background: #7f1d1d; border: 2px solid #ef4444; border-radius: 4px; padding: 16px 28px; z-index: 70; text-align: center; box-shadow: 0 0 60px rgba(239, 68, 68, 0.7); }
 
         .complete-banner { display: none; position: absolute; top: 140px; left: 50%; transform: translateX(-50%); background: rgba(6, 78, 59, 0.95); border: 2px solid #10b981; border-radius: 6px; padding: 20px 36px; z-index: 70; text-align: center; box-shadow: 0 0 70px rgba(16, 185, 129, 0.7); }
+
+        /* 🔴 画面内直接起動ボタン（ブラウザの音声制限を100%解除） */
+        #launch-overlay-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 18px 42px;
+            font-size: 20px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            color: #fff;
+            background: linear-gradient(135deg, #ef4444, #b91c1c);
+            border: 2px solid #fca5a5;
+            border-radius: 8px;
+            box-shadow: 0 0 50px rgba(239, 68, 68, 0.8);
+            cursor: pointer;
+            z-index: 100;
+            transition: all 0.2s ease;
+        }
+        #launch-overlay-btn:hover {
+            transform: translate(-50%, -50%) scale(1.05);
+            box-shadow: 0 0 70px rgba(239, 68, 68, 1.0);
+        }
     </style>
 </head>
 <body>
     <canvas id="canvas-main"></canvas>
+
+    <button id="launch-overlay-btn">🔴 LAUNCH MISSION (CLICK TO START)</button>
 
     <div id="pip-box" class="pip-container" title="クリックでPiPの表示/非表示を切り替え">
         <canvas id="canvas-pip"></canvas>
@@ -775,9 +780,12 @@ html_template = """
         const rudDesc = document.getElementById('rud-desc');
         const eventLog = document.getElementById('event-log');
         const subCallout = document.getElementById('sub-callout');
+        const launchBtn = document.getElementById('launch-overlay-btn');
 
+        let isMissionStarted = false;
         let isMissionEnded = false;
         let catchPopPlayed = false;
+        let tStart = performance.now();
 
         let pipVisible = true;
         const pipBox = document.getElementById('pip-box');
@@ -827,7 +835,7 @@ html_template = """
         }
 
         // =========================================================================
-        // 🔊 音響合成システム（完全アクティベート＆実写音響）
+        // 🔊 音響合成システム（ユーザー操作連動・確実アンロック）
         // =========================================================================
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let actx = null, subRumble = null, shockCrackle = null, gasHiss = null;
@@ -877,8 +885,11 @@ html_template = """
             }
         }
 
-        ['click', 'touchstart', 'mousedown', 'keydown'].forEach(evt => {
-            window.addEventListener(evt, () => { ensureAudioActive(); });
+        launchBtn.addEventListener('click', () => {
+            ensureAudioActive();
+            launchBtn.style.display = 'none';
+            isMissionStarted = true;
+            tStart = performance.now();
         });
 
         // 💥 【実写級切り離し音】重厚インパルス爆縮 ＋ パシュウウ高圧パージ
@@ -1029,7 +1040,7 @@ html_template = """
         landscapeGroup.add(oceanMesh);
 
         // =========================================================================
-        // 🏗️ 発射台 ＆ スイングアーム機構
+        // 🏗️ 発射台 ＆ スイングアーム機構（Y=67.5m で宙づりキャッチ）
         // =========================================================================
         const pad = new THREE.Group();
         scene.add(pad);
@@ -1200,13 +1211,12 @@ html_template = """
         }
 
         // =========================================================================
-        // 🚀 ロケット本体 ＆ 独立ブースターモデル構築（消滅バグ完全根絶）
+        // 🚀 ロケット本体 ＆ 独立ブースター（最初から完全独立シーングラフ配置）
         // =========================================================================
         const rocket = new THREE.Group();
         rocket.position.y = 6.0;
         scene.add(rocket);
 
-        // 🎯 ブースター専用グループ（最初からscene直下に配置してスケール崩れを完全防止）
         const s1Group = new THREE.Group();
         scene.add(s1Group);
 
@@ -1598,7 +1608,6 @@ html_template = """
         // =========================================================================
         // ⏱️ アニメーション・メインループ
         // =========================================================================
-        const tStart = performance.now();
         let boosterDetached = false;
         let stage1Detached = false;
         let fairingDetached = false;
@@ -1611,10 +1620,10 @@ html_template = """
 
             requestAnimationFrame(animate);
 
-            const elapsedSec = (now - tStart) / 1000.0;
-            const simT = simCfg.is_preview ? -10.0 : (-10.0 + elapsedSec);
+            const elapsedSec = isMissionStarted ? ((now - tStart) / 1000.0) : 0.0;
+            const simT = isMissionStarted ? (-10.0 + elapsedSec) : -10.0;
 
-            if (!simCfg.is_preview) {
+            if (isMissionStarted) {
                 updateFlightCallouts(simT);
             }
 
@@ -1652,7 +1661,7 @@ html_template = """
             const perpX = Math.cos(pitch), perpY = -Math.sin(pitch);
 
             // 1. 外部ストラップオンブースター分離
-            if (!p0.strapon && !boosterDetached && boosterUnits.length > 0 && !simCfg.is_preview) {
+            if (!p0.strapon && !boosterDetached && boosterUnits.length > 0 && isMissionStarted) {
                 boosterDetached = true;
                 playHeavySeparationSound();
                 camShake = 0.25;
@@ -1696,7 +1705,7 @@ html_template = """
 
             // 2. 🎯 第1段ブースター分離 ＆ リアルな独立キネマティクス（消滅ゼロ保証）
             const isSeparated = (p0.stage === 2 || p0.b_active);
-            if (isSeparated && !stage1Detached && !simCfg.is_preview) {
+            if (isSeparated && !stage1Detached && isMissionStarted) {
                 stage1Detached = true;
                 playHeavySeparationSound();
                 camShake = 0.35;
@@ -1719,12 +1728,11 @@ html_template = """
                 }
             }
 
-            // 🎯 【座標スケール修正】ブースターの座標スケールを 0.1 倍に完全に統一
+            // 🎯 縮尺統一（メートル座標）
             const bY_scaled = (bY * 0.1) + 6.0;
 
             if (stage1Detached) {
                 s1Group.visible = true;
-                // 突起ピンがアーム（Y=67.5m）に合致するよう物理固定
                 s1Group.position.set(bX * 0.1, bY_scaled, 0);
                 s1Group.rotation.set(0, 0, -bPitch);
                 s1Group.updateMatrixWorld(true);
@@ -1768,7 +1776,6 @@ html_template = """
                     s1NozzleTips.forEach(t => { t.plume.visible = false; });
                 }
             } else {
-                // 切り離し前はロケット本体に完全同期
                 s1Group.visible = true;
                 s1Group.position.set(rx, ry + 6.0, 0);
                 s1Group.rotation.z = -pitch;
@@ -1776,7 +1783,7 @@ html_template = """
             }
 
             // 3. フェアリング分離
-            if (!p0.fairing && !fairingDetached && fairingHalves.length > 0 && !simCfg.is_preview) {
+            if (!p0.fairing && !fairingDetached && fairingHalves.length > 0 && isMissionStarted) {
                 fairingDetached = true;
                 playHeavySeparationSound();
                 for(let fh of fairingHalves) {
@@ -1797,7 +1804,7 @@ html_template = """
             }
 
             // 4. メインエンジン火炎
-            if (p0.thrust && !p0.exploded && !simCfg.is_preview) {
+            if (p0.thrust && !p0.exploded && isMissionStarted) {
                 const activeTips = (p0.stage === 1) ? s1NozzleTips : s2NozzleTips;
                 if (p0.stage === 1 && !boosterDetached) activeTips.push(...boosterNozzleTips);
 
@@ -1842,8 +1849,7 @@ html_template = """
             for(let rcs of rcsNozzles) {
                 let firePulse = false;
 
-                // 🎯 姿勢変化の瞬間だけ一瞬パルス噴射（反作用方向へ噴射）
-                if (!simCfg.is_preview && simT > -0.5 && !p0.exploded) {
+                if (isMissionStarted && simT > -0.5 && !p0.exploded) {
                     if (rcs.isS1 && !stage1Detached && isFiringRcs) {
                         if (rcs.dir.id === "+Pitch" && rcsCommand > 0.2) firePulse = true;
                         if (rcs.dir.id === "-Pitch" && rcsCommand < -0.2) firePulse = true;
@@ -1881,11 +1887,11 @@ html_template = """
             // 6. 発射台消音注水デリュージ
             if (simT < 0.0) {
                 const sec = Math.ceil(Math.abs(simT));
-                document.getElementById('tv-timer').innerText = simCfg.is_preview ? "PAD INSPECTION" : `T- 00:0${sec}.0`;
+                document.getElementById('tv-timer').innerText = !isMissionStarted ? "PAD READY (PRESS LAUNCH)" : `T- 00:0${sec}.0`;
 
                 emitParticle(rx + 1.25, ry + 6.0 + s1Len * 0.85, 0, 0.25, 0.05, 0, 0.9, 4.2, 45, 0.4, 0xffffff);
 
-                if (simT >= -5.0 && !p0.exploded && !simCfg.is_preview) {
+                if (simT >= -5.0 && !p0.exploded && isMissionStarted) {
                     if (gasHiss && actx) gasHiss.gain.setTargetAtTime(0.55, actx.currentTime, 0.2);
 
                     for(let i=0; i<6; i++) {
@@ -1898,7 +1904,7 @@ html_template = """
                     }
                 }
 
-                if (simT >= -simCfg.ignition_lead && !p0.exploded && !simCfg.is_preview) {
+                if (simT >= -simCfg.ignition_lead && !p0.exploded && isMissionStarted) {
                     for(let tObj of s1NozzleTips) {
                         tObj.node.getWorldPosition(tempTipPos);
                         emitNozzleSpark(
@@ -1909,7 +1915,7 @@ html_template = """
                     }
                 }
 
-                if (simT >= -3.0 && !p0.exploded && !simCfg.is_preview) {
+                if (simT >= -3.0 && !p0.exploded && isMissionStarted) {
                     camShake = 0.25;
                     for(let i=0; i<8; i++) {
                         const ang = Math.random() * Math.PI * 2;
@@ -1976,10 +1982,10 @@ html_template = """
                 rocket.localToWorld(activeFocusWorld);
             }
 
-            if (simCfg.is_preview) {
+            if (!isMissionStarted) {
                 document.getElementById('cam-tag').innerText = "PAD INSPECTION: LIVE 3D CINEMA VIEW";
-                const orbitAng = elapsedSec * 0.22;
-                cameraMain.position.set(Math.sin(orbitAng) * 115.0, 28.0 + Math.sin(elapsedSec * 0.3) * 10.0, Math.cos(orbitAng) * 115.0);
+                const orbitAng = (performance.now() / 1000.0) * 0.22;
+                cameraMain.position.set(Math.sin(orbitAng) * 115.0, 28.0 + Math.sin(orbitAng * 1.5) * 10.0, Math.cos(orbitAng) * 115.0);
                 cameraMain.lookAt(0, 6.0 + (s1Len + s2Len) * 0.45, 0);
             } else {
                 const desiredOffset = new THREE.Vector3();
@@ -2087,10 +2093,9 @@ final_html = final_html.replace("__FAIL_MSG__", fail_msg_clean)
 
 components.html(final_html, height=980)
 
-if launch_clicked:
-    st.markdown("---")
-    st.markdown("### 📋 フライトテレメトリ詳細レポート")
-    if error_msg:
-        st.error(f"⚠️ **ミッション異常終了 (RUD)**: {error_msg}")
-    else:
-        st.success("🎉 **ミッション完全成功 (Starship LEO Insertion & Super Heavy Mechazilla Catch)**: 第1段ブースターのタワーキャッチおよび第2段の軌道投入シーケンスが設計通り正常に推移しました。")
+st.markdown("---")
+st.markdown("### 📋 フライトテレメトリ詳細レポート")
+if error_msg:
+    st.error(f"⚠️ **ミッション異常終了 (RUD)**: {error_msg}")
+else:
+    st.success("🎉 **ミッション完全成功 (Starship LEO Insertion & Super Heavy Mechazilla Catch)**: 第1段ブースターのタワーキャッチおよび第2段の軌道投入シーケンスが設計通り正常に推移しました。")
