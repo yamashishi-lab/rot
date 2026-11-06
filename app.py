@@ -569,10 +569,9 @@ html_template = """
         .pip-container { 
             position: absolute; 
             top: 56px; 
-            left: 18px; 
             right: 18px; 
-            width: calc(100vw - 36px); 
-            height: 295px; 
+            width: 420px; 
+            height: 240px; 
             border: 2px solid rgba(56, 189, 248, 0.95); 
             border-radius: 6px; 
             z-index: 60; 
@@ -682,8 +681,8 @@ html_template = """
 
             function resizePipRenderer() {
                 if (pipBox && pipVisible) {
-                    const w = pipBox.clientWidth || window.innerWidth - 36;
-                    const h = pipBox.clientHeight || 295;
+                    const w = pipBox.clientWidth || 420;
+                    const h = pipBox.clientHeight || 240;
                     rendererPip.setSize(w, h);
                     cameraPip.aspect = w / h;
                     cameraPip.updateProjectionMatrix();
@@ -696,7 +695,7 @@ html_template = """
                 canvasPip.style.display = pipVisible ? 'block' : 'none';
                 document.getElementById('pip-tag').style.display = pipVisible ? 'block' : 'none';
                 document.getElementById('pip-hud-alt').style.display = pipVisible ? 'block' : 'none';
-                pipBox.style.height = pipVisible ? '295px' : '32px';
+                pipBox.style.height = pipVisible ? '240px' : '32px';
                 document.getElementById('pip-hint').innerText = pipVisible ? '[CLICK TO HIDE]' : '[CLICK TO SHOW]';
                 setTimeout(resizePipRenderer, 50);
             });
@@ -877,12 +876,12 @@ html_template = """
             rendererMain.toneMappingExposure = 1.35;
 
             const rendererPip = new THREE.WebGLRenderer({ canvas: canvasPip, antialias: true });
-            rendererPip.setSize(520, 295);
+            rendererPip.setSize(420, 240);
             rendererPip.toneMapping = THREE.ACESFilmicToneMapping;
             rendererPip.toneMappingExposure = 1.45;
 
             const cameraMain = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 2.0, 75000);
-            const cameraPip = new THREE.PerspectiveCamera(38.0, 520 / 295, 2.0, 75000);
+            const cameraPip = new THREE.PerspectiveCamera(38.0, 420 / 240, 2.0, 75000);
 
             const sunLight = new THREE.DirectionalLight(0xfffaed, 5.0);
             sunLight.position.set(4000, 6000, 3000); scene.add(sunLight);
@@ -1342,8 +1341,13 @@ html_template = """
                 rocket.rotation.z = -pitch;
                 rocket.updateMatrixWorld(true);
 
-                starMat.opacity = Math.min(0.95, Math.max(0.02, (alt - 15.0) / 60.0));
-                skyDomeMat.color.setHex((alt > 65.0) ? 0x020815 : 0x0a1c30);
+                starMat.opacity = Math.min(0.95, Math.max(0.05, (alt - 15.0) / 55.0));
+                const spaceFactor = Math.min(1.0, Math.max(0.0, (alt - 12.0) / 70.0));
+                skyDomeMat.color.setRGB(
+                    1.0 - spaceFactor * 0.95,
+                    1.0 - spaceFactor * 0.92,
+                    1.0 - spaceFactor * 0.85
+                );
 
                 const ux = Math.sin(pitch), uy = Math.cos(pitch);
                 const perpX = Math.cos(pitch), perpY = -Math.sin(pitch);
@@ -1649,6 +1653,7 @@ html_template = """
                     }
                     cameraMain.lookAt(activeFocusWorld);
                 }
+                skyDome.position.copy(cameraMain.position);
 
                 // CAM 02 地上固定追尾
                 if (pipVisible) {
@@ -1682,6 +1687,8 @@ html_template = """
                     pipTrackingSpot.target.updateMatrixWorld();
                     rendererPip.render(scene, cameraPip);
                 }
+
+                rendererMain.render(scene, cameraMain);
 
                 const dRangeKm = (rx * 10.0) / 1000.0;
                 drawPrecisionOrbitMap(alt, dRangeKm, p0.exploded, (p0.event === "ORBIT"));
@@ -1733,6 +1740,11 @@ html_template = """
             }
 
             // 🎯 メインアニメーションループを確実に開始
+            rendererMain.setSize(window.innerWidth || 1200, window.innerHeight || 980);
+            cameraMain.aspect = (window.innerWidth || 1200) / (window.innerHeight || 980);
+            cameraMain.updateProjectionMatrix();
+            resizePipRenderer();
+
             requestAnimationFrame(animate);
 
             window.addEventListener('resize', () => {
