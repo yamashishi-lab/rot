@@ -323,7 +323,7 @@ target_bottom_y_3d = 68.6 - pin_offset_3d
 TOWER_PHYSICAL_CATCH_Y = max(0.0, (target_bottom_y_3d - 6.0) * 10.0)
 
 # =========================================================================
-# 💥 物理シミュレーション (ブースター上昇し続け問題・早期降下＆反転完全修正)
+# 💥 物理シミュレーション (ブースター落下継続制御)
 # =========================================================================
 def run_simulation(preview_only=False):
     if preview_only:
@@ -445,7 +445,6 @@ def run_simulation(preview_only=False):
                     b_active = True
                     b_sep_time = t
                     b_x, b_y = x, y
-                    # 修正点②：過剰な上昇速度を初期段階で引き継ぎすぎないようカット＆即座に下向きベクトルへ移行準備
                     b_vx = vx - np.cos(pitch_rad) * 4.0
                     b_vy = (vy * 0.28) - 18.0
                     b_pitch = visual_pitch
@@ -485,7 +484,6 @@ def run_simulation(preview_only=False):
                 fuel_s2_rem -= (thrust / (isp * g0)) * dt
                 current_pc = 220.0 * (thrust / thrust_base if thrust_base > 0 else 0.0)
 
-        # 第1段ブースター物理演算（上昇継続バグ修正：上昇速度急速キル＆着陸燃焼）
         b_rcs = 0.0
         if b_active and not b_caught:
             b_alt = b_y
@@ -511,13 +509,11 @@ def run_simulation(preview_only=False):
                     b_rcs = 1.0 if pitch_err < -0.05 else (-1.0 if pitch_err > 0.05 else 0.0)
                     b_pitch += np.clip(pitch_err * 0.45, -0.65, 0.65) * dt
                     b_vx -= 12.0 * dt
-                    # 上昇速度を早期にゼロ以下（降下）に押し戻す
                     if b_vy > 0: b_vy -= (g0 * 2.8) * dt
                     else: b_vy -= (g0 + 4.0) * dt
                     b_x = max(0.0, b_x + b_vx * dt)
                     b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
                 elif b_alt > 32000 and b_fuel > s1_fuel * 1000 * 0.04 and b_vx > -650.0:
-                    # ブーストバック燃焼（高度上昇を確実に止めて帰還軌道へ）
                     b_pitch = b_pitch + (-1.57 - b_pitch) * 0.4
                     b_thrust = True
                     b_rcs = 1.0 if abs(-1.57 - b_pitch) > 0.08 else 0.0
@@ -557,7 +553,6 @@ def run_simulation(preview_only=False):
                     b_pitch += (target_bp - b_pitch) * 0.25
                     b_vx += (-b_x / 25.0 - b_vx) * 0.25
                     b_thrust = False
-                    # 自由落下時は下向き重力とドラッグで確実に加速降下
                     b_vy += (-g0 * 1.2 + b_drag_y / (s1_spec["dry_mass"] * 1000.0)) * dt
                     b_x = max(0.0, b_x + b_vx * dt)
                     b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
@@ -794,6 +789,15 @@ html_template = """
 html_template += """
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
+    // 改善点3：万一のJSエラー発生時にHUD上に瞬時に赤文字で表示するトラップ
+    window.onerror = function(msg, url, line) {
+        const el = document.getElementById('event-log');
+        if (el) {
+            el.innerText = "🚨 SCRIPT ERROR (L" + line + "): " + msg;
+            el.style.color = "#ef4444";
+        }
+    };
+
     window.addEventListener('DOMContentLoaded', () => {
         try {
             const simData = __SIM_DATA__;
@@ -889,7 +893,7 @@ html_template += """
             }
 
             // =========================================================================
-            // 🔊 音響合成システム (修正点③：過大音割れ完全解消・実写オンボード音響)
+            // 🔊 音響合成システム (適正ゲイン音響・音割れ完全解消)
             // =========================================================================
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             let actx = null, subRumble = null, shockCrackle = null, gasHiss = null, boosterRumble = null, boosterCrackle = null;
@@ -967,7 +971,6 @@ html_template += """
                 nSrc.start(now);
             }
 
-            // 修正点③：適正ゲイン（4.8/3.2から0.45/0.25へ）に再調整し、クリアで重みのある機体構造伝達音を実現
             function playHeavySeparationSound() {
                 ensureAudioActive();
                 if (!actx) return;
@@ -1037,14 +1040,17 @@ html_template += """
             }
 
             // =========================================================================
-            // 🌍 背景・レンダラー・修正点①＆⑤ (真っ暗クラッシュ・Z-Fightingチラつき完全修復)
+            // 🌍 背景・レンダラー・修正点2 (初期サイズ0pxフォールバック対策)
             // =========================================================================
             const scene = new THREE.Scene();
             scene.fog = new THREE.FogExp2(0x4a769e, 0.000028);
 
+            const initW = window.innerWidth || document.documentElement.clientWidth || 1200;
+            const initH = window.innerHeight || document.documentElement.clientHeight || 980;
+
             const rendererMain = new THREE.WebGLRenderer({ canvas: canvasMain, antialias: true, powerPreference: "high-performance" });
             rendererMain.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-            rendererMain.setSize(window.innerWidth, window.innerHeight);
+            rendererMain.setSize(initW, initH);
             rendererMain.toneMapping = THREE.ACESFilmicToneMapping;
             rendererMain.toneMappingExposure = 1.32;
             rendererMain.shadowMap.enabled = true;
@@ -1056,10 +1062,9 @@ html_template += """
             rendererPip.toneMappingExposure = 1.40;
             rendererPip.shadowMap.enabled = true;
 
-            const cameraMain = new THREE.PerspectiveCamera(16.0, window.innerWidth / window.innerHeight, 2.0, 95000);
+            const cameraMain = new THREE.PerspectiveCamera(16.0, initW / initH, 2.0, 95000);
             const cameraPip = new THREE.PerspectiveCamera(20.0, 420 / 240, 2.0, 95000);
 
-            // 魔改造④：朝焼け・夕焼け調の低角ゴッドレイ光源配置
             const sunLight = new THREE.DirectionalLight(0xffedd5, 4.8);
             sunLight.position.set(1800, 2100, 1500);
             sunLight.castShadow = true;
@@ -1129,7 +1134,6 @@ html_template += """
             const skyDome = new THREE.Mesh(skyDomeGeo, skyDomeMat); 
             scene.add(skyDome);
 
-            // 修正点①：変数名を確実に定義し、暗黒クラッシュを完全防止
             const atmoLimbMat = new THREE.MeshBasicMaterial({
                 color: 0x38bdf8,
                 transparent: true,
@@ -1184,7 +1188,6 @@ html_template += """
                 return tex;
             }
 
-            // 修正点⑤：海岸線と海面を完全にX軸で分割し、Z-fightingによるチラつきを根絶
             const landscapeGroup = new THREE.Group(); 
             scene.add(landscapeGroup);
             const coastPlane = new THREE.Mesh(
@@ -1473,7 +1476,6 @@ html_template += """
                 s1Group.add(catchPinsMesh);
             }
 
-            // 魔改造②：大気圏再突入プラズマ発光メッシュ
             const plasmaMesh = new THREE.Mesh(
                 new THREE.CylinderGeometry(1.45, 0.4, 6.0, 16, 1, true),
                 new THREE.MeshBasicMaterial({ color: 0xf43f5e, transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false, fog: false })
@@ -1531,7 +1533,6 @@ html_template += """
                 return new THREE.CanvasTexture(cvs);
             }
 
-            // 魔改造③：アナモルフィック・水平レンズフレアテクスチャ
             function createStreakFlareTex() {
                 const cvs = document.createElement('canvas'); cvs.width = 256; cvs.height = 32;
                 const ctx = cvs.getContext('2d');
@@ -1673,12 +1674,10 @@ html_template += """
             engineHaloGlow.scale.set(6.5, 6.5, 1.0);
             scene.add(engineHaloGlow);
 
-            // 魔改造③：アナモルフィック・ストリークフレア（高輝度時に横一文字へ閃光）
             const streakSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: streakFlareTex, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.0, depthWrite: false, fog: false }));
             streakSprite.scale.set(70.0, 3.2, 1.0);
             scene.add(streakSprite);
 
-            // 魔改造①：点火直後の音響衝撃波リング（Acoustic Shockwave Ring）
             const shockRingGeo = new THREE.RingGeometry(0.5, 2.5, 48);
             shockRingGeo.rotateX(-Math.PI / 2);
             const shockRingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false, fog: false });
@@ -1858,7 +1857,7 @@ html_template += """
 
             const cloudTex = createCloudTex(), sparkTex = createSparkTex();
 
-            // 修正点⑤：カメラ近接時のフェードアウトに対応した雲海スプライトリスト
+            // 改善点1：構文エラー箇所を修正（cz >= 0 ? 230 : -230）
             const cloudDeck = new THREE.Group(); scene.add(cloudDeck);
             const cloudSprites = [];
             for(let ci=0; ci<95; ci++) {
@@ -1867,7 +1866,7 @@ html_template += """
                 let cx = (Math.random() - 0.5) * 4200.0, cz = (Math.random() - 0.5) * 4200.0;
                 if (Math.abs(cx) < 190 && Math.abs(cz) < 190) {
                     cx += (cx >= 0 ? 230 : -230);
-                    cz += (cz >= 230 : -230);
+                    cz += (cz >= 0 ? 230 : -230);
                 }
                 const cy = 135.0 + (Math.random() - 0.5) * 35.0;
                 csp.position.set(cx, cy, cz);
@@ -1994,7 +1993,7 @@ html_template += """
             }
 
             // =========================================================================
-            // ⏱️ アニメーション・メインループ (全8大魔改造＆修正機能完全同期)
+            // ⏱️ アニメーション・メインループ
             // =========================================================================
             const tStart = performance.now();
             let boosterDetached = false, stage1Detached = false, fairingDetached = false, camShake = 0.0;
@@ -2003,15 +2002,15 @@ html_template += """
             const tempV = new THREE.Vector3();
             const activeFocusWorld = new THREE.Vector3();
             const smoothCamTarget = new THREE.Vector3(0, 6.0, 0);
-            const cameraLookDamped = new THREE.Vector3(0, 6.0, 0); // 魔改造⑦：カメラ追従遅延用
+            const cameraLookDamped = new THREE.Vector3(0, 6.0, 0);
 
             const baseFlameColor = new THREE.Color(simCfg.flame_hex);
             const seaLevelFlameColor = new THREE.Color(0xffedd5);
-            const raptorGreenColor = new THREE.Color(0x10b981); // 魔改造⑥：点火時グリーン
+            const raptorGreenColor = new THREE.Color(0x10b981);
             const curDynamicFlameColor = new THREE.Color();
             const steamWhiteColor = new THREE.Color(0xf8fafc);
 
-            let catchStartTime = 0.0; // 魔改造⑤：キャッチ減衰振り子用
+            let catchStartTime = 0.0;
 
             function animate(now) {
                 if (isMissionEnded) return;
@@ -2065,7 +2064,6 @@ html_template += """
                     frostMesh.material.opacity = Math.max(0.0, 0.72 - (alt / 35.0) * 0.72);
                 }
 
-                // 修正点⑤：宇宙空間へ進むにつれてフォグ濃度を完全に減衰し、背景の瞬き・青残りを解消
                 scene.fog.density = THREE.MathUtils.lerp(0.000028, 0.0, Math.min(1.0, alt / 25.0));
 
                 starMat.opacity = Math.min(0.95, Math.max(0.05, (alt - 15.0) / 55.0));
@@ -2082,7 +2080,6 @@ html_template += """
                     atmoLimbMat.opacity = 0.0;
                 }
 
-                // 修正点⑤：カメラ近傍を横切る雲海スプライトを個別フェードアウトして白飛びフラッシュを防止
                 cloudSprites.forEach(csp => {
                     const cDist = cameraMain.position.distanceTo(csp.position);
                     csp.material.opacity = THREE.MathUtils.clamp((cDist - 120.0) / 250.0, 0.0, 0.32);
@@ -2110,9 +2107,6 @@ html_template += """
                     }
                 }
 
-                // =========================================================================
-                // 🚀 修正点②：外部ストラップオンブースターの適正な重力落下
-                // =========================================================================
                 if (!p0.strapon && !boosterDetached && boosterUnits.length > 0 && !simCfg.is_preview) {
                     boosterDetached = true;
                     playHeavySeparationSound();
@@ -2149,7 +2143,6 @@ html_template += """
                             b.rx += outZ * 0.0035;
                             b.rz += -outX * 0.0035;
                         }
-                        // 修正点②：しっかり下方向へ重力加速して自然に後方へ離脱
                         b.vy -= (1.8 + Math.min(4.5, b.sepAge * 0.65)) * 0.016;
                         b.mesh.position.x += b.vx;
                         b.mesh.position.y += b.vy;
@@ -2159,7 +2152,6 @@ html_template += """
                     }
                 }
 
-                // 第1段・第2段ステージ分離
                 const isSeparated = (p0.stage === 2 || p0.b_active);
                 if (isSeparated && !stage1Detached && !simCfg.is_preview) {
                     stage1Detached = true;
@@ -2176,7 +2168,6 @@ html_template += """
                             1.2, 9.5, 38, 0.85, simCfg.flame_hex, 0.92, 0.0
                         );
                     }
-                    // 魔改造⑧：ホットステージング火炎を浴びて鏡面ステンレスが煤け、黒ずみ汚れが蓄積
                     if (s1Body && s1Body.material) {
                         s1Body.material.roughness = 0.42;
                         s1Body.material.color.setRGB(0.72, 0.74, 0.78);
@@ -2222,7 +2213,6 @@ html_template += """
                     }
                 }
 
-                // 魔改造②：大気圏突入時の赤紫プラズマシース（高度20km〜60kmの超音速降下時）
                 if (stage1Detached && bY > 20000 && bY < 65000 && p0.mach > 2.5) {
                     plasmaMesh.material.opacity = Math.min(0.75, (p0.mach - 2.5) * 0.35);
                     plasmaMesh.rotation.y += 0.12;
@@ -2233,7 +2223,6 @@ html_template += """
                 if (stage1Detached) {
                     s1Group.visible = true;
 
-                    // 魔改造⑤：タワーキャッチ時の実写物理（減衰バネ振り子揺動＆ピン摩擦火花）
                     if (p0.b_caught) {
                         if (catchStartTime === 0.0) catchStartTime = simT;
                         const catchAge = simT - catchStartTime;
@@ -2286,7 +2275,6 @@ html_template += """
                         document.getElementById('tv-stage-badge').innerText = "TOWER CATCH SUCCESS";
                         document.getElementById('tv-stage-badge').style.color = "#38bdf8";
 
-                        // 魔改造⑥：シャットダウン直後のオレンジ煤煙残火
                         if (simT - catchStartTime < 1.2 && Math.random() < 0.6) {
                             s1Group.localToWorld(tempV.set(0, 0, 0));
                             emitParticle(tempV.x, tempV.y - 0.5, tempV.z, (Math.random()-0.5)*0.6, -0.4, (Math.random()-0.5)*0.6, 0.6, 3.8, 30, 0.35, 0xd97706, 0.96, 0.01, true);
@@ -2308,7 +2296,6 @@ html_template += """
                             });
                         });
 
-                        // 修正点④：帰還着陸時の地表2層爆風スチーム・ダウンウォッシュ完全再現
                         if (bY <= 1500) {
                             const groundRatio = Math.max(0.15, 1.0 - (bY / 1500.0));
                             const blastCount = Math.ceil(9 * groundRatio);
@@ -2359,7 +2346,7 @@ html_template += """
                 }
 
                 // =========================================================================
-                // 💥 改善①＆魔改造⑥：グリーン点火フラッシュ＆ノズル内包高圧プルーム
+                // 💥 ノズル内包プルーム ＆ 点火フラッシュ
                 // =========================================================================
                 const isEngineFiring = (p0.thrust && !p0.exploded && !simCfg.is_preview);
                 
@@ -2373,7 +2360,6 @@ html_template += """
                     const activeTips = (p0.stage === 1) ? s1NozzleTips : s2NozzleTips;
                     const inactiveTips = (p0.stage === 1) ? s2NozzleTips : (stage1Detached ? [] : s1NozzleTips);
 
-                    // 魔改造⑥：点火から0.4秒間だけのラプター特有のグリーン点火フラッシュ
                     const igniteElapsed = simT - (-simCfg.ignition_lead);
                     if (igniteElapsed >= 0 && igniteElapsed < 0.42 && simCfg.s1_mat === 'ss') {
                         curDynamicFlameColor.copy(raptorGreenColor).lerp(baseFlameColor, igniteElapsed / 0.42);
@@ -2485,7 +2471,7 @@ html_template += """
                 }
 
                 // =========================================================================
-                // 🎯 改善③：精密RCSスラスター
+                // 🎯 精密RCSスラスター
                 // =========================================================================
                 const cmdFired = (Math.abs(rcsCmd) > 0.2 && Math.abs(prevRcsCmd) <= 0.2);
                 if (cmdFired) {
@@ -2555,7 +2541,7 @@ html_template += """
                 }
 
                 // =========================================================================
-                // 🌊 改善④＆魔改造①：発射台爆風スチーム・点火音響衝撃波リング
+                // 🌊 発射台爆風スチーム・点火音響衝撃波リング
                 // =========================================================================
                 if (simT < 0.0) {
                     const sec = Math.ceil(Math.abs(simT));
@@ -2578,7 +2564,6 @@ html_template += """
                     }
 
                     if (simT >= -simCfg.ignition_lead && !p0.exploded && !simCfg.is_preview) {
-                        // 魔改造①：点火トリガー瞬間に音響衝撃波を音速拡大
                         if (!shockwaveFired) {
                             shockwaveFired = true;
                             shockRingMat.opacity = 0.8;
@@ -2655,7 +2640,6 @@ html_template += """
                     }
                 }
 
-                // 魔改造①：音響衝撃波リングの超音速拡散＆フェード
                 if (shockRingMat.opacity > 0.005) {
                     shockRingMesh.scale.x += 1.8;
                     shockRingMesh.scale.z += 1.8;
@@ -2707,7 +2691,7 @@ html_template += """
                 else { activeFocusWorld.set(0, s1Len * 0.52, 0); rocket.localToWorld(activeFocusWorld); }
 
                 // =========================================================================
-                // 🎥 魔改造⑦：地上超望遠カメラの陽炎（ヒートヘイズ）と追従遅延ダンピング
+                // 🎥 超望遠カメラ・陽炎・追従遅延
                 // =========================================================================
                 if (simCfg.is_preview) {
                     const ang = elapsedSec * 0.22;
@@ -2717,7 +2701,6 @@ html_template += """
                 } else {
                     cameraMain.position.set(activeFocusWorld.x - 180.0, activeFocusWorld.y + 35.0, activeFocusWorld.z + 320.0);
                     
-                    // 魔改造⑦：低高度時の陽炎による空気の熱揺らぎ
                     const heatHazeFactor = Math.max(0.0, 1.0 - alt / 4.0);
                     const heatHazeX = Math.sin(now * 0.018) * 0.15 * heatHazeFactor;
                     const heatHazeY = Math.cos(now * 0.022) * 0.18 * heatHazeFactor;
@@ -2733,14 +2716,12 @@ html_template += """
                         camShake *= 0.94;
                     }
 
-                    // 魔改造⑦：急加速や分離時のカメラマン／自動追尾ジンバルの慣性追従遅延
                     cameraLookDamped.lerp(activeFocusWorld, 0.14);
                     cameraMain.lookAt(cameraLookDamped);
                 }
                 skyDome.position.copy(cameraMain.position);
                 atmoLimbMesh.position.set(cameraMain.position.x, -56000, cameraMain.position.z);
 
-                // CAM 02 地上光学追跡カメラ
                 if (pipVisible) {
                     let targetPos = new THREE.Vector3();
                     if (stage1Detached && p0.b_active) {
@@ -2840,21 +2821,30 @@ html_template += """
                 }
             }
 
-            rendererMain.setSize(window.innerWidth || 1200, window.innerHeight || 980);
-            cameraMain.aspect = (window.innerWidth || 1200) / (window.innerHeight || 980);
+            const finalW = window.innerWidth || 1200;
+            const finalH = window.innerHeight || 980;
+            rendererMain.setSize(finalW, finalH);
+            cameraMain.aspect = finalW / finalH;
             cameraMain.updateProjectionMatrix();
             resizePipRenderer();
 
             requestAnimationFrame(animate);
 
             window.addEventListener('resize', () => {
-                cameraMain.aspect = window.innerWidth / window.innerHeight;
+                const rw = window.innerWidth || 1200;
+                const rh = window.innerHeight || 980;
+                cameraMain.aspect = rw / rh;
                 cameraMain.updateProjectionMatrix();
-                rendererMain.setSize(window.innerWidth, window.innerHeight);
+                rendererMain.setSize(rw, rh);
                 resizePipRenderer();
             });
         } catch(err) {
             console.error("Simulation Render Error:", err);
+            const el = document.getElementById('event-log');
+            if (el) {
+                el.innerText = "🚨 SIM RENDER ERROR: " + err.message;
+                el.style.color = "#ef4444";
+            }
         }
     });
     </script>
