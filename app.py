@@ -451,10 +451,10 @@ def run_simulation(preview_only=False):
                 if not b_active:
                     b_active = True
                     b_sep_time = t
-                    # 分離瞬間は位置を変えず、機体の慣性速度を引き継ぎつつ微小な分離反動(Δv)のみ付与
+                    # 分離瞬間：第2段側の現在位置・速度を引き継ぎつつ、第1段ブースターは下・後ろ方向へ慣性分離
                     b_x, b_y = x, y
-                    b_vx = vx - np.cos(pitch_rad) * 2.5
-                    b_vy = vy - np.sin(pitch_rad) * 2.5
+                    b_vx = vx - 15.0
+                    b_vy = vy - 25.0
                     b_pitch = visual_pitch
                     b_omega = 0.0
             else:
@@ -493,7 +493,7 @@ def run_simulation(preview_only=False):
                 fuel_s2_rem -= (thrust / (isp * g0)) * dt
                 current_pc = 220.0 * (thrust / thrust_base if thrust_base > 0 else 0.0)
 
-        # 第1段ブースターの連続慣性運動＆RTLS帰還制御
+        # 第1段ブースターの独立した物理運動・重力落下＆RTLS帰還制御
         b_rcs = 0.0
         if b_active and not b_caught:
             b_alt = b_y
@@ -503,38 +503,44 @@ def run_simulation(preview_only=False):
             b_drag_y = -b_drag * (b_vy / b_v) if b_v > 0 else 0.0
             b_drag_x = -b_drag * (b_vx / b_v) if b_v > 0 else 0.0
             sep_elapsed = t - b_sep_time
+            b_cur_mass = float(s1_spec["dry_mass"] * 1000.0 + max(0.0, b_fuel))
 
             if not spacex_return_mode:
-                # 使い捨てモード：ゆっくり後ろへ離れながら自然落下
+                # 使い捨てモード：分離後は自重と空気抵抗により自然落下
                 b_thrust = False
                 b_pitch += 0.04 * dt
-                b_vx += (b_drag_x / (s1_spec["dry_mass"] * 1000.0)) * dt
-                b_vy += (-g0 + b_drag_y / (s1_spec["dry_mass"] * 1000.0)) * dt
-                b_x = max(0.0, b_x + b_vx * dt)
+                b_ax = b_drag_x / b_cur_mass
+                b_ gravedad = g0 * ((R_earth / (R_earth + max(0.0, b_y))) ** 2)
+                b_ay = -b_gravedad + (b_drag_y / b_cur_mass)
+                b_vx += b_ax * dt
+                b_vy += b_ay * dt
+                b_x += b_vx * dt
                 b_y = max(0.0, b_y + b_vy * dt)
             else:
-                # SpaceX RTLSモード：最初の4秒間はホットステージングのブラストとRCSでゆっくりフリップ＆分離
+                # SpaceX RTLSモード：フリップ、ブーストバック、着陸焼鈍
                 if sep_elapsed <= 4.5:
                     b_thrust = False
                     target_flip = -1.57
                     pitch_err = target_flip - b_pitch
                     b_rcs = 1.0 if pitch_err < -0.05 else (-1.0 if pitch_err > 0.05 else 0.0)
                     b_pitch += np.clip(pitch_err * 0.35, -0.45, 0.45) * dt
-                    # 最初は毎秒数メートルずつジワジワと第2段から遅れていく
-                    b_vx -= 6.5 * dt
-                    b_vy -= (g0 + 3.5) * dt
-                    b_x = max(0.0, b_x + b_vx * dt)
+                    b_gravedad = g0 * ((R_earth / (R_earth + max(0.0, b_y))) ** 2)
+                    b_vx += (b_drag_x / b_cur_mass) * dt
+                    b_vy += (-b_gravedad + b_drag_y / b_cur_mass) * dt
+                    b_x += b_vx * dt
                     b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
                 elif b_alt > 35000 and b_fuel > s1_fuel * 1000 * 0.04 and b_vx > -650.0:
-                    # ブーストバック燃焼
                     b_pitch = THREE_LERP(b_pitch, -1.57, 0.35) if 'THREE_LERP' in globals() else (b_pitch + (-1.57 - b_pitch) * 0.35)
                     b_thrust = True
                     b_rcs = 1.0 if abs(-1.57 - b_pitch) > 0.08 else 0.0
                     b_force = s1_spec["thrust_vac"] * 1000.0 * 0.95
                     b_fuel -= (b_force / (s1_spec["isp_vac"] * g0)) * dt
-                    b_vx -= (b_force / (s1_spec["dry_mass"] * 1000.0)) * dt * 2.8
-                    b_vy += (-g0 + b_drag_y / (s1_spec["dry_mass"] * 1000.0)) * dt
-                    b_x = max(0.0, b_x + b_vx * dt)
+                    b_gravedad = g0 * ((R_earth / (R_earth + max(0.0, b_y))) ** 2)
+                    b_ax = (-b_force / b_cur_mass) + (b_drag_x / b_cur_mass)
+                    b_ay = -b_gravedad + (b_drag_y / b_cur_mass)
+                    b_vx += b_ax * dt
+                    b_vy += b_ay * dt
+                    b_x += b_vx * dt
                     b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
                 elif 12000 < b_alt <= 28000 and b_vy < -400 and b_fuel > s1_fuel * 1000 * 0.015:
                     target_bp = float(np.clip(-b_vx * 0.0008, -0.2, 0.2))
@@ -543,9 +549,11 @@ def run_simulation(preview_only=False):
                     b_thrust = True
                     b_force = s1_spec["thrust_vac"] * 1000.0 * 0.85
                     b_fuel -= (b_force / (s1_spec["isp_vac"] * g0)) * dt
-                    b_vy += (b_force / (s1_spec["dry_mass"] * 1000.0)) * dt * 0.9
-                    b_vy += (-g0 + b_drag_y / (s1_spec["dry_mass"] * 1000.0)) * dt
-                    b_x = max(0.0, b_x + b_vx * dt)
+                    b_gravedad = g0 * ((R_earth / (R_earth + max(0.0, b_y))) ** 2)
+                    b_ay = -b_gravedad + (b_force / b_cur_mass) * 0.9 + (b_drag_y / b_cur_mass)
+                    b_vx += (b_drag_x / b_cur_mass) * dt
+                    b_vy += b_ay * dt
+                    b_x += b_vx * dt
                     b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
                 elif b_alt <= (TOWER_PHYSICAL_CATCH_Y + 3600.0):
                     rem_h = max(0.0, b_alt - TOWER_PHYSICAL_CATCH_Y)
@@ -557,8 +565,9 @@ def run_simulation(preview_only=False):
                     desired_vy = -max(2.2, rem_h * 0.24)
                     b_vy += (desired_vy - b_vy) * 0.55
                     b_vx = -b_x * 0.65
-                    b_vy += (-g0 + b_drag_y / (s1_spec["dry_mass"] * 1000.0)) * dt
-                    b_x = max(0.0, b_x + b_vx * dt)
+                    b_gravedad = g0 * ((R_earth / (R_earth + max(0.0, b_y))) ** 2)
+                    b_vy += (-b_gravedad + b_drag_y / b_cur_mass) * dt
+                    b_x += b_vx * dt
                     b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
                 else:
                     target_bp = float(np.clip((b_x / 4000.0) * 0.2, -0.25, 0.25))
@@ -566,8 +575,9 @@ def run_simulation(preview_only=False):
                     b_pitch += (target_bp - b_pitch) * 0.25
                     b_vx += (-b_x / 25.0 - b_vx) * 0.25
                     b_thrust = False
-                    b_vy += (-g0 + b_drag_y / (s1_spec["dry_mass"] * 1000.0)) * dt
-                    b_x = max(0.0, b_x + b_vx * dt)
+                    b_gravedad = g0 * ((R_earth / (R_earth + max(0.0, b_y))) ** 2)
+                    b_vy += (-b_gravedad + b_drag_y / b_cur_mass) * dt
+                    b_x += b_vx * dt
                     b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
 
                 if b_y <= (TOWER_PHYSICAL_CATCH_Y + 12.0) and abs(b_x) < 40.0:
