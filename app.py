@@ -408,9 +408,9 @@ def run_simulation(preview_only=False):
         rcs_cmd = 0.0
         if rcs_cooldown > 0:
             rcs_cooldown -= dt
-        elif (abs(pitch_rate) > 0.06 and alt_km > 0.8) or (alt_km >= 230.0 and pitch_deg > 0.1):
+        elif (abs(pitch_rate) > 0.18 and alt_km > 0.8) or (alt_km >= 230.0 and pitch_deg > 0.1):
             rcs_cmd = -1.0 if pitch_rate > 0 else 1.0
-            rcs_cooldown = 5.5
+            rcs_cooldown = 8.0
 
         cur_event = "FLIGHT"
         if v >= 340.0 and not supersonic_called:
@@ -1242,6 +1242,22 @@ html_template = """
             s1Body.castShadow = true; s1Body.receiveShadow = true;
             s1Group.add(s1Body);
 
+            // クライオジェニック・フロスト（低温推進剤タンク表面の白い霜）レイヤー
+            let frostMesh = null;
+            if (simCfg.s1_mat === 'ss' || simCfg.s1_mat === 'saturn') {
+                const frostMat = new THREE.MeshStandardMaterial({
+                    color: 0xffffff,
+                    roughness: 0.95,
+                    metalness: 0.05,
+                    transparent: true,
+                    opacity: 0.72,
+                    depthWrite: false
+                });
+                frostMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.124, 1.124, s1Len * 0.65, s1Segments), frostMat);
+                frostMesh.position.y = s1Len * 0.48;
+                s1Group.add(frostMesh);
+            }
+
             if (!isPencilRocket && simCfg.s1_mat !== 'baguette') {
                 const feedPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, s1Len * 0.92, 12), pipeMat);
                 feedPipe.position.set(1.14, s1Len * 0.48, 0); feedPipe.castShadow = true; s1Group.add(feedPipe);
@@ -1612,11 +1628,16 @@ html_template = """
 
             const cloudTex = createCloudTex(), sparkTex = createSparkTex();
 
+            // 雲海配置（中心部をドーナツ状に空け、不透明度を抑えてロケットの視界を確保）
             const cloudDeck = new THREE.Group(); scene.add(cloudDeck);
             for(let ci=0; ci<75; ci++) {
-                const cMat = new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0.52, depthWrite: false });
+                const cMat = new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0.25, depthWrite: false });
                 const csp = new THREE.Sprite(cMat);
-                const cx = (Math.random() - 0.5) * 3600.0, cz = (Math.random() - 0.5) * 3600.0;
+                let cx = (Math.random() - 0.5) * 3600.0, cz = (Math.random() - 0.5) * 3600.0;
+                if (Math.abs(cx) < 180 && Math.abs(cz) < 180) {
+                    cx += (cx >= 0 ? 220 : -220);
+                    cz += (cz >= 0 ? 220 : -220);
+                }
                 const cy = 125.0 + (Math.random() - 0.5) * 30.0;
                 csp.position.set(cx, cy, cz);
                 const csc = 85.0 + Math.random() * 110.0;
@@ -1698,6 +1719,7 @@ html_template = """
             let counterPulseTimer = 0.0, counterDirSign = 0.0;
             const tempV = new THREE.Vector3();
             const activeFocusWorld = new THREE.Vector3();
+            const smoothCamTarget = new THREE.Vector3(0, 6.0, 0);
 
             function animate(now) {
                 if (isMissionEnded) return;
@@ -1731,6 +1753,11 @@ html_template = """
                 rocket.position.set(rx, ry + 6.0, 0);
                 rocket.rotation.z = -pitch;
                 rocket.updateMatrixWorld(true);
+
+                // フロスト（霜）の高度上昇に伴う昇華・剥落
+                if (frostMesh) {
+                    frostMesh.material.opacity = Math.max(0.0, 0.72 - (alt / 35.0) * 0.72);
+                }
 
                 starMat.opacity = Math.min(0.95, Math.max(0.05, (alt - 15.0) / 55.0));
                 const spaceFactor = Math.min(1.0, Math.max(0.0, (alt - 12.0) / 70.0));
@@ -1837,6 +1864,16 @@ html_template = """
                     s1Group.rotation.set(0, 0, -bPitch);
                     s1Group.updateMatrixWorld(true);
 
+                    // 再突入時の極超音速空力加熱プラズマ（高度75km〜30km降下中）
+                    if (bY > 28000 && bY < 75000 && !p0.b_thrust && Math.random() < 0.35) {
+                        s1Group.localToWorld(tempV.set((Math.random()-0.5)*1.8, 0.5, (Math.random()-0.5)*1.8));
+                        emitParticle(
+                            tempV.x, tempV.y, tempV.z,
+                            (Math.random()-0.5)*0.8, 3.5 + Math.random()*2.0, (Math.random()-0.5)*0.8,
+                            0.8, 4.2, 12, 0.42, 0xf97316
+                        );
+                    }
+
                     if (p0.b_thrust && !landingSonicBoomPlayed && bY <= 3600) {
                         playLandingIgnitionBoom();
                         landingSonicBoomPlayed = true;
@@ -1869,6 +1906,10 @@ html_template = """
                     } else if (p0.b_thrust) {
                         const isThreeOnly = (bY <= 1200);
                         const bUx = Math.sin(bPitch), bUy = Math.cos(bPitch);
+
+                        mainCombinedGroup.visible = true;
+                        mainCombinedGroup.scale.set(isThreeOnly ? 0.35 : 0.65, 0.75 + Math.random()*0.15, isThreeOnly ? 0.35 : 0.65);
+
                         s1NozzleTips.forEach((t, i) => {
                             const active = isThreeOnly ? t.isCenter : (i < 13);
                             t.glow.visible = active;
@@ -1884,9 +1925,9 @@ html_template = """
                         if (bY <= 1500 && Math.random() < 0.65) {
                             s1Group.localToWorld(tempV.set(0, 0, 0));
                             emitParticle(
-                                tempV.x + (Math.random()-0.5)*3.5, tempV.y - 2, tempV.z + (Math.random()-0.5)*3.5,
+                                tempV.x + (Math.random()-0.5)*3.5, tempV.y - 2, tempV.z - 4.0 + (Math.random()-0.5)*3.5,
                                 (Math.random()-0.5)*3.0, 0.4, (Math.random()-0.5)*3.0,
-                                4.0, 24.0, 40, 0.85
+                                3.0, 18.0, 40, 0.65
                             );
                         }
                     } else {
@@ -1927,7 +1968,7 @@ html_template = """
                 // =========================================================================
                 if (p0.thrust && !p0.exploded && !simCfg.is_preview) {
                     const activeTips = (p0.stage === 1) ? s1NozzleTips : s2NozzleTips;
-                    const inactiveTips = (p0.stage === 1) ? s2NozzleTips : s1NozzleTips;
+                    const inactiveTips = (p0.stage === 1) ? s2NozzleTips : (stage1Detached ? [] : s1NozzleTips);
                     const curFlameHex = (p0.stage === 1) ? simCfg.flame_hex : simCfg.s2_flame_hex;
 
                     inactiveTips.forEach(t => {
@@ -1938,12 +1979,14 @@ html_template = """
 
                     const expansionFactor = 1.0 + Math.min(22.0, Math.pow(Math.max(0.0, alt - 15.0) / 9.5, 1.45));
 
-                    // 1本の美しい統合メインプルームを中央で駆動
+                    // 1本の美しい統合メインプルーム（大気希薄化に伴うベル型膨張）
                     if (p0.stage === 1) {
                         mainCombinedGroup.visible = true;
                         const pulse = 0.94 + Math.random() * 0.12;
-                        mainCombinedGroup.scale.set(1.0 + (expansionFactor - 1.0)*0.06, pulse, 1.0 + (expansionFactor - 1.0)*0.06);
-                    } else {
+                        const bellExp = 1.0 + Math.min(3.5, Math.pow(Math.max(0.0, alt - 10.0) / 14.0, 1.25));
+                        mainCombinedGroup.scale.set(bellExp, pulse, bellExp);
+                        mainCombinedPlumeMat.opacity = Math.max(0.55, 0.92 - (alt / 80.0) * 0.35);
+                    } else if (!stage1Detached) {
                         mainCombinedGroup.visible = false;
                     }
 
@@ -1961,15 +2004,15 @@ html_template = """
                         });
 
                         // 高高度でのスペース・ジェリーフィッシュ（巨大な光のベール拡散）
-                        if (Math.random() < (alt > 35.0 ? 0.65 : 0.28)) {
+                        if (Math.random() < (alt > 35.0 ? 0.65 : 0.15)) {
                             tObj.node.getWorldPosition(tempV);
                             const spread = (Math.random() - 0.5) * (1.1 * expansionFactor);
                             const isSpaceJelly = (alt > 40.0);
                             const pLife = isSpaceJelly ? 55 : 28;
                             const pEndSize = isSpaceJelly ? (22.0 * expansionFactor) : (8.0 * expansionFactor);
-                            const pAlpha = isSpaceJelly ? 0.35 : 0.68;
+                            const pAlpha = isSpaceJelly ? 0.35 : 0.45;
                             emitParticle(
-                                tempV.x - ux * 4.0, tempV.y - uy * 4.0, tempV.z + spread,
+                                tempV.x - ux * 8.0, tempV.y - uy * 8.0, tempV.z + spread,
                                 -ux * (4.5 + Math.random()*3.0) + perpX * spread * 0.5,
                                 -uy * (4.5 + Math.random()*3.0) + perpY * spread * 0.5,
                                 (Math.random() - 0.5) * 1.5,
@@ -1991,17 +2034,19 @@ html_template = """
                     engineBounceLight.position.set(rx, ry + 3.0, 4.0);
                     rendererMain.toneMappingExposure = THREE.MathUtils.lerp(rendererMain.toneMappingExposure, 1.15, 0.08);
                 } else {
-                    s1NozzleTips.forEach(t => {
-                        t.glow.visible = false;
-                        t.cross.visible = false;
-                        t.disks.forEach(d => d.visible = false);
-                    });
+                    if (!stage1Detached) {
+                        s1NozzleTips.forEach(t => {
+                            t.glow.visible = false;
+                            t.cross.visible = false;
+                            t.disks.forEach(d => d.visible = false);
+                        });
+                        mainCombinedGroup.visible = false;
+                    }
                     s2NozzleTips.forEach(t => {
                         t.glow.visible = false;
                         t.cross.visible = false;
                         t.disks.forEach(d => d.visible = false);
                     });
-                    mainCombinedGroup.visible = false;
                     anamorphicFlare.material.opacity = THREE.MathUtils.lerp(anamorphicFlare.material.opacity, 0.0, 0.15);
                     underglowSp.material.opacity = 0.0;
                     engineBounceLight.intensity = 0.0;
@@ -2039,8 +2084,8 @@ html_template = """
                             if (isCounterBurst && ((rcs.dir.dx < -0.3 && counterDirSign > 0) || (rcs.dir.dx > 0.3 && counterDirSign < 0))) {
                                 burst = true;
                             }
-                            // ロール/ヨー軸の自律微調整（実機のように斜めやZ軸から小刻みに「シュッ」と吹く）
-                            if (Math.random() < 0.035 && (Math.abs(rcs.dir.dz) > 0.3 || Math.abs(rcs.dir.dx) > 0.5)) {
+                            // 高高度（30km以上）でのみ自律微調整を低頻度で発動
+                            if (alt > 30.0 && Math.random() < 0.002 && (Math.abs(rcs.dir.dz) > 0.3 || Math.abs(rcs.dir.dx) > 0.5)) {
                                 burst = true;
                             }
                         }
@@ -2058,30 +2103,30 @@ html_template = """
                         rcs.mount.parent.getWorldQuaternion(parentQuat);
                         localJetDir.applyQuaternion(parentQuat);
 
-                        for(let k=0; k<3; k++) {
-                            const spd = 2.2 + Math.random() * 2.2;
+                        for(let k=0; k<2; k++) {
+                            const spd = 2.0 + Math.random() * 1.5;
                             emitParticle(
                                 tempV.x, tempV.y, tempV.z,
-                                localJetDir.x * spd + (Math.random()-0.5)*0.25,
-                                localJetDir.y * spd + (Math.random()-0.5)*0.25,
-                                localJetDir.z * spd + (Math.random()-0.5)*0.25,
-                                0.18, 2.5, 7, 0.55, 0xe0f2fe
+                                localJetDir.x * spd + (Math.random()-0.5)*0.2,
+                                localJetDir.y * spd + (Math.random()-0.5)*0.2,
+                                localJetDir.z * spd + (Math.random()-0.5)*0.2,
+                                0.15, 1.2, 5, 0.35, 0xe0f2fe
                             );
                         }
                     }
                 }
 
-                // 注水デリュージ・先行点火・排煙
+                // 注水デリュージ・先行点火・排煙（奥側配置＆透明度最適化で視界クリア化）
                 if (simT < 0.0) {
                     const sec = Math.ceil(Math.abs(simT));
                     document.getElementById('tv-timer').innerText = simCfg.is_preview ? "PAD INSPECTION" : `T- 00:0${sec}.0`;
-                    emitParticle(rx + 1.25, ry + 6.0 + s1Len * 0.85, 0, 0.25, 0.05, 0, 0.9, 4.2, 45, 0.4, 0xffffff);
+                    emitParticle(rx + 1.25, ry + 6.0 + s1Len * 0.85, -2.0, 0.25, 0.05, 0, 0.9, 3.5, 45, 0.35, 0xffffff);
 
                     if (simT >= -5.0 && !p0.exploded && !simCfg.is_preview) {
                         if (gasHiss && actx) gasHiss.gain.setTargetAtTime(0.55, actx.currentTime, 0.2);
                         for(let i=0; i<8; i++) {
                             const side = (Math.random() - 0.5) * 18.0;
-                            emitParticle(rx + side, 3.5, (Math.random()-0.5)*18.0, side*0.35, 0.4+Math.random()*0.8, (Math.random()-0.5)*2.0, 5.0, 32.0, 60, 0.85, 0xe0f2fe);
+                            emitParticle(rx + side, 3.5, -4.0 + (Math.random()-0.5)*14.0, side*0.35, 0.4+Math.random()*0.8, (Math.random()-0.5)*2.0, 4.0, 24.0, 50, 0.50, 0xe0f2fe);
                         }
                     }
 
@@ -2102,9 +2147,9 @@ html_template = """
                             const ang = Math.random() * Math.PI * 2;
                             const dist = 3.0 + Math.random() * 8.0;
                             emitParticle(
-                                rx + Math.cos(ang) * dist, 3.5, Math.sin(ang) * dist,
-                                Math.cos(ang) * (4.0 + Math.random()*4.0), 0.5 + Math.random()*0.8, Math.sin(ang) * (4.0 + Math.random()*4.0),
-                                8.0, 48.0, 85, 0.92, 0xf8fafc
+                                rx + Math.cos(ang) * dist, 3.5, -4.0 + Math.sin(ang) * dist * 0.7,
+                                Math.cos(ang) * (3.5 + Math.random()*3.5), 0.5 + Math.random()*0.8, Math.sin(ang) * (3.5 + Math.random()*3.5),
+                                5.0, 32.0, 65, 0.55, 0xf8fafc
                             );
                         }
                     }
@@ -2124,9 +2169,9 @@ html_template = """
                             const ang = Math.random() * Math.PI * 2;
                             const dist = 4.0 + Math.random() * 10.0;
                             emitParticle(
-                                rx + Math.cos(ang) * dist, 3.5, Math.sin(ang) * dist,
-                                Math.cos(ang) * (4.8 + Math.random()*4.5), 0.3 + Math.random()*0.6, Math.sin(ang) * (4.8 + Math.random()*4.5),
-                                9.0, 56.0, 85, 0.88, 0xf1f5f9
+                                rx + Math.cos(ang) * dist, 3.5, -5.0 + Math.sin(ang) * dist * 0.6,
+                                Math.cos(ang) * (4.0 + Math.random()*3.5), 0.3 + Math.random()*0.6, Math.sin(ang) * (4.0 + Math.random()*3.5),
+                                6.0, 35.0, 65, 0.50, 0xf1f5f9
                             );
                         }
                     }
@@ -2161,19 +2206,30 @@ html_template = """
                 if (p0.stage === 2) { activeFocusWorld.set(0, s2Len * 0.45, 0); s2Group.localToWorld(activeFocusWorld); }
                 else { activeFocusWorld.set(0, s1Len * 0.52, 0); rocket.localToWorld(activeFocusWorld); }
 
-                // 超望遠カメラポジショニング (FOV 16°)
+                // 超望遠カメラポジショニング (FOV 16°・望遠レンズ追跡ラグ＆呼吸感のある微細手ブレ)
                 if (simCfg.is_preview) {
                     const ang = elapsedSec * 0.22;
                     cameraMain.position.set(Math.sin(ang) * 280.0, 42.0, Math.cos(ang) * 280.0);
-                    cameraMain.lookAt(0, 6.0 + (s1Len + s2Len) * 0.45, 0);
+                    smoothCamTarget.set(0, 6.0 + (s1Len + s2Len) * 0.45, 0);
+                    cameraMain.lookAt(smoothCamTarget);
                 } else {
                     cameraMain.position.set(activeFocusWorld.x - 180.0, activeFocusWorld.y + 35.0, activeFocusWorld.z + 320.0);
+                    
+                    // 実写光学トラッカー特有の追尾慣性ラグ
+                    smoothCamTarget.lerp(activeFocusWorld, 0.08);
+
+                    // 光学望遠レンズの緩やかな浮動
+                    const lensFloatX = Math.sin(now * 0.0018) * 0.45;
+                    const lensFloatY = Math.cos(now * 0.0013) * 0.35;
+                    cameraMain.position.x += lensFloatX;
+                    cameraMain.position.y += lensFloatY;
+
                     if (camShake > 0.002) {
                         cameraMain.position.x += (Math.random() - 0.5) * camShake * 2.5;
                         cameraMain.position.y += (Math.random() - 0.5) * camShake * 2.5;
                         camShake *= 0.94;
                     }
-                    cameraMain.lookAt(activeFocusWorld);
+                    cameraMain.lookAt(smoothCamTarget);
                 }
                 skyDome.position.copy(cameraMain.position);
 
