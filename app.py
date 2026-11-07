@@ -324,7 +324,7 @@ target_bottom_y_3d = 68.6 - pin_offset_3d
 TOWER_PHYSICAL_CATCH_Y = max(0.0, (target_bottom_y_3d - 6.0) * 10.0)
 
 # =========================================================================
-# 💥 物理シミュレーション (4段階RUD飛散追従演算対応)
+# 💥 物理シミュレーション (重厚・実写相対速度分離対応)
 # =========================================================================
 def run_simulation(preview_only=False):
     if preview_only:
@@ -446,8 +446,9 @@ def run_simulation(preview_only=False):
                     b_active = True
                     b_sep_time = t
                     b_x, b_y = x, y
-                    b_vx = vx - np.cos(pitch_rad) * 4.0
-                    b_vy = (vy * 0.28) - 18.0
+                    # 修正点③：第1段分離初期は急ブレーキせず、実機通りわずかな相対速度差（-3.0m/s）で優雅に滑り出し
+                    b_vx = vx - np.cos(pitch_rad) * 1.8
+                    b_vy = vy - np.sin(pitch_rad) * 3.0
                     b_pitch = visual_pitch
             else:
                 cur_mass = float((s1_spec["dry_mass"] + s2_fuel + s2_spec["dry_mass"] + payload_mass) * 1000.0 + f_mass + w_mass + strap_m + fuel_s1_rem)
@@ -503,15 +504,15 @@ def run_simulation(preview_only=False):
                 b_x = max(0.0, b_x + b_vx * dt)
                 b_y = max(0.0, b_y + b_vy * dt)
             else:
-                if sep_elapsed <= 4.0:
+                if sep_elapsed <= 5.5:
                     b_thrust = False
                     target_flip = -1.57
                     pitch_err = target_flip - b_pitch
                     b_rcs = 1.0 if pitch_err < -0.05 else (-1.0 if pitch_err > 0.05 else 0.0)
-                    b_pitch += np.clip(pitch_err * 0.45, -0.65, 0.65) * dt
-                    b_vx -= 12.0 * dt
-                    if b_vy > 0: b_vy -= (g0 * 2.8) * dt
-                    else: b_vy -= (g0 + 4.0) * dt
+                    b_pitch += np.clip(pitch_err * 0.28, -0.45, 0.45) * dt
+                    b_vx -= 6.0 * dt
+                    if b_vy > 0: b_vy -= (g0 * 1.6) * dt
+                    else: b_vy -= (g0 + 2.0) * dt
                     b_x = max(0.0, b_x + b_vx * dt)
                     b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
                 elif b_alt > 32000 and b_fuel > s1_fuel * 1000 * 0.04 and b_vx > -650.0:
@@ -676,7 +677,6 @@ html_template = """
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #01040a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; }
         #canvas-main { width: 100%; height: 100%; display: block; position: absolute; top:0; left:0; z-index: 1; }
         
-        /* 魔改造⑤：実機放送特有の周辺光量落ち（ヴィネット効果） */
         .vignette-overlay {
             position: absolute;
             top: 0; left: 0;
@@ -686,7 +686,6 @@ html_template = """
             background: radial-gradient(circle at center, transparent 65%, rgba(1, 4, 10, 0.42) 100%);
         }
         
-        /* 修正点①：スクロールなし全表示トップバナー */
         .top-banner { 
             position: absolute; 
             top: 0; 
@@ -707,7 +706,6 @@ html_template = """
         }
         .banner-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-        /* 修正点①：CAM 02 をバナー下端に1px単位でギリギリ配置 */
         .pip-container { 
             position: absolute; 
             top: 48px; 
@@ -871,7 +869,6 @@ html_template += """
             let rudStartTime = 0.0;
             let is13to3CutoffTriggered = false;
 
-            // 修正点①：CAM 02 (PiP) をバナー下端+4pxのギリギリ位置にリアルタイム追従
             function updatePipPosition() {
                 if (pipBox && topBannerBar) {
                     const rect = topBannerBar.getBoundingClientRect();
@@ -953,7 +950,7 @@ html_template += """
             }
 
             // =========================================================================
-            // 🔊 音響合成システム (修正点②：最初からの発射音再生、修正点④：コンプリート音削除)
+            // 🔊 音響合成システム
             // =========================================================================
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             let actx = null, subRumble = null, shockCrackle = null, gasHiss = null, boosterRumble = null, boosterCrackle = null;
@@ -1007,7 +1004,6 @@ html_template += """
                 }
             }
             
-            // 修正点②：親フレーム含むあらゆる操作で即時AudioContextアンロック
             ['click', 'touchstart', 'mousedown', 'keydown', 'pointerdown', 'mousemove'].forEach(evt => {
                 window.addEventListener(evt, ensureAudioActive, { once: false, passive: true });
                 try {
@@ -1160,6 +1156,11 @@ html_template += """
             
             const pipTrackingSpot = new THREE.DirectionalLight(0xffffff, 2.5); 
             scene.add(pipTrackingSpot);
+
+            // 魔改造②：ブースター着陸時のタワー照射専用動的ポイントライト
+            const towerCatchLight = new THREE.PointLight(simCfg.flame_hex, 0.0, 95, 2.0);
+            towerCatchLight.position.set(-8.5, 70.0, 0);
+            scene.add(towerCatchLight);
 
             function generateEnvironmentMap() {
                 const cvs = document.createElement('canvas'); cvs.width = 1024; cvs.height = 512;
@@ -1716,7 +1717,9 @@ html_template += """
                     tipArray.push({
                         node: tipObj, isCenter: pos.isCenter, glow: glowSp,
                         cross: crossGroup, disks: disks, firing: false, exitR: exitRadius,
-                        coneMat: innerConeMat
+                        coneMat: innerConeMat,
+                        coreP1Mat: coreMat,
+                        coreP2Mat: coreMat
                     });
                     group.add(engUnit);
                 }
@@ -1780,12 +1783,12 @@ html_template += """
             vaporCone1.position.set(0, s1Len + s2Len + 1.2, 0);
             rocket.add(vaporCone1);
 
+            // 修正点①：下段ヴェイパーコーンはs1Groupに帰属させ、ステージ切り離し時に第2段側に残らないよう完全分離
             const vaporCone2 = new THREE.Mesh(new THREE.ConeGeometry(3.1, 4.8, 32, 1, true), vaporMat);
-            vaporCone2.position.set(0, s1Len + 1.0, 0);
-            rocket.add(vaporCone2);
+            vaporCone2.position.set(0, s1Len - 0.5, 0);
+            s1Group.add(vaporCone2);
 
             const wingsGroup = new THREE.Group(); s1Group.add(wingsGroup);
-            const gridFinMeshes = [];
             const gridFinMat = darkSteelMat.clone();
             const aoaRad = (simCfg.aoa * Math.PI) / 180.0;
             if (simCfg.wing_id === 'grid') {
@@ -1796,7 +1799,6 @@ html_template += """
                     gfFrame.rotation.y = -ang; gfFrame.rotation.z = aoaRad;
                     const gridBox = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.14, 1.25), gridFinMat);
                     gridBox.position.x = 0.62; gridBox.castShadow = true; gfFrame.add(gridBox); wingsGroup.add(gfFrame);
-                    gridFinMeshes.push(gridBox);
                 }
             } else if (simCfg.wing_id === 'starship_flap') {
                 for(let side of [-1, 1]) {
@@ -1878,10 +1880,16 @@ html_template += """
             const solarR = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.8, 0.05), solarWingMat);
             solarR.position.set(2.4, 0, 0); solarR.scale.set(0.01, 1, 1); payloadGroup.add(solarR);
 
+            // 修正点①：切り離し部品の残存バグ完全解決（黒タイル半分を親にadd、アボートタワー分離対応）
             const fairingHalves = [];
+            let abortTowerUnit = null;
+
             if (simCfg.fairing_shape === 'abort_tower') {
-                const cap = new THREE.Mesh(new THREE.ConeGeometry(1.14, 2.8, 24), s2Mat); cap.position.y = s2Len + 1.4; cap.castShadow = true; s2Group.add(cap);
-                const spike = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 3.8, 12), darkSteelMat); spike.position.y = s2Len + 4.2; spike.castShadow = true; s2Group.add(spike);
+                abortTowerUnit = new THREE.Group();
+                abortTowerUnit.position.y = s2Len;
+                const cap = new THREE.Mesh(new THREE.ConeGeometry(1.14, 2.8, 24), s2Mat); cap.position.y = 1.4; cap.castShadow = true; abortTowerUnit.add(cap);
+                const spike = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 3.8, 12), darkSteelMat); spike.position.y = 4.2; spike.castShadow = true; abortTowerUnit.add(spike);
+                s2Group.add(abortTowerUnit);
             } else if (simCfg.fairing_shape === 'pencil_tip') {
                 const wood = new THREE.Mesh(new THREE.ConeGeometry(1.12, 3.8, 6), new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.9 }));
                 wood.position.y = s2Len + 1.9; wood.castShadow = true; s2Group.add(wood);
@@ -1898,11 +1906,13 @@ html_template += """
                     const halfMesh = new THREE.Mesh(new THREE.LatheGeometry(ogivePts, 16, (side === 1) ? 0 : Math.PI, Math.PI), s2Mat);
                     halfMesh.position.y = s2Len; halfMesh.castShadow = true; s2Group.add(halfMesh);
 
+                    // 黒タイル半分をhalfMeshの子要素にして一緒に分離
                     if (simCfg.fairing_shape === 'starship_crew' && side === 1) {
                         const blackHalf = new THREE.Mesh(new THREE.LatheGeometry(ogivePts, 16, 0, Math.PI), blackTileMat);
-                        blackHalf.scale.set(1.006, 1.0, 1.006); blackHalf.position.y = s2Len; blackHalf.castShadow = true; s2Group.add(blackHalf);
+                        blackHalf.scale.set(1.006, 1.0, 1.006); blackHalf.castShadow = true;
+                        halfMesh.add(blackHalf);
                     }
-                    fairingHalves.push({ mesh: halfMesh, side: side, detached: false, vx: 0, vy: 0, rotZ: 0 });
+                    fairingHalves.push({ mesh: halfMesh, side: side, detached: false, vx: 0, vy: 0, rotZ: 0, rotX: 0 });
                 }
             }
 
@@ -1969,15 +1979,16 @@ html_template += """
 
             const cloudTex = createCloudTex(), sparkTex = createSparkTex();
 
+            // 修正点②：空の雲（cloudDeck）を発射台周辺（半径450m以内）から完全に排除して煙との混同を防止
             const cloudDeck = new THREE.Group(); scene.add(cloudDeck);
             const cloudSprites = [];
             for(let ci=0; ci<95; ci++) {
-                const cMat = new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0.32, depthWrite: false });
+                const cMat = new THREE.SpriteMaterial({ map: cloudTex, color: 0xdbeafe, transparent: true, opacity: 0.22, depthWrite: false });
                 const csp = new THREE.Sprite(cMat);
                 let cx = (Math.random() - 0.5) * 4200.0, cz = (Math.random() - 0.5) * 4200.0;
-                if (Math.abs(cx) < 190 && Math.abs(cz) < 190) {
-                    cx += (cx >= 0 ? 230 : -230);
-                    cz += (cz >= 0 ? 230 : -230);
+                if (Math.hypot(cx, cz) < 450.0) {
+                    cx += (cx >= 0 ? 450 : -450);
+                    cz += (cz >= 0 ? 450 : -450);
                 }
                 const cy = 135.0 + (Math.random() - 0.5) * 35.0;
                 csp.position.set(cx, cy, cz);
@@ -2116,6 +2127,7 @@ html_template += """
             // =========================================================================
             const tStart = performance.now();
             let boosterDetached = false, stage1Detached = false, fairingDetached = false, camShake = 0.0;
+            let abortTowerDetached = false;
             let prevRcsCmd = 0.0, prevBoosterRcs = 0.0;
             let counterPulseTimer = 0.0, counterDirSign = 0.0;
             const tempV = new THREE.Vector3();
@@ -2134,7 +2146,6 @@ html_template += """
                 if (isMissionEnded) return;
                 requestAnimationFrame(animate);
 
-                // 修正点①：毎フレームバナー下端位置をCAM 02に適用（リサイズ・改行時も完全密着）
                 updatePipPosition();
 
                 const elapsedSec = (now - tStart) / 1000.0;
@@ -2193,7 +2204,7 @@ html_template += """
 
                 cloudSprites.forEach(csp => {
                     const cDist = cameraMain.position.distanceTo(csp.position);
-                    csp.material.opacity = THREE.MathUtils.clamp((cDist - 120.0) / 250.0, 0.0, 0.32);
+                    csp.material.opacity = THREE.MathUtils.clamp((cDist - 120.0) / 250.0, 0.0, 0.22);
                 });
 
                 const ux = Math.sin(pitch), uy = Math.cos(pitch);
@@ -2221,7 +2232,6 @@ html_template += """
                     vaporMat.opacity = 0.0;
                 }
 
-                // 魔改造④：高高度（30km〜80km）でのエンジン光に照らされる氷の剥離（Ice Shedding）
                 if (!simCfg.is_preview && !p0.exploded) {
                     if (simT > 0 && simT < 12.0 && Math.random() < 0.65) {
                         for(let k=0; k<2; k++) {
@@ -2243,44 +2253,43 @@ html_template += """
                     }
                 }
 
-                // ブースター分離
+                // 修正点③：サイドブースターの重厚でゆっくりとした実写切り離し（初速抑制＋3.5秒並走傾斜＋先端分離ガス）
                 if (!p0.strapon && !boosterDetached && boosterUnits.length > 0 && !simCfg.is_preview) {
                     boosterDetached = true;
                     playHeavySeparationSound();
-                    camShake = 0.22;
+                    camShake = 0.18;
                     for(let b of boosterUnits) {
                         b.detached = true;
                         b.sepAge = 0.0;
                         scene.attach(b.mesh);
                         b.tips.forEach(t => { t.glow.visible = false; t.cross.visible = false; t.disks.forEach(d => d.visible = false); });
                         const outX = Math.cos(b.angle), outZ = Math.sin(b.angle);
-                        const sepP = simCfg.sep_thrust;
-                        b.vx = perpX * outX * (0.15 * sepP);
-                        b.vy = -0.35 * sepP;
-                        b.vz = outZ * (0.15 * sepP);
+                        b.vx = perpX * outX * 0.035;
+                        b.vy = -0.04;
+                        b.vz = outZ * 0.035;
                         b.rx = 0.0; b.rz = 0.0;
-
-                        b.mesh.getWorldPosition(tempV);
-                        for(let k=0; k<6; k++) {
-                            emitParticle(
-                                tempV.x, tempV.y + s1Len * 0.65, tempV.z,
-                                outX * (0.4 + Math.random()*0.4), (Math.random()-0.5)*0.3, outZ * (0.4 + Math.random()*0.4),
-                                0.3, 2.2, 24, 0.55, 0xe0f2fe, 0.94, 0.0
-                            );
-                        }
                     }
                 }
                 if (boosterDetached) {
                     for(let b of boosterUnits) {
                         b.sepAge += 0.016;
                         const outX = Math.cos(b.angle), outZ = Math.sin(b.angle);
-                        if (b.sepAge < 1.8) {
-                            b.vx += perpX * outX * 0.018;
-                            b.vz += outZ * 0.018;
-                            b.rx += outZ * 0.0035;
-                            b.rz += -outX * 0.0035;
+                        if (b.sepAge < 3.5) {
+                            b.vx += perpX * outX * 0.0045;
+                            b.vz += outZ * 0.0045;
+                            b.rx += outZ * 0.0012;
+                            b.rz += -outX * 0.0012;
+                            // 先端分離スラスターの白いガス噴射
+                            if (Math.random() < 0.6) {
+                                b.mesh.getWorldPosition(tempV);
+                                emitParticle(
+                                    tempV.x, tempV.y + s1Len * 0.75, tempV.z,
+                                    outX * 0.6, 0.2, outZ * 0.6,
+                                    0.2, 1.2, 12, 0.45, 0xffffff, 0.94, 0.0
+                                );
+                            }
                         }
-                        b.vy -= (1.8 + Math.min(4.5, b.sepAge * 0.65)) * 0.016;
+                        b.vy -= (0.45 + Math.min(2.5, b.sepAge * 0.35)) * 0.016;
                         b.mesh.position.x += b.vx;
                         b.mesh.position.y += b.vy;
                         b.mesh.position.z += b.vz;
@@ -2289,15 +2298,23 @@ html_template += """
                     }
                 }
 
-                // ホットステージング
+                // 修正点①＆③：ホットステージング分離時の残存パーツ完全解消 ＆ 重厚なゆっくり離脱
                 const isSeparated = (p0.stage === 2 || p0.b_active);
                 if (isSeparated && !stage1Detached && !simCfg.is_preview) {
                     stage1Detached = true;
                     hotStagingSparkTimer = 2.6;
                     playHeavySeparationSound();
                     camShake = 0.45;
-                    rendererMain.toneMappingExposure = 2.3; // 魔改造③：ステージ分離時の瞬間ハレーション
+                    rendererMain.toneMappingExposure = 2.3;
                     mainCombinedGroup.visible = false;
+                    spaceJellyMesh.visible = false; // 修正点①：第1段切り離し時にジェリーフィッシュの残存を即座にリセット
+
+                    // アボートタワーがある場合は分離時に前方へ切り離し
+                    if (abortTowerUnit && !abortTowerDetached) {
+                        abortTowerDetached = true;
+                        scene.attach(abortTowerUnit);
+                    }
+
                     s1Group.localToWorld(tempV.set(0, s1Len, 0));
                     for(let i=0; i<36; i++) {
                         const ang = (i / 36) * Math.PI * 2;
@@ -2311,6 +2328,11 @@ html_template += """
                         s1Body.material.roughness = 0.42;
                         s1Body.material.color.setRGB(0.72, 0.74, 0.78);
                     }
+                }
+
+                if (abortTowerDetached && abortTowerUnit) {
+                    abortTowerUnit.position.x += perpX * 0.8;
+                    abortTowerUnit.position.y += 1.8;
                 }
 
                 if (hotStagingSparkTimer > 0) {
@@ -2336,23 +2358,38 @@ html_template += """
                 }
 
                 const bY_scaled = (bY * 0.1) + 6.0;
+
+                // 魔改造④：キャッチ時のダンパー沈み込み（1.5m）と白煙摩擦スモーク
                 if (simCfg.spacex_return && isStarshipPad) {
                     if (p0.b_caught) {
+                        if (catchStartTime === 0.0) catchStartTime = simT;
+                        const catchAge = simT - catchStartTime;
+                        const damperDip = Math.sin(Math.min(Math.PI, catchAge * 4.5)) * 1.5;
+                        chopstickGroup.position.y = 67.5 - damperDip;
                         armLeftPivot.rotation.y = THREE.MathUtils.lerp(armLeftPivot.rotation.y, 0.08, 0.25);
                         armRightPivot.rotation.y = THREE.MathUtils.lerp(armRightPivot.rotation.y, -0.08, 0.25);
                         document.getElementById('hud-arm').innerText = "CATCH LOCKED (PIN SECURED)";
                         document.getElementById('hud-arm').style.color = "#10b981";
+
+                        // レール摩擦白煙
+                        if (catchAge < 0.8 && Math.random() < 0.7) {
+                            emitParticle(-8.5, 68.0, 1.5, 0.4, 0.6, 0.4, 0.2, 1.8, 20, 0.6, 0xffffff, 0.95, 0.01);
+                            emitParticle(-8.5, 68.0, -1.5, 0.4, 0.6, -0.4, 0.2, 1.8, 20, 0.6, 0xffffff, 0.95, 0.01);
+                        }
                     } else if (stage1Detached && bY <= 1500) {
+                        chopstickGroup.position.y = 67.5;
                         armLeftPivot.rotation.y = THREE.MathUtils.lerp(armLeftPivot.rotation.y, 0.05, 0.12);
                         armRightPivot.rotation.y = THREE.MathUtils.lerp(armRightPivot.rotation.y, -0.05, 0.12);
                         document.getElementById('hud-arm').innerText = "CLOSING ARMS";
                         document.getElementById('hud-arm').style.color = "#38bdf8";
                     } else if (stage1Detached && bY <= 4500) {
+                        chopstickGroup.position.y = 67.5;
                         armLeftPivot.rotation.y = THREE.MathUtils.lerp(armLeftPivot.rotation.y, -0.16, 0.08);
                         armRightPivot.rotation.y = THREE.MathUtils.lerp(armRightPivot.rotation.y, 0.16, 0.08);
                         document.getElementById('hud-arm').innerText = "DEPLOYED (WIDE READY)";
                         document.getElementById('hud-arm').style.color = "#34d399";
                     } else {
+                        chopstickGroup.position.y = 67.5;
                         armLeftPivot.rotation.y = THREE.MathUtils.lerp(armLeftPivot.rotation.y, -0.75, 0.05);
                         armRightPivot.rotation.y = THREE.MathUtils.lerp(armRightPivot.rotation.y, 0.75, 0.05);
                         document.getElementById('hud-arm').innerText = "STOWED CLEAR";
@@ -2360,7 +2397,6 @@ html_template += """
                     }
                 }
 
-                // 魔改造①：Super Heavy再突入時のグリッドフィン赤熱＆紫ピンクプラズマ
                 if (stage1Detached && bY > 20000 && bY < 65000 && p0.mach > 2.5) {
                     const plasmaOp = Math.min(0.75, (p0.mach - 2.5) * 0.35);
                     plasmaMesh.material.opacity = plasmaOp;
@@ -2389,7 +2425,6 @@ html_template += """
                     s1Group.visible = true;
 
                     if (p0.b_caught) {
-                        if (catchStartTime === 0.0) catchStartTime = simT;
                         const catchAge = simT - catchStartTime;
                         const dampedSway = Math.sin(catchAge * 6.5) * Math.exp(-catchAge * 1.4) * 0.06;
                         s1Group.position.set(bX * 0.1 + dampedSway * 2.5, bY_scaled, 0);
@@ -2435,6 +2470,7 @@ html_template += """
                             t.disks.forEach(d => d.visible = false);
                         });
                         mainCombinedGroup.visible = false;
+                        towerCatchLight.intensity = 0.0;
                         document.getElementById('tv-stage-badge').innerText = "TOWER CATCH SUCCESS";
                         document.getElementById('tv-stage-badge').style.color = "#38bdf8";
 
@@ -2446,7 +2482,13 @@ html_template += """
                         mainCombinedGroup.visible = false;
                         const isThreeOnly = (bY <= 1200);
 
-                        // 魔改造②：着陸燃焼時 13基→3基カットオフ演出（外側ノズルからの残炎・白煙）
+                        // 魔改造②：タワー構造物へのエンジン光の照り返し
+                        if (bY <= 2500) {
+                            towerCatchLight.intensity = 8.5 * (1.0 - bY / 2500.0);
+                        } else {
+                            towerCatchLight.intensity = 0.0;
+                        }
+
                         if (isThreeOnly && !is13to3CutoffTriggered) {
                             is13to3CutoffTriggered = true;
                             s1NozzleTips.forEach((t, i) => {
@@ -2472,18 +2514,19 @@ html_template += """
                             });
                         });
 
-                        if (bY <= 1500) {
-                            const groundRatio = Math.max(0.15, 1.0 - (bY / 1500.0));
-                            const blastCount = Math.ceil(12 * groundRatio);
+                        // 修正点②：着陸煙と雲の完全差別化（着陸直前350m以下でのみ発射台上で金・橙・煤の3層高密度スチーム爆風）
+                        if (bY <= 350.0) {
+                            const groundRatio = Math.max(0.2, 1.0 - (bY / 350.0));
+                            const blastCount = Math.ceil(14 * groundRatio);
                             for (let i = 0; i < blastCount; i++) {
                                 const ang = Math.random() * Math.PI * 2;
-                                const spd = (3.5 + Math.random() * 4.5) * groundRatio;
-                                const isLit = (i < 4);
+                                const spd = (4.0 + Math.random() * 5.5) * groundRatio;
+                                const pType = Math.random();
+                                const col = (pType < 0.4) ? 0xf59e0b : ((pType < 0.75) ? 0xfef08a : 0x52525b);
                                 emitParticle(
-                                    (bX * 0.1) + Math.cos(ang) * 1.8, 4.2 + Math.random() * 1.5, Math.sin(ang) * 1.8,
-                                    Math.cos(ang) * spd, 0.2 + Math.random() * 0.4, Math.sin(ang) * spd,
-                                    4.0, 24.0 * groundRatio + 10.0, 58, isLit ? 0.75 : 0.55,
-                                    isLit ? 0xfef08a : 0xf1f5f9, 0.88, 0.035, isLit
+                                    (bX * 0.1) + Math.cos(ang) * 2.0, 3.8 + Math.random() * 1.2, Math.sin(ang) * 2.0,
+                                    Math.cos(ang) * spd, 0.15 + Math.random() * 0.35, Math.sin(ang) * spd,
+                                    3.8, 26.0 * groundRatio + 8.0, 52, 0.85, col, 0.88, 0.025, (pType < 0.75)
                                 );
                             }
                         }
@@ -2494,6 +2537,7 @@ html_template += """
                             t.disks.forEach(d => d.visible = false);
                         });
                         mainCombinedGroup.visible = false;
+                        towerCatchLight.intensity = 0.0;
                     }
                 } else {
                     s1Group.visible = !p0.exploded;
@@ -2502,22 +2546,25 @@ html_template += """
                     s1Group.updateMatrixWorld(true);
                 }
 
+                // 修正点①：フェアリング切り離し（太陽光スペキュラ反射＆クリーンな分離）
                 if (!p0.fairing && !fairingDetached && fairingHalves.length > 0 && !simCfg.is_preview) {
                     fairingDetached = true;
                     playHeavySeparationSound();
                     for(let fh of fairingHalves) {
                         fh.detached = true; scene.attach(fh.mesh);
-                        fh.vx = perpX * fh.side * 0.45;
-                        fh.vy = -0.25;
-                        fh.rotZ = -fh.side * 0.025;
+                        fh.vx = perpX * fh.side * 0.32;
+                        fh.vy = -0.18;
+                        fh.rotZ = -fh.side * 0.018;
+                        fh.rotX = 0.012;
                     }
                 }
                 if (fairingDetached) {
                     for(let fh of fairingHalves) {
                         fh.mesh.position.x += fh.vx;
                         fh.mesh.position.y += fh.vy;
-                        fh.vy -= 0.022;
+                        fh.vy -= 0.018;
                         fh.mesh.rotation.z += fh.rotZ;
+                        fh.mesh.rotation.x += fh.rotX;
                     }
                 }
 
@@ -2527,7 +2574,9 @@ html_template += """
                 const s1TargetEmissive = (p0.stage === 1 && isEngineFiring) ? 1.25 : (p0.b_thrust && !p0.b_caught ? 1.1 : 0.0);
                 s1InconelNozzleMat.emissiveIntensity = THREE.MathUtils.lerp(s1InconelNozzleMat.emissiveIntensity, s1TargetEmissive, (p0.stage === 1 && isEngineFiring) ? 0.06 : 0.018);
 
-                const s2TargetEmissive = (p0.stage === 2 && isEngineFiring) ? 1.35 : 0.0;
+                // 魔改造③：宇宙空間（高度80km以上）での真空ノズル赤熱発光（サクランボ色）
+                const s2TargetEmissive = (p0.stage === 2 && isEngineFiring) ? (alt > 80.0 ? 1.85 : 1.35) : 0.0;
+                s2InconelNozzleMat.emissive = new THREE.Color(alt > 80.0 ? 0xff2200 : 0xff4500);
                 s2InconelNozzleMat.emissiveIntensity = THREE.MathUtils.lerp(s2InconelNozzleMat.emissiveIntensity, s2TargetEmissive, (p0.stage === 2 && isEngineFiring) ? 0.08 : 0.015);
 
                 if (isEngineFiring) {
@@ -2575,7 +2624,7 @@ html_template += """
                         mainCombinedGroup.visible = false;
                     }
 
-                    if (alt >= 38.0 && alt <= 115.0) {
+                    if (alt >= 38.0 && alt <= 115.0 && p0.stage === 1) {
                         spaceJellyMesh.visible = true;
                         const jellyProgress = Math.sin(((alt - 38.0) / 77.0) * Math.PI);
                         spaceJellyMat.opacity = jellyProgress * 0.42;
@@ -2593,6 +2642,17 @@ html_template += """
                         if (tObj.coneMat) tObj.coneMat.color.copy(curDynamicFlameColor);
                         const fPulse = 0.92 + Math.random() * 0.16;
                         tObj.cross.scale.set(1.0, fPulse * 0.85, 1.0);
+
+                        // 魔改造③：宇宙空間（高度80km以上）での希薄透明化
+                        if (p0.stage === 2 && alt > 80.0) {
+                            if (tObj.coneMat) tObj.coneMat.opacity = 0.45;
+                            if (tObj.coreP1Mat) tObj.coreP1Mat.opacity = 0.35;
+                            if (tObj.coreP2Mat) tObj.coreP2Mat.opacity = 0.35;
+                        } else {
+                            if (tObj.coneMat) tObj.coneMat.opacity = 0.95;
+                            if (tObj.coreP1Mat) tObj.coreP1Mat.opacity = 0.95;
+                            if (tObj.coreP2Mat) tObj.coreP2Mat.opacity = 0.95;
+                        }
 
                         tObj.disks.forEach((d, k) => {
                             d.visible = (alt < 70.0);
@@ -2812,7 +2872,6 @@ html_template += """
                     }
                 }
 
-                // 修正点②：カウントダウン開始（T-10秒〜）からの発射台アンビエント音と点火音
                 if (simT < 0.0) {
                     const sec = Math.ceil(Math.abs(simT));
                     document.getElementById('tv-timer').innerText = simCfg.is_preview ? "PAD INSPECTION" : `T- 00:0${sec}.0`;
@@ -2820,7 +2879,6 @@ html_template += """
 
                     if (!simCfg.is_preview && actx) {
                         ensureAudioActive();
-                        // T-10秒〜 T-5秒：ベント排気音
                         if (gasHiss) {
                             const hissGain = (simT >= -5.0) ? 0.65 : 0.22;
                             gasHiss.gain.setTargetAtTime(hissGain, actx.currentTime, 0.2);
@@ -2846,7 +2904,7 @@ html_template += """
                             shockwaveFired = true;
                             shockRingMat.opacity = 0.8;
                             shockRingMesh.scale.set(1.0, 1.0, 1.0);
-                            rendererMain.toneMappingExposure = 2.6; // 魔改造③：点火時の白飛び露出オーバー
+                            rendererMain.toneMappingExposure = 2.6;
                         }
 
                         if (actx) {
@@ -3002,10 +3060,9 @@ html_template += """
                 }
 
                 // =========================================================================
-                // 📺 修正点③：CAM 02 (地上望遠) ＆ CAM 01 (メイン) 完全環境分離レンダリング
+                // 📺 CAM 02 (地上望遠) ＆ CAM 01 (メイン) 完全環境分離レンダリング
                 // =========================================================================
                 if (pipVisible) {
-                    // ① CAM 02 描画環境：どんな高度でも「地上の澄み切った青空・大気フォグ・星空なし」を強制固定
                     skyDome.position.copy(cameraPip.position);
                     skyDomeMat.color.setRGB(1.0, 1.0, 1.0);
                     starPoints.visible = false;
@@ -3052,7 +3109,6 @@ html_template += """
                     rendererPip.render(scene, cameraPip);
                 }
 
-                // ② CAM 01 描画環境：高度に応じた宇宙空間・星空・フォグ消失への復元
                 skyDome.position.copy(cameraMain.position);
                 skyDomeMat.color.setRGB(
                     1.0 - spaceFactor * 0.95,
@@ -3096,7 +3152,6 @@ html_template += """
                 const isOrbit = (p0.event === "ORBIT");
                 const canComplete = simCfg.spacex_return ? (isOrbit && p0.b_caught) : isOrbit;
 
-                // 修正点④：コンプリート音は一切鳴らさず完全な宇宙の静寂へ
                 if (canComplete && !isMissionEnded) {
                     completeBanner.style.display = 'block';
                     if (simCfg.spacex_return) {
