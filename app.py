@@ -141,7 +141,6 @@ strap_keys = list(STRAPON_BOOSTERS.keys())
 wing_keys = list(AERO_WINGS.keys())
 fair_keys = list(FAIRINGS.keys())
 
-# プリセット選択時のセッションステート自動同期関数
 def on_preset_change():
     chosen = st.session_state.get("preset_selector")
     cfg = PRESETS.get(chosen)
@@ -175,7 +174,6 @@ def on_preset_change():
         st.session_state["k_water"] = int(cfg["water"])
         st.session_state["k_turn_exp"] = float(cfg["turn_exp"])
 
-# 初期化
 if "initialized_preset" not in st.session_state:
     st.session_state["preset_selector"] = list(PRESETS.keys())[1]
     on_preset_change()
@@ -661,7 +659,7 @@ html_template = """
         </div>
         <div style="display: flex; align-items: center; gap: 14px; font-family: monospace; font-size: clamp(9px, 1.1vw, 11px);">
             <span style="color: #94a3b8;">ATMOS: <strong id="hud-regime" style="color: #f8fafc;">TROPOSPHERE</strong></span>
-            <span style="color: #94a3b8;">GN2 RCS: <strong id="hud-rcs" style="color: #38bdf8;">STANDBY</strong></span>
+            <span style="color: #94a3b8;">GN2 RCS: <strong id="hud-rcs" style="color: #38bdf8;">ACTIVE (8-AXIS AUTONOMOUS)</strong></span>
             <span style="color: #94a3b8;">ARM: <strong id="hud-arm" style="color: #f59e0b;">STOWED</strong></span>
             <span id="comm-status" style="color: #10b981;">LOCKED</span>
         </div>
@@ -722,7 +720,6 @@ html_template = """
 
             let isMissionEnded = false, catchPopPlayed = false, pipVisible = true;
             let landingSonicBoomPlayed = false;
-            let vaporConeFired = false;
             const pipBox = document.getElementById('pip-box');
 
             function resizePipRenderer() {
@@ -787,7 +784,7 @@ html_template = """
             }
 
             // =========================================================================
-            // 🔊 音響合成システム (RCS音響改善・多重化抑制・温和化)
+            // 🔊 音響合成システム (RCS温和化＆過負荷防止)
             // =========================================================================
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             let actx = null, subRumble = null, shockCrackle = null, gasHiss = null, boosterRumble = null, boosterCrackle = null;
@@ -894,17 +891,17 @@ html_template = """
                 pSrc.start(now + 0.015);
             }
 
-            // スラスター音量を約1/8に減衰し、高域を削ってマイルドな「ポフッ」という実機バルブ音に変更
+            // 温和で控えめな冷ガスバルブ音（高域減衰・耳障り感解消）
             function playRcsPuffSound() {
                 if (!actx) return;
-                const now = actx.currentTime, dur = 0.06;
+                const now = actx.currentTime, dur = 0.055;
                 const buf = actx.createBuffer(1, Math.floor(actx.sampleRate * dur), actx.sampleRate);
                 const data = buf.getChannelData(0);
-                for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (actx.sampleRate * 0.018));
+                for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (actx.sampleRate * 0.016));
                 const src = actx.createBufferSource(); src.buffer = buf;
-                const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.setValueAtTime(1350, now); bp.Q.value = 1.1;
-                const g = actx.createGain(); g.gain.setValueAtTime(0.022, now); g.gain.exponentialRampToValueAtTime(0.001, now + dur);
-                src.connect(bp); bp.connect(g); g.connect(actx.destination);
+                const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.setValueAtTime(1400, now); bp.Q.value = 1.0;
+                const g = actx.createGain(); g.gain.setValueAtTime(0.018, now); g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+                src.connect(bp); src.connect(g); g.connect(actx.destination);
                 src.start(now);
             }
 
@@ -1098,7 +1095,7 @@ html_template = """
             }
 
             // =========================================================================
-            // 🎨 プロシージャル・テクスチャ生成
+            // 🎨 プロシージャル・テクスチャ生成 (溶接ビード＆完全エッジ減衰)
             // =========================================================================
             function createSaturnRollPattern() {
                 const cvs = document.createElement('canvas'); cvs.width = 512; cvs.height = 512;
@@ -1168,28 +1165,35 @@ html_template = """
                 return new THREE.CanvasTexture(cvs);
             }
 
-            function createCryoFrostTexture() {
+            // 実機特有のリング溶接ビード線＆パネル反射ムラ（バンプ＆ラフネスマップ）
+            function createWeldSeamTexture() {
                 const cvs = document.createElement('canvas'); cvs.width = 256; cvs.height = 512;
                 const ctx = cvs.getContext('2d');
-                const g = ctx.createLinearGradient(0, 0, 0, 512);
-                g.addColorStop(0.0, '#334155');
-                g.addColorStop(0.15, '#e2e8f0');
-                g.addColorStop(0.5, '#f8fafc');
-                g.addColorStop(0.85, '#e2e8f0');
-                g.addColorStop(1.0, '#1e293b');
-                ctx.fillStyle = g; ctx.fillRect(0, 0, 256, 512);
-                return new THREE.CanvasTexture(cvs);
+                ctx.fillStyle = '#7f7f7f'; ctx.fillRect(0, 0, 256, 512);
+                for(let y=32; y<512; y+=48) {
+                    ctx.fillStyle = '#9a9a9a'; ctx.fillRect(0, y, 256, 2);
+                    ctx.fillStyle = '#5c5c5c'; ctx.fillRect(0, y+2, 256, 2);
+                }
+                const imgData = ctx.getImageData(0,0,256,512);
+                for(let k=0; k<imgData.data.length; k+=4) {
+                    const n = (Math.random() - 0.5) * 12;
+                    imgData.data[k] += n; imgData.data[k+1] += n; imgData.data[k+2] += n;
+                }
+                ctx.putImageData(imgData, 0, 0);
+                const tex = new THREE.CanvasTexture(cvs);
+                tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+                return tex;
             }
 
             const saturnRollTex = createSaturnRollPattern();
             const baguetteTex = createBaguetteTexture();
             const pencilTex = createPencilTexture();
             const tileTex = createHexTileTexture();
-            const cryoFrostTex = createCryoFrostTexture();
+            const weldSeamTex = createWeldSeamTexture();
 
             function getRealisticMaterial(matId) {
                 if (matId === 'saturn') {
-                    return new THREE.MeshStandardMaterial({ map: saturnRollTex, roughness: 0.35, metalness: 0.15, envMap: proceduralEnvMap });
+                    return new THREE.MeshStandardMaterial({ map: saturnRollTex, roughness: 0.35, metalness: 0.15, envMap: proceduralEnvMap, bumpMap: weldSeamTex, bumpScale: 0.008 });
                 } else if (matId === 'baguette') {
                     return new THREE.MeshStandardMaterial({ map: baguetteTex, roughness: 0.95, metalness: 0.02 });
                 } else if (matId === 'pencil') {
@@ -1197,19 +1201,21 @@ html_template = """
                 } else if (matId === 'ss') {
                     return new THREE.MeshStandardMaterial({
                         color: 0xf1f5f9,
-                        roughness: 0.14,
-                        metalness: 0.96,
+                        roughness: 0.16,
+                        metalness: 0.94,
                         envMap: proceduralEnvMap,
-                        roughnessMap: cryoFrostTex
+                        bumpMap: weldSeamTex,
+                        bumpScale: 0.010,
+                        roughnessMap: weldSeamTex
                     });
                 } else if (matId === 'al') {
-                    return new THREE.MeshStandardMaterial({ color: 0xc2410c, roughness: 0.70, metalness: 0.15 });
+                    return new THREE.MeshStandardMaterial({ color: 0xc2410c, roughness: 0.70, metalness: 0.15, bumpMap: weldSeamTex, bumpScale: 0.006 });
                 } else if (matId === 'cf') {
                     return new THREE.MeshStandardMaterial({ color: 0x111317, roughness: 0.85, metalness: 0.08, bumpMap: tileTex, bumpScale: 0.02 });
                 } else if (matId === 'military') {
-                    return new THREE.MeshStandardMaterial({ color: 0x3f4f38, roughness: 0.65, metalness: 0.35, envMap: proceduralEnvMap });
+                    return new THREE.MeshStandardMaterial({ color: 0x3f4f38, roughness: 0.65, metalness: 0.35, envMap: proceduralEnvMap, bumpMap: weldSeamTex, bumpScale: 0.008 });
                 } else {
-                    return new THREE.MeshStandardMaterial({ color: 0x3f3f46, roughness: 0.32, metalness: 0.85, envMap: proceduralEnvMap });
+                    return new THREE.MeshStandardMaterial({ color: 0x3f3f46, roughness: 0.32, metalness: 0.85, envMap: proceduralEnvMap, bumpMap: weldSeamTex, bumpScale: 0.008 });
                 }
             }
 
@@ -1260,28 +1266,42 @@ html_template = """
             }
 
             // =========================================================================
-            // 🔥 超高輝度クロスプレーン・バーナーコア ＆ マッハディスク生成
+            // 🔥 超高輝度クロスプレーン・バーナーコア (背景枠・フォグ干渉解消仕様)
             // =========================================================================
             function createLaserCoreTex() {
                 const cvs = document.createElement('canvas'); cvs.width = 64; cvs.height = 256;
                 const ctx = cvs.getContext('2d');
-                const g = ctx.createLinearGradient(32, 0, 32, 256);
-                g.addColorStop(0.0, 'rgba(255,255,255,1.0)');
-                g.addColorStop(0.12, 'rgba(224,242,254,0.98)');
-                g.addColorStop(0.35, 'rgba(96,165,250,0.85)');
-                g.addColorStop(0.70, 'rgba(29,78,216,0.35)');
-                g.addColorStop(1.0, 'rgba(0,0,0,0)');
-                ctx.fillStyle = g; ctx.fillRect(0, 0, 64, 256);
+                ctx.clearRect(0, 0, 64, 256);
+                
+                // 縦方向グラデーション
+                const gY = ctx.createLinearGradient(0, 0, 0, 256);
+                gY.addColorStop(0.0, 'rgba(255,255,255,1.0)');
+                gY.addColorStop(0.12, 'rgba(224,242,254,0.95)');
+                gY.addColorStop(0.35, 'rgba(96,165,250,0.85)');
+                gY.addColorStop(0.70, 'rgba(29,78,216,0.25)');
+                gY.addColorStop(1.0, 'rgba(0,0,0,0)');
+                ctx.fillStyle = gY; ctx.fillRect(0, 0, 64, 256);
+                
+                // 左右エッジの完全アルファ減衰（パッツリ境界線の完全消去）
+                ctx.globalCompositeOperation = 'destination-in';
+                const gX = ctx.createLinearGradient(0, 0, 64, 0);
+                gX.addColorStop(0.0, 'rgba(0,0,0,0)');
+                gX.addColorStop(0.25, 'rgba(0,0,0,1)');
+                gX.addColorStop(0.75, 'rgba(0,0,0,1)');
+                gX.addColorStop(1.0, 'rgba(0,0,0,0)');
+                ctx.fillStyle = gX; ctx.fillRect(0, 0, 64, 256);
+                
                 return new THREE.CanvasTexture(cvs);
             }
 
             function createGlowPointTex() {
                 const cvs = document.createElement('canvas'); cvs.width = 64; cvs.height = 64;
                 const ctx = cvs.getContext('2d');
-                const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 30);
+                ctx.clearRect(0, 0, 64, 64);
+                const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 31);
                 g.addColorStop(0.0, 'rgba(255,255,255,1.0)');
-                g.addColorStop(0.3, 'rgba(147,197,253,0.8)');
-                g.addColorStop(0.7, 'rgba(37,99,235,0.25)');
+                g.addColorStop(0.25, 'rgba(147,197,253,0.85)');
+                g.addColorStop(0.65, 'rgba(37,99,235,0.2)');
                 g.addColorStop(1.0, 'rgba(0,0,0,0)');
                 ctx.fillStyle = g; ctx.fillRect(0, 0, 64, 64);
                 return new THREE.CanvasTexture(cvs);
@@ -1290,15 +1310,16 @@ html_template = """
             function createDiamondDiskTex() {
                 const cvs = document.createElement('canvas'); cvs.width = 64; cvs.height = 64;
                 const ctx = cvs.getContext('2d');
-                ctx.fillStyle = '#000000'; ctx.fillRect(0,0,64,64);
+                ctx.clearRect(0, 0, 64, 64);
+                const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 30);
+                g.addColorStop(0.0, 'rgba(255,255,255,1.0)');
+                g.addColorStop(0.35, 'rgba(186,230,253,0.85)');
+                g.addColorStop(0.75, 'rgba(59,130,246,0.3)');
+                g.addColorStop(1.0, 'rgba(0,0,0,0)');
+                ctx.fillStyle = g;
                 ctx.beginPath();
                 ctx.moveTo(32, 4); ctx.lineTo(58, 32); ctx.lineTo(32, 60); ctx.lineTo(6, 32); ctx.closePath();
-                const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 28);
-                g.addColorStop(0.0, 'rgba(255,255,255,1.0)');
-                g.addColorStop(0.4, 'rgba(186,230,253,0.9)');
-                g.addColorStop(0.8, 'rgba(59,130,246,0.4)');
-                g.addColorStop(1.0, 'rgba(0,0,0,0)');
-                ctx.fillStyle = g; ctx.fill();
+                ctx.fill();
                 return new THREE.CanvasTexture(cvs);
             }
 
@@ -1315,7 +1336,7 @@ html_template = """
                 envMap: proceduralEnvMap
             });
 
-            // クロスプレーン＋ノズル内壁グロー＋定在ショックダイヤモンズ内蔵
+            // fog: false を全マテリアルに徹底付与（背景四角枠・変色バグを根本解決）
             function buildFullDetailedEngineCluster(parent, count, basePosY, epsScale, tipArray, flameHex) {
                 const group = new THREE.Group(); group.position.y = basePosY;
                 const bellH = 1.2 * epsScale, bellW = 0.22 * Math.pow(epsScale, 0.65);
@@ -1327,11 +1348,11 @@ html_template = """
                 corePlaneGeo.translate(0, -12.0, 0);
                 const coreMat = new THREE.MeshBasicMaterial({
                     map: laserCoreTex, color: flameHex, transparent: true, opacity: 0.96,
-                    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+                    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false
                 });
 
-                const glowMat = new THREE.SpriteMaterial({ map: glowPointTex, color: flameHex, blending: THREE.AdditiveBlending, depthWrite: false });
-                const diskMat = new THREE.SpriteMaterial({ map: diamondDiskTex, color: flameHex, blending: THREE.AdditiveBlending, depthWrite: false });
+                const glowMat = new THREE.SpriteMaterial({ map: glowPointTex, color: flameHex, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+                const diskMat = new THREE.SpriteMaterial({ map: diamondDiskTex, color: flameHex, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
 
                 const enginePositions = [];
                 if (count === 33) {
@@ -1351,13 +1372,11 @@ html_template = """
 
                     const tipObj = new THREE.Object3D(); tipObj.position.set(0, -bellH, 0);
 
-                    // ノズル開口部の強烈な白熱発光
                     const glowSp = new THREE.Sprite(glowMat);
                     glowSp.scale.set(bellW * 4.5, bellW * 4.5, 1.0);
                     glowSp.visible = false;
                     tipObj.add(glowSp);
 
-                    // 十字交差プレーン（レーザープラズマ柱）
                     const coreP1 = new THREE.Mesh(corePlaneGeo, coreMat);
                     const coreP2 = new THREE.Mesh(corePlaneGeo, coreMat);
                     coreP2.rotation.y = Math.PI / 2;
@@ -1366,7 +1385,6 @@ html_template = """
                     crossGroup.visible = false;
                     tipObj.add(crossGroup);
 
-                    // マッハディスク列
                     const disks = [];
                     for(let k=1; k<=4; k++) {
                         const mDisk = new THREE.Sprite(diskMat);
@@ -1390,26 +1408,57 @@ html_template = """
             const s1EpsScale = 0.75 + (simCfg.s1_eps / 70.0) * 0.75;
             buildFullDetailedEngineCluster(s1Group, simCfg.s1_eng, 0.0, s1EpsScale, s1NozzleTips, simCfg.flame_hex);
 
-            // アナモルフィック・レンズフレア（横一文字の光条）
+            // 1本の太く美しい「統合メインプルーム」（エンジン群全体を包む迫真の奔流）
+            const mainCombinedPlumeMat = new THREE.MeshBasicMaterial({
+                map: laserCoreTex, color: simCfg.flame_hex, transparent: true, opacity: 0.92,
+                blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false
+            });
+            const mainCombinedPlumeGeo = new THREE.PlaneGeometry(3.6, 42.0);
+            mainCombinedPlumeGeo.translate(0, -21.0, 0);
+            const mcp1 = new THREE.Mesh(mainCombinedPlumeGeo, mainCombinedPlumeMat);
+            const mcp2 = new THREE.Mesh(mainCombinedPlumeGeo, mainCombinedPlumeMat);
+            mcp2.rotation.y = Math.PI / 2;
+            const mainCombinedGroup = new THREE.Group();
+            mainCombinedGroup.add(mcp1); mainCombinedGroup.add(mcp2);
+            mainCombinedGroup.visible = false;
+            s1Group.add(mainCombinedGroup);
+
+            // ボリューメトリック・アンダーグロー（煙や発射台を内側から染める巨大光球）
+            const underglowMat = new THREE.SpriteMaterial({ map: glowPointTex, color: simCfg.flame_hex, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0, fog: false });
+            const underglowSp = new THREE.Sprite(underglowMat);
+            underglowSp.scale.set(85.0, 85.0, 1.0);
+            scene.add(underglowSp);
+
+            // 上下端も完全アルファ減衰させたアナモルフィック・レンズフレア
             function createStreakTex() {
                 const cvs = document.createElement('canvas'); cvs.width = 256; cvs.height = 32;
                 const ctx = cvs.getContext('2d');
-                const g = ctx.createLinearGradient(0, 16, 256, 16);
-                g.addColorStop(0.0, 'rgba(0,0,0,0)');
-                g.addColorStop(0.4, 'rgba(96,165,250,0.4)');
-                g.addColorStop(0.5, 'rgba(255,255,255,1.0)');
-                g.addColorStop(0.6, 'rgba(96,165,250,0.4)');
-                g.addColorStop(1.0, 'rgba(0,0,0,0)');
-                ctx.fillStyle = g; ctx.fillRect(0, 0, 256, 32);
+                ctx.clearRect(0, 0, 256, 32);
+                
+                const gX = ctx.createLinearGradient(0, 16, 256, 16);
+                gX.addColorStop(0.0, 'rgba(0,0,0,0)');
+                gX.addColorStop(0.4, 'rgba(96,165,250,0.5)');
+                gX.addColorStop(0.5, 'rgba(255,255,255,1.0)');
+                gX.addColorStop(0.6, 'rgba(96,165,250,0.5)');
+                gX.addColorStop(1.0, 'rgba(0,0,0,0)');
+                ctx.fillStyle = gX; ctx.fillRect(0, 0, 256, 32);
+
+                ctx.globalCompositeOperation = 'destination-in';
+                const gY = ctx.createLinearGradient(128, 0, 128, 32);
+                gY.addColorStop(0.0, 'rgba(0,0,0,0)');
+                gY.addColorStop(0.5, 'rgba(0,0,0,1)');
+                gY.addColorStop(1.0, 'rgba(0,0,0,0)');
+                ctx.fillStyle = gY; ctx.fillRect(0, 0, 256, 32);
+
                 return new THREE.CanvasTexture(cvs);
             }
-            const flareMat = new THREE.SpriteMaterial({ map: createStreakTex(), color: simCfg.flame_hex, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0 });
+            const flareMat = new THREE.SpriteMaterial({ map: createStreakTex(), color: simCfg.flame_hex, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0, fog: false });
             const anamorphicFlare = new THREE.Sprite(flareMat);
             anamorphicFlare.scale.set(95.0, 3.2, 1.0);
             scene.add(anamorphicFlare);
 
-            // トランスソニック・ベイパーコーン（音速突破時の水蒸気雲）
-            const vaporMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false });
+            // トランスソニック・ベイパーコーン
+            const vaporMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false, fog: false });
             const vaporCone = new THREE.Mesh(new THREE.ConeGeometry(2.8, 4.5, 32, 1, true), vaporMat);
             vaporCone.position.set(0, s1Len * 0.82, 0);
             rocket.add(vaporCone);
@@ -1517,6 +1566,7 @@ html_template = """
                 }
             }
 
+            // 8方向ローカル全方位パルスRCSスラスター
             const rcsNozzles = [];
             const rcs8Dirs = [
                 { id: "+X", dx:  1, dy: 0, dz:  0 },
@@ -1575,8 +1625,8 @@ html_template = """
             }
 
             const pool = [];
-            for(let i=0; i<800; i++) {
-                const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0, depthWrite: false }));
+            for(let i=0; i<850; i++) {
+                const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0, depthWrite: false, fog: false }));
                 sp.visible = false; scene.add(sp);
                 pool.push({ sp, active: false, vx: 0, vy: 0, vz: 0, age: 0, maxAge: 1, s0: 1, s1: 5, o: 0.8 });
             }
@@ -1592,7 +1642,7 @@ html_template = """
 
             const sparks = [];
             for(let i=0; i<300; i++) {
-                const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: sparkTex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+                const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: sparkTex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
                 sp.visible = false; scene.add(sp);
                 sparks.push({ sp, active: false, vx: 0, vy: 0, vz: 0, age: 0, maxAge: 1 });
             }
@@ -1608,7 +1658,7 @@ html_template = """
 
             const iceShards = [];
             for(let i=0; i<150; i++) {
-                const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
+                const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, fog: false }));
                 sp.visible = false; scene.add(sp);
                 iceShards.push({ sp, active: false, vx: 0, vy: 0, vz: 0, age: 0, maxAge: 1 });
             }
@@ -1645,6 +1695,7 @@ html_template = """
             const tStart = performance.now();
             let boosterDetached = false, stage1Detached = false, fairingDetached = false, camShake = 0.0;
             let prevRcsCmd = 0.0;
+            let counterPulseTimer = 0.0, counterDirSign = 0.0;
             const tempV = new THREE.Vector3();
             const activeFocusWorld = new THREE.Vector3();
 
@@ -1692,7 +1743,7 @@ html_template = """
                 const ux = Math.sin(pitch), uy = Math.cos(pitch);
                 const perpX = Math.cos(pitch), perpY = -Math.sin(pitch);
 
-                // 音速突破時のトランスソニック・ベイパーコーン表示 (Mach 0.98 - 1.25)
+                // トランスソニック・ベイパーコーン (Mach 0.96 - 1.22)
                 if (mach >= 0.96 && mach <= 1.22 && alt < 18.0 && !simCfg.is_preview) {
                     const vAlpha = Math.sin((mach - 0.96) / 0.26 * Math.PI) * 0.75;
                     vaporMat.opacity = vAlpha;
@@ -1744,7 +1795,7 @@ html_template = """
                     stage1Detached = true;
                     playHeavySeparationSound();
                     camShake = 0.65;
-                    // ホットステージング時の360度水平火炎スプラッシュ
+                    mainCombinedGroup.visible = false;
                     for(let i=0; i<48; i++) {
                         const ang = (i / 48) * Math.PI * 2;
                         emitParticle(
@@ -1812,6 +1863,7 @@ html_template = """
                             t.cross.visible = false;
                             t.disks.forEach(d => d.visible = false);
                         });
+                        mainCombinedGroup.visible = false;
                         document.getElementById('tv-stage-badge').innerText = "TOWER CATCH SUCCESS";
                         document.getElementById('tv-stage-badge').style.color = "#38bdf8";
                     } else if (p0.b_thrust) {
@@ -1843,6 +1895,7 @@ html_template = """
                             t.cross.visible = false;
                             t.disks.forEach(d => d.visible = false);
                         });
+                        mainCombinedGroup.visible = false;
                     }
                 } else {
                     s1Group.visible = true;
@@ -1870,48 +1923,57 @@ html_template = """
                 }
 
                 // =========================================================================
-                // 💥 実写級ロケット排気バーナー (レーザーコア + マッハディスク + レンズ光条)
+                // 💥 統合メインプルーム ＆ スペース・ジェリーフィッシュ排気雲
                 // =========================================================================
                 if (p0.thrust && !p0.exploded && !simCfg.is_preview) {
                     const activeTips = (p0.stage === 1) ? s1NozzleTips : s2NozzleTips;
                     const inactiveTips = (p0.stage === 1) ? s2NozzleTips : s1NozzleTips;
                     const curFlameHex = (p0.stage === 1) ? simCfg.flame_hex : simCfg.s2_flame_hex;
-                    const curSparkHex = (p0.stage === 1) ? simCfg.spark_hex : simCfg.s2_spark_hex;
-                    
+
                     inactiveTips.forEach(t => {
                         t.glow.visible = false;
                         t.cross.visible = false;
                         t.disks.forEach(d => d.visible = false);
                     });
 
-                    const expansionFactor = 1.0 + Math.min(18.0, Math.pow(Math.max(0.0, alt - 15.0) / 10.0, 1.35));
+                    const expansionFactor = 1.0 + Math.min(22.0, Math.pow(Math.max(0.0, alt - 15.0) / 9.5, 1.45));
 
-                    // 各ノズルのコアプラズマ・ノズル白熱・定在ショックコーンを同期駆動
+                    // 1本の美しい統合メインプルームを中央で駆動
+                    if (p0.stage === 1) {
+                        mainCombinedGroup.visible = true;
+                        const pulse = 0.94 + Math.random() * 0.12;
+                        mainCombinedGroup.scale.set(1.0 + (expansionFactor - 1.0)*0.06, pulse, 1.0 + (expansionFactor - 1.0)*0.06);
+                    } else {
+                        mainCombinedGroup.visible = false;
+                    }
+
+                    // 個別ノズルは短い高圧コアと白熱グローのみシャープに点灯
                     for(let tObj of activeTips) {
                         tObj.glow.visible = true;
                         tObj.cross.visible = true;
-                        
-                        // 高速フリッカー脈動（カメラシャッター干渉）
-                        const fPulse = 0.92 + Math.random() * 0.16;
-                        tObj.cross.scale.set(1.0 + (expansionFactor - 1.0)*0.08, fPulse, 1.0 + (expansionFactor - 1.0)*0.08);
+                        const fPulse = 0.90 + Math.random() * 0.18;
+                        tObj.cross.scale.set(0.9, fPulse * 0.75, 0.9);
 
-                        // マッハディスク（ショックダイヤモンズ）の間隔とスケール制御
                         tObj.disks.forEach((d, k) => {
-                            d.visible = (alt < 70.0); // 真空領域では拡散して消失
-                            d.position.y = -(k + 1) * 3.6 * (fPulse / Math.max(1.0, expansionFactor * 0.3));
-                            d.scale.set(0.65 + Math.random()*0.1, 0.42 + Math.random()*0.06, 1);
+                            d.visible = (alt < 65.0);
+                            d.position.y = -(k + 1) * 3.2 * fPulse;
+                            d.scale.set(0.55 + Math.random()*0.08, 0.35 + Math.random()*0.05, 1);
                         });
 
-                        // 外周へのシアレイヤー拡散排気煙
-                        if (Math.random() < 0.35) {
+                        // 高高度でのスペース・ジェリーフィッシュ（巨大な光のベール拡散）
+                        if (Math.random() < (alt > 35.0 ? 0.65 : 0.28)) {
                             tObj.node.getWorldPosition(tempV);
-                            const spread = (Math.random() - 0.5) * (0.8 * expansionFactor);
+                            const spread = (Math.random() - 0.5) * (1.1 * expansionFactor);
+                            const isSpaceJelly = (alt > 40.0);
+                            const pLife = isSpaceJelly ? 55 : 28;
+                            const pEndSize = isSpaceJelly ? (22.0 * expansionFactor) : (8.0 * expansionFactor);
+                            const pAlpha = isSpaceJelly ? 0.35 : 0.68;
                             emitParticle(
                                 tempV.x - ux * 4.0, tempV.y - uy * 4.0, tempV.z + spread,
-                                -ux * (4.5 + Math.random()*3.0) + perpX * spread * 0.4,
-                                -uy * (4.5 + Math.random()*3.0) + perpY * spread * 0.4,
-                                (Math.random() - 0.5) * 1.2,
-                                1.5 * expansionFactor, 8.0 * expansionFactor, 28, 0.72, curFlameHex
+                                -ux * (4.5 + Math.random()*3.0) + perpX * spread * 0.5,
+                                -uy * (4.5 + Math.random()*3.0) + perpY * spread * 0.5,
+                                (Math.random() - 0.5) * 1.5,
+                                1.5 * expansionFactor, pEndSize, pLife, pAlpha, curFlameHex
                             );
                         }
                     }
@@ -1919,7 +1981,11 @@ html_template = """
                     // アナモルフィック・レンズフレア（横一文字の光条）
                     rocket.localToWorld(tempV.set(0, (p0.stage === 1 ? 0 : s1Len + 2.2), 0));
                     anamorphicFlare.position.copy(tempV);
-                    anamorphicFlare.material.opacity = THREE.MathUtils.lerp(anamorphicFlare.material.opacity, 0.65 + Math.random()*0.25, 0.2);
+                    anamorphicFlare.material.opacity = THREE.MathUtils.lerp(anamorphicFlare.material.opacity, 0.60 + Math.random()*0.25, 0.2);
+
+                    // ボリューメトリック・アンダーグロー（煙や発射台の照り返し）
+                    underglowSp.position.set(tempV.x - ux * 8.0, tempV.y - uy * 8.0, tempV.z);
+                    underglowSp.material.opacity = Math.max(0.0, (1.0 - alt / 45.0) * 0.22);
 
                     engineBounceLight.intensity = Math.max(0.0, 7.5 - alt * 0.25);
                     engineBounceLight.position.set(rx, ry + 3.0, 4.0);
@@ -1935,42 +2001,56 @@ html_template = """
                         t.cross.visible = false;
                         t.disks.forEach(d => d.visible = false);
                     });
+                    mainCombinedGroup.visible = false;
                     anamorphicFlare.material.opacity = THREE.MathUtils.lerp(anamorphicFlare.material.opacity, 0.0, 0.15);
+                    underglowSp.material.opacity = 0.0;
                     engineBounceLight.intensity = 0.0;
                     rendererMain.toneMappingExposure = THREE.MathUtils.lerp(rendererMain.toneMappingExposure, 1.35, 0.05);
                 }
 
                 // =========================================================================
-                // 🎮 RCS スラスター噴射制御 (ループ外1回のみ再生・音響過負荷防止)
+                // 🎮 リアルRCSスラスター (マルチ軸微調整パルス＋カウンター噴射＋表示安定化)
                 // =========================================================================
-                let rcsActiveHUD = false;
                 const cmdFired = (Math.abs(rcsCmd) > 0.2 && Math.abs(prevRcsCmd) <= 0.2);
+                if (cmdFired) {
+                    counterDirSign = (rcsCmd > 0) ? -1.0 : 1.0;
+                    counterPulseTimer = 0.28; // 0.28秒後に逆噴射パルスを自律発動
+                }
                 prevRcsCmd = rcsCmd;
+
+                let isCounterBurst = false;
+                if (counterPulseTimer > 0) {
+                    counterPulseTimer -= 0.016;
+                    if (counterPulseTimer <= 0) isCounterBurst = true;
+                }
+
                 let soundTriggeredThisFrame = false;
 
                 for(let rcs of rcsNozzles) {
                     let burst = false;
                     if (!simCfg.is_preview && simT > 0 && !p0.exploded) {
-                        if (rcs.isS1 && stage1Detached && p0.b_caught) {
-                            burst = false;
-                        } else {
-                            if (cmdFired) {
-                                if (rcs.isS1 && !stage1Detached && ((rcs.dir.dx < -0.3 && rcsCmd > 0) || (rcs.dir.dx > 0.3 && rcsCmd < 0))) burst = true;
-                                if (!rcs.isS1 && stage1Detached && ((rcs.dir.dx < -0.3 && rcsCmd > 0) || (rcs.dir.dx > 0.3 && rcsCmd < 0))) burst = true;
+                        const targetActive = (rcs.isS1 && !stage1Detached) || (!rcs.isS1 && stage1Detached);
+                        if (targetActive) {
+                            // 主ピッチ制御噴射
+                            if (cmdFired && ((rcs.dir.dx < -0.3 && rcsCmd > 0) || (rcs.dir.dx > 0.3 && rcsCmd < 0))) {
+                                burst = true;
                             }
-                            if (rcs.isS1 && stage1Detached && p0.b_active && !p0.b_caught && (bY <= 3000) && cmdFired) {
+                            // カウンターブレーキ噴射（揺り戻し止め）
+                            if (isCounterBurst && ((rcs.dir.dx < -0.3 && counterDirSign > 0) || (rcs.dir.dx > 0.3 && counterDirSign < 0))) {
+                                burst = true;
+                            }
+                            // ロール/ヨー軸の自律微調整（実機のように斜めやZ軸から小刻みに「シュッ」と吹く）
+                            if (Math.random() < 0.035 && (Math.abs(rcs.dir.dz) > 0.3 || Math.abs(rcs.dir.dx) > 0.5)) {
                                 burst = true;
                             }
                         }
                     }
 
                     if (burst) {
-                        // ループ内で多重再生させず、1回のパルス要求につき1度だけマイルドに再生
                         if (!soundTriggeredThisFrame) {
                             playRcsPuffSound();
                             soundTriggeredThisFrame = true;
                         }
-                        rcsActiveHUD = true;
                         rcs.mount.getWorldPosition(tempV);
 
                         const localJetDir = new THREE.Vector3(rcs.dir.dx, rcs.dir.dy, rcs.dir.dz).normalize();
@@ -1979,19 +2059,17 @@ html_template = """
                         localJetDir.applyQuaternion(parentQuat);
 
                         for(let k=0; k<3; k++) {
-                            const spd = 1.6 + Math.random() * 2.0;
+                            const spd = 2.2 + Math.random() * 2.2;
                             emitParticle(
                                 tempV.x, tempV.y, tempV.z,
-                                localJetDir.x * spd + (Math.random()-0.5)*0.2,
-                                localJetDir.y * spd + (Math.random()-0.5)*0.2,
-                                localJetDir.z * spd + (Math.random()-0.5)*0.2,
-                                0.2, 3.2, 7, 0.65, 0xe0f2fe
+                                localJetDir.x * spd + (Math.random()-0.5)*0.25,
+                                localJetDir.y * spd + (Math.random()-0.5)*0.25,
+                                localJetDir.z * spd + (Math.random()-0.5)*0.25,
+                                0.18, 2.5, 7, 0.55, 0xe0f2fe
                             );
                         }
                     }
                 }
-                document.getElementById('hud-rcs').innerText = rcsActiveHUD ? "PULSE FIRING (8-AXIS)" : "STANDBY";
-                document.getElementById('hud-rcs').style.color = rcsActiveHUD ? "#34d399" : "#38bdf8";
 
                 // 注水デリュージ・先行点火・排煙
                 if (simT < 0.0) {
@@ -2083,7 +2161,7 @@ html_template = """
                 if (p0.stage === 2) { activeFocusWorld.set(0, s2Len * 0.45, 0); s2Group.localToWorld(activeFocusWorld); }
                 else { activeFocusWorld.set(0, s1Len * 0.52, 0); rocket.localToWorld(activeFocusWorld); }
 
-                // 超望遠カメラポジショニング (FOV 16°による実写望遠パース)
+                // 超望遠カメラポジショニング (FOV 16°)
                 if (simCfg.is_preview) {
                     const ang = elapsedSec * 0.22;
                     cameraMain.position.set(Math.sin(ang) * 280.0, 42.0, Math.cos(ang) * 280.0);
@@ -2183,7 +2261,7 @@ html_template = """
                 }
             }
 
-            // 🎯 メインアニメーションループを確実に開始
+            // メインアニメーションループ開始
             rendererMain.setSize(window.innerWidth || 1200, window.innerHeight || 980);
             cameraMain.aspect = (window.innerWidth || 1200) / (window.innerHeight || 980);
             cameraMain.updateProjectionMatrix();
