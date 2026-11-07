@@ -448,9 +448,9 @@ def run_simulation(preview_only=False):
                 if spacex_return_mode and not b_active:
                     b_active = True
                     b_x, b_y = x, y
-                    b_vy = -45.0
-                    b_vx = -(b_x / 55.0)
-                    b_pitch = 0.20
+                    b_vy = vy - 2.0
+                    b_vx = vx
+                    b_pitch = 0.05
             else:
                 cur_mass = float((s1_spec["dry_mass"] + s2_fuel + s2_spec["dry_mass"] + payload_mass) * 1000.0 + f_mass + w_mass + strap_m + fuel_s1_rem)
                 atm_factor = float(np.exp(-alt / 7400.0))
@@ -1711,7 +1711,7 @@ html_template = """
             for(let i=0; i<850; i++) {
                 const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0, depthWrite: false, fog: false }));
                 sp.visible = false; scene.add(sp);
-                pool.push({ sp, active: false, vx: 0, vy: 0, vz: 0, age: 0, maxAge: 1, s0: 1, s1: 5, o: 0.8 });
+                pool.push({ sp, active: false, vx: 0, vy: 0, vz: 0, age: 0, maxAge: 1, s0: 1, s1: 5, o: 0.8, rotSpeed: (Math.random()-0.5)*0.02 });
             }
             let pIdx = 0;
             function emitParticle(x, y, z, vx, vy, vz, s0, s1, life, opacity, hexColor=0xf1f5f9) {
@@ -1721,6 +1721,7 @@ html_template = """
                 p.vx = vx; p.vy = vy; p.vz = vz;
                 p.age = 0; p.maxAge = life; p.s0 = s0; p.s1 = s1; p.o = opacity;
                 p.sp.material.color.setHex(hexColor);
+                p.rotSpeed = (Math.random() - 0.5) * 0.03;
             }
 
             const sparks = [];
@@ -1940,10 +1941,11 @@ html_template = """
                         scene.attach(b.mesh);
                         const outX = Math.cos(b.angle), outZ = Math.sin(b.angle);
                         const sepP = simCfg.sep_thrust;
-                        b.vx = perpX * outX * (1.2 * sepP);
-                        b.vy = -2.5 * sepP;
-                        b.vz = outZ * (1.2 * sepP);
-                        b.rx = outZ * 0.18; b.rz = -outX * 0.18;
+                        // 改善案：ストラップオンブースターの分離をよりゆっくり優雅に
+                        b.vx = perpX * outX * (0.45 * sepP);
+                        b.vy = -0.6 * sepP;
+                        b.vz = outZ * (0.45 * sepP);
+                        b.rx = outZ * 0.05; b.rz = -outX * 0.05;
                     }
                 }
                 if (boosterDetached) {
@@ -1951,7 +1953,7 @@ html_template = """
                         b.mesh.position.x += b.vx * 0.016;
                         b.mesh.position.y += b.vy * 0.016;
                         b.mesh.position.z += b.vz * 0.016;
-                        b.vy -= 1.8 * 0.016;
+                        b.vy -= 0.45 * 0.016; // 改善案：重力を抑えた優雅な落下
                         b.mesh.rotation.x += b.rx * 0.016;
                         b.mesh.rotation.z += b.rz * 0.016;
                     }
@@ -2355,6 +2357,12 @@ html_template = """
                     if (!p.active) continue;
                     p.age++;
                     if (p.age >= p.maxAge) { p.active = false; p.sp.visible = false; continue; }
+                    
+                    // 改善案：流体ドラッグによる減速＆熱浮力上昇＆スピン回転
+                    p.vx *= 0.96; p.vz *= 0.96;
+                    p.vy += 0.012;
+                    p.sp.rotation.z += p.rotSpeed;
+
                     p.sp.position.x += p.vx; p.sp.position.y += p.vy; p.sp.position.z += p.vz;
                     const pr = p.age / p.maxAge;
                     const sc = p.s0 + (p.s1 - p.s0) * Math.pow(pr, 0.65);
