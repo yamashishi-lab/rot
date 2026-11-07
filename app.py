@@ -584,7 +584,6 @@ def run_simulation(preview_only=False):
         s2_pct = max(0.0, (fuel_s2_rem / fuel_s2_init) * 100.0)
         apogee_val = alt_km + (max(0.0, vy)**2 / (2.0 * g0 * 1000.0))
 
-        # 💥 修正点④：動圧過大破断時、即時停止せず爆発後の飛散・落下履歴（4.5秒＝9ステップ）を追加して完全描画
         if q > cur_spec["max_q"]:
             fail_reason = f"Max-Q 構造圧壊: 動圧 {q:.1f} kPa が強度限界を超過。"
             for rud_step in range(9):
@@ -677,10 +676,41 @@ html_template = """
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #01040a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; }
         #canvas-main { width: 100%; height: 100%; display: block; position: absolute; top:0; left:0; z-index: 1; }
         
-        /* 修正点③：上部バナーと絶対に被らない動的追従PiPスタイル */
+        /* 魔改造⑤：実機放送特有の周辺光量落ち（ヴィネット効果） */
+        .vignette-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 5;
+            background: radial-gradient(circle at center, transparent 65%, rgba(1, 4, 10, 0.42) 100%);
+        }
+        
+        /* 修正点①：スクロールなし全表示トップバナー */
+        .top-banner { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            min-height: 42px;
+            background: linear-gradient(180deg, rgba(2,6,16,0.96) 0%, rgba(3,10,24,0.92) 100%); 
+            border-bottom: 1px solid rgba(56,189,248,0.22); 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 4px 14px; 
+            z-index: 20; 
+            flex-wrap: wrap; 
+            gap: 6px 12px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+            overflow-x: hidden;
+        }
+        .banner-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+        /* 修正点①：CAM 02 をバナー下端に1px単位でギリギリ配置 */
         .pip-container { 
             position: absolute; 
-            top: 52px; 
+            top: 48px; 
             right: 8px; 
             width: 410px; 
             max-width: calc(100vw - 16px);
@@ -692,36 +722,16 @@ html_template = """
             background: #071526; 
             overflow: hidden; 
             cursor: pointer; 
-            transition: height 0.25s ease, top 0.2s ease;
+            transition: height 0.25s ease;
         }
         #canvas-pip { width: 100%; height: 100%; display: block; transition: filter 0.15s ease-out; }
         .pip-tag { position: absolute; top: 6px; left: 12px; font-size: 10px; font-weight: 800; color: #fff; background: rgba(15, 23, 42, 0.94); padding: 3px 8px; border-radius: 2px; letter-spacing: 1px; font-family: monospace; z-index: 65; pointer-events: none; border-left: 2px solid #38bdf8; }
         .pip-alt { position: absolute; bottom: 6px; right: 12px; font-size: 11px; font-family: monospace; color: #38bdf8; font-weight: 700; background: rgba(15, 23, 42, 0.94); padding: 2px 8px; border-radius: 2px; z-index: 65; pointer-events: none; }
-        .pip-toggle-hint { position: absolute; top: 6px; right: 12px; font-size: 9px; font-family: monospace; color: #94a3b8; background: rgba(15, 23, 42, 0.94); padding: 3px 6px; border-radius: 2px; z-index: 65; pointer-events: none; }
+        .pip-hint { position: absolute; top: 6px; right: 12px; font-size: 9px; font-family: monospace; color: #94a3b8; background: rgba(15, 23, 42, 0.94); padding: 3px 6px; border-radius: 2px; z-index: 65; pointer-events: none; }
         
         .hud-orbit { position: absolute; bottom: 86px; left: 24px; width: 320px; background: #030712; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 4px; padding: 8px 12px; z-index: 50; color: #fff; box-shadow: 0 8px 32px rgba(0,0,0,0.85); }
         #orbit-canvas { width: 296px; height: 64px; background: #020617; border-radius: 2px; border: 1px solid rgba(255,255,255,0.08); display: block; margin-top: 4px; }
         
-        /* 修正点①＆③：折り返しなし1行統一スリムトップバナー */
-        .top-banner { 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 46px;
-            background: linear-gradient(180deg, rgba(2,6,16,0.96) 0%, rgba(3,10,24,0.92) 100%); 
-            border-bottom: 1px solid rgba(56,189,248,0.22); 
-            display: flex; 
-            align-items: center; 
-            justify-content: space-between; 
-            padding: 0 18px; 
-            z-index: 20; 
-            flex-wrap: nowrap; 
-            gap: 14px; 
-            box-shadow: 0 4px 20px rgba(0,0,0,0.7);
-            overflow-x: auto;
-        }
-        .banner-group { display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; flex-shrink: 0; }
         .hud-telemetry { position: absolute; bottom: 0; left: 0; width: 100%; height: 76px; background: #01040a; border-top: 1px solid rgba(255,255,255,0.12); padding: 8px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 20; pointer-events: none; }
         .hud-telemetry > * { pointer-events: auto; }
         .telemetry-row { display: flex; gap: clamp(14px, 2.2vw, 28px); align-items: center; flex-wrap: nowrap; overflow-x: auto; }
@@ -729,7 +739,6 @@ html_template = """
         .telemetry-label { font-size: 9px; color: #94a3b8; letter-spacing: 1px; }
         .telemetry-val { color: #fff; font-size: clamp(13px, 1.6vw, 17px); font-weight: 800; font-family: 'Consolas', monospace; }
         
-        /* 修正点④：洗練された事後フェードインRUDバナー */
         .rud-banner { 
             display: none; 
             position: absolute; 
@@ -751,12 +760,13 @@ html_template = """
     </style>
 </head>
 <body>
+    <div class="vignette-overlay"></div>
     <canvas id="canvas-main"></canvas>
     <div id="pip-box" class="pip-container" title="クリックでCAM 02 (地上光学望遠) の表示/非表示を切り替え">
         <canvas id="canvas-pip"></canvas>
         <div id="pip-tag" class="pip-tag">CAM 02: GROUND OPTICAL TRACKER</div>
         <div id="pip-hud-alt" class="pip-alt">BOOSTER: 0.0 km</div>
-        <div id="pip-hint" class="pip-toggle-hint">[CLICK TO TOGGLE]</div>
+        <div id="pip-hint" class="pip-hint">[CLICK TO TOGGLE]</div>
     </div>
     
     <div class="top-banner" id="top-banner-bar">
@@ -859,16 +869,14 @@ html_template += """
             let cloudWakeTriggered = false;
             let rudSequenceStarted = false;
             let rudStartTime = 0.0;
+            let is13to3CutoffTriggered = false;
 
-            // 修正点③：バナー高さを動的監視し、PiPのtop位置を常に被らないギリギリへリアルタイム配置
+            // 修正点①：CAM 02 (PiP) をバナー下端+4pxのギリギリ位置にリアルタイム追従
             function updatePipPosition() {
                 if (pipBox && topBannerBar) {
-                    const bannerH = topBannerBar.offsetHeight || 46;
-                    pipBox.style.top = (bannerH + 6) + 'px';
+                    const rect = topBannerBar.getBoundingClientRect();
+                    pipBox.style.top = Math.round(rect.bottom + 4) + 'px';
                 }
-            }
-            if (window.ResizeObserver) {
-                new ResizeObserver(updatePipPosition).observe(topBannerBar);
             }
             updatePipPosition();
 
@@ -945,7 +953,7 @@ html_template += """
             }
 
             // =========================================================================
-            // 🔊 音響合成システム (修正点②：歓声廃止＆Quindarトーン、爆発デトネーション音)
+            // 🔊 音響合成システム (修正点②：最初からの発射音再生、修正点④：コンプリート音削除)
             // =========================================================================
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             let actx = null, subRumble = null, shockCrackle = null, gasHiss = null, boosterRumble = null, boosterCrackle = null;
@@ -994,27 +1002,22 @@ html_template += """
                     bcSrc.connect(bBp); bBp.connect(waveShaper); waveShaper.connect(boosterCrackle); boosterCrackle.connect(actx.destination);
                     bcSrc.start(0);
                 }
-                if (actx && actx.state === 'suspended') actx.resume();
+                if (actx && actx.state === 'suspended') {
+                    actx.resume().catch(()=>{});
+                }
             }
-            ['click', 'touchstart', 'mousedown', 'keydown'].forEach(evt => window.addEventListener(evt, ensureAudioActive));
+            
+            // 修正点②：親フレーム含むあらゆる操作で即時AudioContextアンロック
+            ['click', 'touchstart', 'mousedown', 'keydown', 'pointerdown', 'mousemove'].forEach(evt => {
+                window.addEventListener(evt, ensureAudioActive, { once: false, passive: true });
+                try {
+                    if (window.parent && window.parent !== window) {
+                        window.parent.addEventListener(evt, ensureAudioActive, { once: false, passive: true });
+                    }
+                } catch(e){}
+            });
+            ensureAudioActive();
 
-            // 修正点②：歓声の代わりに鳴る本物の管制Quindar確認トーン
-            function playQuindarTone() {
-                ensureAudioActive();
-                if (!actx) return;
-                const now = actx.currentTime;
-                const osc = actx.createOscillator();
-                const gain = actx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(2524, now);
-                osc.frequency.setValueAtTime(2475, now + 0.12);
-                gain.gain.setValueAtTime(0.08, now);
-                gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
-                osc.connect(gain); gain.connect(actx.destination);
-                osc.start(now); osc.stop(now + 0.30);
-            }
-
-            // 修正点④：超リアル空中分解デトネーション重爆発音
             function playExplosionDetonationSound() {
                 ensureAudioActive();
                 if (!actx) return;
@@ -1225,7 +1228,8 @@ html_template += """
             }
             starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
             const starMat = new THREE.PointsMaterial({ size: 3.8, color: 0xffffff, transparent: true, opacity: 0.15 });
-            scene.add(new THREE.Points(starGeo, starMat));
+            const starPoints = new THREE.Points(starGeo, starMat);
+            scene.add(starPoints);
 
             function createTerrainTexture() {
                 const cvs = document.createElement('canvas'); cvs.width = 512; cvs.height = 512;
@@ -1423,17 +1427,14 @@ html_template += """
                 return new THREE.CanvasTexture(cvs);
             }
 
-            // 修正点①：ストリンガー縦筋・高コントラストリベット配管テクスチャ
             function createWeldSeamTexture() {
                 const cvs = document.createElement('canvas'); cvs.width = 512; cvs.height = 512;
                 const ctx = cvs.getContext('2d');
                 ctx.fillStyle = '#787878'; ctx.fillRect(0, 0, 512, 512);
-                // 水平リング溶接痕
                 for(let y=16; y<512; y+=32) {
                     ctx.fillStyle = '#a0a0a0'; ctx.fillRect(0, y, 512, 2.5);
                     ctx.fillStyle = '#4a4a4a'; ctx.fillRect(0, y+2.5, 512, 2.5);
                 }
-                // 垂直ストリンガー補強リブ
                 for(let x=12; x<512; x+=24) {
                     ctx.fillStyle = '#8e8e8e'; ctx.fillRect(x, 0, 1.5, 512);
                     ctx.fillStyle = '#525252'; ctx.fillRect(x+1.5, 0, 1.5, 512);
@@ -1519,7 +1520,6 @@ html_template += """
             s1Body.castShadow = true; s1Body.receiveShadow = true;
             s1Group.add(s1Body);
 
-            // 魔改造②：燃料消費連動リアルタイム縮小フロストメッシュ
             let frostMesh = null;
             const fullFrostHeight = s1Len * 0.72;
             if (simCfg.s1_mat === 'ss' || simCfg.s1_mat === 'saturn') {
@@ -1602,7 +1602,6 @@ html_template += """
                 return new THREE.CanvasTexture(cvs);
             }
 
-            // 魔改造①：超鋭利ダイヤモンドディスク（ショックセル）
             function createDiamondDiskTex() {
                 const cvs = document.createElement('canvas'); cvs.width = 64; cvs.height = 64;
                 const ctx = cvs.getContext('2d');
@@ -1625,7 +1624,6 @@ html_template += """
 
             const s1NozzleTips = [], s2NozzleTips = [], boosterNozzleTips = [];
             
-            // 修正点①：ノズル外殻・内壁白熱エミッシブ
             const s1InconelNozzleMat = new THREE.MeshStandardMaterial({
                 color: 0x1f242d, metalness: 0.95, roughness: 0.25,
                 emissive: new THREE.Color(0xff4500), emissiveIntensity: 0.0,
@@ -1643,7 +1641,6 @@ html_template += """
                 blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false
             });
 
-            // 修正点①：ノズルスロート内部超高輝度コア＆多層プルームビルド
             function buildFullDetailedEngineCluster(parent, count, basePosY, epsScale, tipArray, flameHex, nozzleMaterial) {
                 const group = new THREE.Group(); group.position.y = basePosY;
                 const bellH = 1.2 * epsScale;
@@ -1652,7 +1649,6 @@ html_template += """
                 const nozzleGeo = new THREE.CylinderGeometry(0.11, exitRadius, bellH, 16, 1, true);
                 nozzleGeo.translate(0, -bellH / 2, 0);
 
-                // スロート超高輝度ホワイトコア
                 const throatGeo = new THREE.SphereGeometry(0.12, 8, 8);
                 const throatMat = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false });
 
@@ -1752,7 +1748,6 @@ html_template += """
             mainCombinedGroup.visible = false;
             s1EngineGimbalGroup.add(mainCombinedGroup);
 
-            // スペースジェリーフィッシュ（Space Jellyfish）
             const spaceJellyGeo = new THREE.CylinderGeometry(0.8, 14.0, 48.0, 24, 1, true);
             spaceJellyGeo.translate(0, -24.0, 0);
             const spaceJellyMat = new THREE.MeshBasicMaterial({
@@ -1780,7 +1775,6 @@ html_template += """
             scene.add(shockRingMesh);
             let shockwaveFired = false;
 
-            // 魔改造⑤：二重Prandtl-Glauert特異点（ノーズコーン部 ＆ インターステージ部の2段ベイパー）
             const vaporMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false, fog: false });
             const vaporCone1 = new THREE.Mesh(new THREE.ConeGeometry(2.6, 4.2, 32, 1, true), vaporMat);
             vaporCone1.position.set(0, s1Len + s2Len + 1.2, 0);
@@ -1791,6 +1785,8 @@ html_template += """
             rocket.add(vaporCone2);
 
             const wingsGroup = new THREE.Group(); s1Group.add(wingsGroup);
+            const gridFinMeshes = [];
+            const gridFinMat = darkSteelMat.clone();
             const aoaRad = (simCfg.aoa * Math.PI) / 180.0;
             if (simCfg.wing_id === 'grid') {
                 for(let i=0; i<4; i++) {
@@ -1798,8 +1794,9 @@ html_template += """
                     const gfFrame = new THREE.Group();
                     gfFrame.position.set(Math.cos(ang)*1.22, s1Len - 1.1, Math.sin(ang)*1.22);
                     gfFrame.rotation.y = -ang; gfFrame.rotation.z = aoaRad;
-                    const gridBox = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.14, 1.25), darkSteelMat);
+                    const gridBox = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.14, 1.25), gridFinMat);
                     gridBox.position.x = 0.62; gridBox.castShadow = true; gfFrame.add(gridBox); wingsGroup.add(gfFrame);
+                    gridFinMeshes.push(gridBox);
                 }
             } else if (simCfg.wing_id === 'starship_flap') {
                 for(let side of [-1, 1]) {
@@ -1845,7 +1842,6 @@ html_template += """
                 }
             }
 
-            // 魔改造③：ホットステージング火炎偏向スリット＆赤熱リング
             const interStage = new THREE.Group(); interStage.position.y = s1Len; s1Group.add(interStage);
             const interStageMat = darkSteelMat.clone();
             const interTruss = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.12, 2.2, 24, 4, true), interStageMat);
@@ -2026,7 +2022,6 @@ html_template += """
                 s.sp.material.color.setHex(hexCol);
             }
 
-            // 修正点④：空中分解（RUD）時に飛び散る3Dデブリ片クラスタ（25個）
             const rudDebris = [];
             const debrisGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
             for(let i=0; i<25; i++) {
@@ -2117,7 +2112,7 @@ html_template += """
             }
 
             // =========================================================================
-            // ⏱️ アニメーション・メインループ (全項目反映)
+            // ⏱️ アニメーション・メインループ
             // =========================================================================
             const tStart = performance.now();
             let boosterDetached = false, stage1Detached = false, fairingDetached = false, camShake = 0.0;
@@ -2138,6 +2133,9 @@ html_template += """
             function animate(now) {
                 if (isMissionEnded) return;
                 requestAnimationFrame(animate);
+
+                // 修正点①：毎フレームバナー下端位置をCAM 02に適用（リサイズ・改行時も完全密着）
+                updatePipPosition();
 
                 const elapsedSec = (now - tStart) / 1000.0;
                 const simT = simCfg.is_preview ? -10.0 : (-10.0 + elapsedSec);
@@ -2183,7 +2181,6 @@ html_template += """
                     : (stage1Detached && p0.b_thrust ? THREE.MathUtils.clamp(bPitch * 0.25, -0.08, 0.08) : 0.0);
                 s1EngineGimbalGroup.rotation.z = THREE.MathUtils.lerp(s1EngineGimbalGroup.rotation.z, targetGimbalAngle, 0.15);
 
-                // 魔改造②：推進剤消費連動フロスト縮小
                 if (frostMesh) {
                     const propPct = (p0.stage === 1 ? s1PropVal : 0.0) / 100.0;
                     const curFrostH = Math.max(0.1, fullFrostHeight * propPct);
@@ -2192,20 +2189,7 @@ html_template += """
                     frostMesh.material.opacity = Math.max(0.0, (0.75 * propPct) - (alt / 45.0) * 0.4);
                 }
 
-                scene.fog.density = THREE.MathUtils.lerp(0.000028, 0.0, Math.min(1.0, alt / 25.0));
-                starMat.opacity = Math.min(0.95, Math.max(0.05, (alt - 15.0) / 55.0));
                 const spaceFactor = Math.min(1.0, Math.max(0.0, (alt - 12.0) / 70.0));
-                skyDomeMat.color.setRGB(
-                    1.0 - spaceFactor * 0.95,
-                    1.0 - spaceFactor * 0.92,
-                    1.0 - spaceFactor * 0.85
-                );
-
-                if (alt > 20.0) {
-                    atmoLimbMat.opacity = Math.min(0.42, (alt - 20.0) / 55.0);
-                } else {
-                    atmoLimbMat.opacity = 0.0;
-                }
 
                 cloudSprites.forEach(csp => {
                     const cDist = cameraMain.position.distanceTo(csp.position);
@@ -2215,7 +2199,6 @@ html_template += """
                 const ux = Math.sin(pitch), uy = Math.cos(pitch);
                 const perpX = Math.cos(pitch), perpY = -Math.sin(pitch);
 
-                // 魔改造④：雲海通過ウェイク（引き込み渦）
                 if (alt >= 1.2 && alt <= 2.2 && !cloudWakeTriggered && !simCfg.is_preview) {
                     cloudWakeTriggered = true;
                     for(let i=0; i<16; i++) {
@@ -2228,7 +2211,6 @@ html_template += """
                     }
                 }
 
-                // 魔改造⑤：二段ヴェイパーコーン（マッハ1.00前後のPrandtl-Glauert特異点）
                 if (mach >= 0.95 && mach <= 1.18 && alt < 18.0 && !simCfg.is_preview && !p0.exploded) {
                     const vAlpha = Math.sin((mach - 0.95) / 0.23 * Math.PI) * 0.78;
                     vaporMat.opacity = vAlpha;
@@ -2239,14 +2221,25 @@ html_template += """
                     vaporMat.opacity = 0.0;
                 }
 
-                if (simT > 0 && simT < 12.0 && Math.random() < 0.65) {
-                    for(let k=0; k<2; k++) {
-                        const h = Math.random() * s1Len;
-                        const aAngle = Math.random() * Math.PI * 2;
-                        emitIceShard(
-                            rx + Math.cos(aAngle)*1.18, ry + 6.0 + h, Math.sin(aAngle)*1.18,
-                            (Math.random()-0.5)*0.3, -0.6 - Math.random()*0.5, (Math.random()-0.5)*0.3
-                        );
+                // 魔改造④：高高度（30km〜80km）でのエンジン光に照らされる氷の剥離（Ice Shedding）
+                if (!simCfg.is_preview && !p0.exploded) {
+                    if (simT > 0 && simT < 12.0 && Math.random() < 0.65) {
+                        for(let k=0; k<2; k++) {
+                            const h = Math.random() * s1Len;
+                            const aAngle = Math.random() * Math.PI * 2;
+                            emitIceShard(
+                                rx + Math.cos(aAngle)*1.18, ry + 6.0 + h, Math.sin(aAngle)*1.18,
+                                (Math.random()-0.5)*0.3, -0.6 - Math.random()*0.5, (Math.random()-0.5)*0.3
+                            );
+                        }
+                    } else if (alt >= 28.0 && alt <= 85.0 && Math.random() < 0.35) {
+                        for(let k=0; k<2; k++) {
+                            const aAngle = Math.random() * Math.PI * 2;
+                            emitIceShard(
+                                rx + Math.cos(aAngle)*1.15, ry + 6.0 + (p0.stage === 1 ? s1Len*0.6 : s1Len + s2Len*0.5), Math.sin(aAngle)*1.15,
+                                -ux * 2.5 + (Math.random()-0.5)*0.8, -uy * 2.5 + (Math.random()-0.5)*0.8, (Math.random()-0.5)*0.8
+                            );
+                        }
                     }
                 }
 
@@ -2296,13 +2289,14 @@ html_template += """
                     }
                 }
 
-                // 魔改造③：ホットステージング火炎偏向カーテン＆リング赤熱
+                // ホットステージング
                 const isSeparated = (p0.stage === 2 || p0.b_active);
                 if (isSeparated && !stage1Detached && !simCfg.is_preview) {
                     stage1Detached = true;
                     hotStagingSparkTimer = 2.6;
                     playHeavySeparationSound();
                     camShake = 0.45;
+                    rendererMain.toneMappingExposure = 2.3; // 魔改造③：ステージ分離時の瞬間ハレーション
                     mainCombinedGroup.visible = false;
                     s1Group.localToWorld(tempV.set(0, s1Len, 0));
                     for(let i=0; i<36; i++) {
@@ -2366,32 +2360,46 @@ html_template += """
                     }
                 }
 
+                // 魔改造①：Super Heavy再突入時のグリッドフィン赤熱＆紫ピンクプラズマ
                 if (stage1Detached && bY > 20000 && bY < 65000 && p0.mach > 2.5) {
-                    plasmaMesh.material.opacity = Math.min(0.75, (p0.mach - 2.5) * 0.35);
+                    const plasmaOp = Math.min(0.75, (p0.mach - 2.5) * 0.35);
+                    plasmaMesh.material.opacity = plasmaOp;
                     plasmaMesh.rotation.y += 0.12;
+
+                    gridFinMat.emissive = new THREE.Color(0xff3300);
+                    gridFinMat.emissiveIntensity = plasmaOp * 1.5;
+
+                    if (Math.random() < 0.45) {
+                        s1Group.localToWorld(tempV.set(0, s1Len - 1.1, 0));
+                        for(let gi=0; gi<2; gi++) {
+                            const gfAngle = Math.random() * Math.PI * 2;
+                            emitParticle(
+                                tempV.x + Math.cos(gfAngle)*1.3, tempV.y, tempV.z + Math.sin(gfAngle)*1.3,
+                                (Math.random()-0.5)*0.5, 3.5 + Math.random()*2.0, (Math.random()-0.5)*0.5,
+                                0.4, 3.5, 20, 0.45, 0xd946ef, 0.94, 0.0, false
+                            );
+                        }
+                    }
                 } else {
                     plasmaMesh.material.opacity = 0.0;
+                    gridFinMat.emissiveIntensity = 0.0;
                 }
 
                 if (stage1Detached) {
                     s1Group.visible = true;
 
                     if (p0.b_caught) {
-                        if (catchStartTime === 0.0) {
-                            catchStartTime = simT;
-                        }
+                        if (catchStartTime === 0.0) catchStartTime = simT;
                         const catchAge = simT - catchStartTime;
                         const dampedSway = Math.sin(catchAge * 6.5) * Math.exp(-catchAge * 1.4) * 0.06;
                         s1Group.position.set(bX * 0.1 + dampedSway * 2.5, bY_scaled, 0);
                         s1Group.rotation.set(0, 0, -bPitch + dampedSway);
 
-                        if (catchAge < 0.65) {
-                            if (catchPinsMesh) {
-                                catchPinsMesh.getWorldPosition(tempV);
-                                for(let k=0; k<4; k++) {
-                                    emitSpark(tempV.x + (Math.random()-0.5)*1.8, tempV.y, tempV.z + (Math.random()-0.5)*1.8, (Math.random()-0.5)*3.5, 1.2+Math.random()*2.0, (Math.random()-0.5)*3.5, 0xf59e0b);
-                                    emitParticle(tempV.x, tempV.y, tempV.z, (Math.random()-0.5)*0.8, 0.4+Math.random()*0.5, (Math.random()-0.5)*0.8, 0.4, 2.5, 25, 0.4, 0xffffff, 0.94, 0.02, false);
-                                }
+                        if (catchAge < 0.65 && catchPinsMesh) {
+                            catchPinsMesh.getWorldPosition(tempV);
+                            for(let k=0; k<4; k++) {
+                                emitSpark(tempV.x + (Math.random()-0.5)*1.8, tempV.y, tempV.z + (Math.random()-0.5)*1.8, (Math.random()-0.5)*3.5, 1.2+Math.random()*2.0, (Math.random()-0.5)*3.5, 0xf59e0b);
+                                emitParticle(tempV.x, tempV.y, tempV.z, (Math.random()-0.5)*0.8, 0.4+Math.random()*0.5, (Math.random()-0.5)*0.8, 0.4, 2.5, 25, 0.4, 0xffffff, 0.94, 0.02, false);
                             }
                         }
                     } else {
@@ -2437,6 +2445,19 @@ html_template += """
                     } else if (p0.b_thrust) {
                         mainCombinedGroup.visible = false;
                         const isThreeOnly = (bY <= 1200);
+
+                        // 魔改造②：着陸燃焼時 13基→3基カットオフ演出（外側ノズルからの残炎・白煙）
+                        if (isThreeOnly && !is13to3CutoffTriggered) {
+                            is13to3CutoffTriggered = true;
+                            s1NozzleTips.forEach((t, i) => {
+                                if (!t.isCenter && i < 13) {
+                                    t.node.getWorldPosition(tempV);
+                                    for(let k=0; k<4; k++) {
+                                        emitParticle(tempV.x, tempV.y, tempV.z, (Math.random()-0.5)*1.2, -1.0 - Math.random(), (Math.random()-0.5)*1.2, 0.8, 4.5, 30, 0.65, 0xfde047, 0.95, 0.01, true);
+                                    }
+                                }
+                            });
+                        }
 
                         s1NozzleTips.forEach((t, i) => {
                             const active = isThreeOnly ? t.isCenter : (i < 13);
@@ -2500,9 +2521,7 @@ html_template += """
                     }
                 }
 
-                // =========================================================================
-                // 💥 修正点①：ノズル内部スロート発光・推進剤別マッハダイヤモンド伸長・排気煤
-                // =========================================================================
+                // ノズル・マッハダイヤモンド
                 const isEngineFiring = (p0.thrust && !p0.exploded && !simCfg.is_preview);
                 
                 const s1TargetEmissive = (p0.stage === 1 && isEngineFiring) ? 1.25 : (p0.b_thrust && !p0.b_caught ? 1.1 : 0.0);
@@ -2566,7 +2585,6 @@ html_template += """
                         spaceJellyMesh.visible = false;
                     }
 
-                    // 魔改造①：高度上昇に伴うショックセル間隔の伸長演算
                     const shockSpacingFactor = 1.0 + Math.min(1.8, alt / 28.0);
 
                     for(let tObj of activeTips) {
@@ -2583,7 +2601,6 @@ html_template += """
                             d.scale.set(diskW, 1.0, diskW);
                         });
 
-                        // 推進剤別：GGサイクル排気ダクト煤（Soot）またはプラズマスプレッド
                         if (simCfg.s1_cycle_id === "gg" && p0.stage === 1 && Math.random() < 0.35) {
                             tObj.node.getWorldPosition(tempV);
                             emitParticle(
@@ -2646,9 +2663,7 @@ html_template += """
                     rendererMain.toneMappingExposure = THREE.MathUtils.lerp(rendererMain.toneMappingExposure, 1.32, 0.05);
                 }
 
-                // =========================================================================
-                // 💥 修正点④：実写級4段階RUD（空中分解・巨大火球・デブリ落下）シーケンス
-                // =========================================================================
+                // 4段階RUD
                 if (p0.exploded && !rudSequenceStarted) {
                     rudSequenceStarted = true;
                     rudStartTime = simT;
@@ -2658,7 +2673,6 @@ html_template += """
                     rocket.visible = false;
                     s1Group.visible = false;
 
-                    // 第1段階：隔壁破断・超高輝度閃光＆極低温クライオ氷霧
                     shockRingMat.opacity = 1.0;
                     shockRingMesh.position.set(rx, ry + 6.0 + s1Len * 0.5, 0);
                     shockRingMesh.scale.set(2.0, 2.0, 2.0);
@@ -2673,7 +2687,6 @@ html_template += """
                         );
                     }
 
-                    // 飛散デブリ初期化
                     rudDebris.forEach((d, di) => {
                         d.active = true;
                         d.mesh.visible = true;
@@ -2692,7 +2705,6 @@ html_template += """
                 if (rudSequenceStarted) {
                     const rudAge = simT - rudStartTime;
 
-                    // 第2段階：引火した巨大火球のモクモク膨張（0.2〜1.8秒）
                     if (rudAge >= 0.15 && rudAge <= 2.2) {
                         for(let i=0; i<6; i++) {
                             const ang = Math.random() * Math.PI * 2;
@@ -2705,7 +2717,6 @@ html_template += """
                         }
                     }
 
-                    // 第3段階：燃えるデブリが煙を引きながら放物線落下
                     rudDebris.forEach(d => {
                         if (!d.active) return;
                         d.vy -= 9.8 * 0.016 * 1.2;
@@ -2725,7 +2736,6 @@ html_template += """
                         }
                     });
 
-                    // 第4段階：爆発後3.0秒経過後に初めてRUDバナーをフェードイン表示
                     if (rudAge >= 3.0 && rudBanner.style.display !== 'block') {
                         rudBanner.style.display = 'block';
                         rudDesc.innerText = failMessage || "機体過負荷による空中分解 (Structural Disassembly)";
@@ -2734,9 +2744,7 @@ html_template += """
                     }
                 }
 
-                // =========================================================================
-                // 🎯 精密RCSスラスター
-                // =========================================================================
+                // RCSスラスター
                 const cmdFired = (Math.abs(rcsCmd) > 0.2 && Math.abs(prevRcsCmd) <= 0.2);
                 if (cmdFired) {
                     counterDirSign = (rcsCmd > 0) ? -1.0 : 1.0;
@@ -2804,16 +2812,22 @@ html_template += """
                     }
                 }
 
-                // =========================================================================
-                // 🌊 発射台爆風スチーム・点火音響衝撃波リング
-                // =========================================================================
+                // 修正点②：カウントダウン開始（T-10秒〜）からの発射台アンビエント音と点火音
                 if (simT < 0.0) {
                     const sec = Math.ceil(Math.abs(simT));
                     document.getElementById('tv-timer').innerText = simCfg.is_preview ? "PAD INSPECTION" : `T- 00:0${sec}.0`;
                     emitParticle(rx + 1.25, ry + 6.0 + s1Len * 0.82, -1.5, 0.18, -0.08, 0, 0.6, 2.8, 38, 0.32, 0xffffff, 0.97, -0.005, false);
 
+                    if (!simCfg.is_preview && actx) {
+                        ensureAudioActive();
+                        // T-10秒〜 T-5秒：ベント排気音
+                        if (gasHiss) {
+                            const hissGain = (simT >= -5.0) ? 0.65 : 0.22;
+                            gasHiss.gain.setTargetAtTime(hissGain, actx.currentTime, 0.2);
+                        }
+                    }
+
                     if (simT >= -5.0 && !p0.exploded && !simCfg.is_preview) {
-                        if (gasHiss && actx) gasHiss.gain.setTargetAtTime(0.65, actx.currentTime, 0.2);
                         const delugeRatio = simCfg.water_flow / 300.0;
                         const countDeluge = Math.max(4, Math.floor(7 * delugeRatio));
                         for(let i=0; i<countDeluge; i++) {
@@ -2832,6 +2846,7 @@ html_template += """
                             shockwaveFired = true;
                             shockRingMat.opacity = 0.8;
                             shockRingMesh.scale.set(1.0, 1.0, 1.0);
+                            rendererMain.toneMappingExposure = 2.6; // 魔改造③：点火時の白飛び露出オーバー
                         }
 
                         if (actx) {
@@ -2954,9 +2969,7 @@ html_template += """
                 if (p0.stage === 2) { activeFocusWorld.set(0, s2Len * 0.45, 0); s2Group.localToWorld(activeFocusWorld); }
                 else { activeFocusWorld.set(0, s1Len * 0.52, 0); rocket.localToWorld(activeFocusWorld); }
 
-                // =========================================================================
-                // 🎥 修正点①：固定望遠トラッキング（CAM 01）確実ロック＆見切れ防止
-                // =========================================================================
+                // カメラトラッキング
                 if (simCfg.is_preview) {
                     const ang = elapsedSec * 0.22;
                     cameraMain.position.set(Math.sin(ang) * 280.0, 42.0, Math.cos(ang) * 280.0);
@@ -2989,11 +3002,15 @@ html_template += """
                 }
 
                 // =========================================================================
-                // 📺 CAM 02 (PiP) 地上光学望遠トラッカー
+                // 📺 修正点③：CAM 02 (地上望遠) ＆ CAM 01 (メイン) 完全環境分離レンダリング
                 // =========================================================================
                 if (pipVisible) {
+                    // ① CAM 02 描画環境：どんな高度でも「地上の澄み切った青空・大気フォグ・星空なし」を強制固定
                     skyDome.position.copy(cameraPip.position);
                     skyDomeMat.color.setRGB(1.0, 1.0, 1.0);
+                    starPoints.visible = false;
+                    scene.fog.density = 0.000028;
+                    scene.fog.color.setHex(0x4a769e);
 
                     let targetPos = new THREE.Vector3();
                     if (stage1Detached && p0.b_active) {
@@ -3035,12 +3052,21 @@ html_template += """
                     rendererPip.render(scene, cameraPip);
                 }
 
+                // ② CAM 01 描画環境：高度に応じた宇宙空間・星空・フォグ消失への復元
                 skyDome.position.copy(cameraMain.position);
                 skyDomeMat.color.setRGB(
                     1.0 - spaceFactor * 0.95,
                     1.0 - spaceFactor * 0.92,
                     1.0 - spaceFactor * 0.85
                 );
+                starPoints.visible = true;
+                starMat.opacity = Math.min(0.95, Math.max(0.05, (alt - 15.0) / 55.0));
+                scene.fog.density = THREE.MathUtils.lerp(0.000028, 0.0, Math.min(1.0, alt / 25.0));
+                if (alt > 20.0) {
+                    atmoLimbMat.opacity = Math.min(0.42, (alt - 20.0) / 55.0);
+                } else {
+                    atmoLimbMat.opacity = 0.0;
+                }
                 atmoLimbMesh.position.set(cameraMain.position.x, -56000, cameraMain.position.z);
                 rendererMain.render(scene, cameraMain);
 
@@ -3070,7 +3096,7 @@ html_template += """
                 const isOrbit = (p0.event === "ORBIT");
                 const canComplete = simCfg.spacex_return ? (isOrbit && p0.b_caught) : isOrbit;
 
-                // 修正点②：歓声ではなくQuindarトーンのみを鳴らしてミッション成功完了
+                // 修正点④：コンプリート音は一切鳴らさず完全な宇宙の静寂へ
                 if (canComplete && !isMissionEnded) {
                     completeBanner.style.display = 'block';
                     if (simCfg.spacex_return) {
@@ -3084,8 +3110,6 @@ html_template += """
                     document.getElementById('tv-stage-badge').style.color = "#10b981";
                     document.getElementById('live-indicator').style.background = "#10b981";
                     document.getElementById('webcast-title').innerText = "CAM 01: MISSION COMPLETED";
-
-                    playQuindarTone();
 
                     if (actx) {
                         if (subRumble) subRumble.gain.setTargetAtTime(0.0001, actx.currentTime, 0.4);
