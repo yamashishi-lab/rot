@@ -1092,7 +1092,7 @@ def run_simulation(preview_only=False):
         )
 
     # =========================================================================
-    # 🔄 【改善適用箇所】ブースター連続降下プロファイル（1300km/h頭打ち排除・着火前ノンストップ加速）
+    # 🔄 ブースター連続降下プロファイル（1300km/h頭打ち排除・着火前ノンストップ加速）
     # =========================================================================
     b_rcs = 0.0
     if b_active and not b_caught:
@@ -1915,7 +1915,7 @@ if(isStarshipPad){
     const jokePlate=new THREE.Mesh(new THREE.BoxGeometry(32,4.0,32),new THREE.MeshStandardMaterial({color:boardColor,roughness:0.7}));jokePlate.position.y=0.5;jokePlate.receiveShadow=true;pad.add(jokePlate);
 }
 
-function createSaturnRollPattern(){const cvs=document.createElement('canvas');cvs.width=512;cvs.height=512;const ctx=cvs.getContext('2d');ctx.fillStyle='#f8fafc';ctx.fillRect(0,0,512,512);ctx.fillStyle='#0f172a';ctx.fillRect(0,0,256,128);ctx.fillRect(256,128,256,128);ctx.fillRect(0,256,256,128);ctx.fillRect(256,384,256,128);ctx.fillStyle='#b91c1c';ctx.font='bold 32px sans-serif';ctx.fillText('USA',190,480);const tex=new THREE.CanvasTexture(cvs);tex.wrapS=THREE.RepeatWrapping;tex.wrapT=THREE.RepeatWrapping;return tex;}
+function createSaturnRollPattern(){const cvs=document.createElement('canvas');cvs.width=512;cvs.height=512;const ctx=cvs.getContext('2d');ctx.fillStyle='#f8fafc';ctx.fillRect(0,0,512,512);ctx.fillStyle='#0f172a';ctx.fillRect(0,0,256,128);ctx.fillRect(256,128,256,128);ctx.fillRect(0,256,256,128);ctx.fillRect(256,384,256,128);ctx.fillStyle='#b91c1c';ctx.font='bold 36px sans-serif';ctx.fillText('USA',190,480);const tex=new THREE.CanvasTexture(cvs);tex.wrapS=THREE.RepeatWrapping;tex.wrapT=THREE.RepeatWrapping;return tex;}
 function createBaguetteTexture(){const cvs=document.createElement('canvas');cvs.width=512;cvs.height=512;const ctx=cvs.getContext('2d');ctx.fillStyle='#c68a4c';ctx.fillRect(0,0,512,512);ctx.fillStyle='#e8b87d';for(let i=0;i<8;i++){ctx.save();ctx.translate(120+(i%3)*120,40+i*60);ctx.rotate(-0.35);ctx.beginPath();ctx.ellipse(0,0,75,14,0,0,Math.PI*2);ctx.fill();ctx.restore();}const imgData=ctx.getImageData(0,0,512,512);for(let k=0;k<imgData.data.length;k+=4){const noise=(Math.random()-0.5)*22;imgData.data[k]+=noise;imgData.data[k+1]+=noise;imgData.data[k+2]+=noise;}ctx.putImageData(imgData,0,0);return new THREE.CanvasTexture(cvs);}
 function createPencilTexture(){const cvs=document.createElement('canvas');cvs.width=512;cvs.height=512;const ctx=cvs.getContext('2d');ctx.fillStyle='#155e3b';ctx.fillRect(0,0,512,512);ctx.fillStyle='#d97706';ctx.font='bold 32px serif';ctx.fillText('★ MITSUBISHI Hi-uni HB ★',60,260);ctx.fillStyle='#ca8a04';ctx.fillRect(0,470,512,42);return new THREE.CanvasTexture(cvs);}
 function createHexTileTexture(){const cvs=document.createElement('canvas');cvs.width=256;cvs.height=256;const ctx=cvs.getContext('2d');ctx.fillStyle='#0f1216';ctx.fillRect(0,0,256,256);ctx.strokeStyle='#1e242d';ctx.lineWidth=1.5;for(let x=0;x<256;x+=16){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,256);ctx.stroke();}for(let y=0;y<256;y+=16){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(256,y);ctx.stroke();}return new THREE.CanvasTexture(cvs);}
@@ -2357,7 +2357,8 @@ function animate(now){
         if(p0.b_caught){
             if(!catchPopPlayed){
                 playFirecrackerSnapSound();catchPopPlayed=true;camShake=0.45;s1Group.localToWorld(tempV.set(0,0,0));
-                for(let i=0;i<28;i++){const ang=Math.random()*Math.PI*2,spd=1.2+Math.random()*2.8;emitParticle(tempV.x+Math.cos(ang)*1.5,tempV.y-1.0,tempV.z+Math.sin(ang)*1.5,Math.cos(ang)*spd,-0.5+Math.random()*1.8,Math.sin(ang)*spd,2.5,16.0,55,0.75,0xf8fafc,0.94,0.03,false);}
+                // 【改善】キャッチ瞬間の白煙発生位置を下げ、不透明度を抑えてロック機構をクリアに魅せる
+                for(let i=0;i<10;i++){const ang=Math.random()*Math.PI*2,spd=1.2+Math.random()*2.8;emitParticle(tempV.x+Math.cos(ang)*1.5,tempV.y-8.0,tempV.z+Math.sin(ang)*1.5,Math.cos(ang)*spd,-0.5+Math.random()*1.8,Math.sin(ang)*spd,2.0,12.0,45,0.28,0xf8fafc,0.94,0.02,false);}
             }
             s1NozzleTips.forEach(t=>{t.glow.visible=false;t.plumeGroup.visible=false;t.diamonds.forEach(d=>d.visible=false);});
             mainCombinedGroup.visible=false;towerCatchLight.intensity=0.0;
@@ -2387,12 +2388,51 @@ function animate(now){
                 const fLen=(isBoostback?1.4:0.68)+Math.random()*0.18;t.plumeGroup.scale.set(isBoostback?1.6:0.85,fLen,isBoostback?1.6:0.85);
                 t.diamonds.forEach((d,k)=>{d.visible=active;d.position.y=-(k+1)*2.6*fLen;d.scale.set(t.exitR*(isBoostback?2.2:1.25),1.0,t.exitR*(isBoostback?2.2:1.25));});
             });
-            if(bY<=2200.0){
-                const groundRatio=Math.max(0.25,1.0-Math.max(0.0,bY-400.0)/1800.0),blastCount=Math.ceil(12*groundRatio);s1Group.localToWorld(tempV.set(0,0,0));
+
+            // 【改善】着陸煙の発生位置をノズル先端のはるか下へ下げ、不透明度を大幅に薄くしてブースターをクリアに可視化
+            if(bY<=1800.0){
+                const groundRatio=Math.max(0.15,1.0-Math.max(0.0,bY-400.0)/1400.0);
+                const blastCount=Math.ceil(4*groundRatio);
+                s1Group.localToWorld(tempV.set(0,0,0));
                 for(let i=0;i<blastCount;i++){
-                    const ang=Math.random()*Math.PI*2,spd=(2.5+Math.random()*4.5)*groundRatio,pType=Math.random(),col=(pType<0.35)?0xf59e0b:((pType<0.65)?0xfef08a:0xe2e8f0);
-                    emitParticle(tempV.x+Math.cos(ang)*1.8,Math.max(3.0,tempV.y-4.0-Math.random()*10.0),tempV.z+Math.sin(ang)*1.8,Math.cos(ang)*spd*0.7,-1.2+Math.random()*2.2,Math.sin(ang)*spd*0.7,3.2,22.0*groundRatio+6.0,48,0.82,col,0.92,0.035,(pType<0.65));
-                    if(bY<=1400.0&&i%2===0)emitParticle((bX*0.1)+Math.cos(ang)*3.5,3.5+Math.random()*2.5,Math.sin(ang)*3.5,Math.cos(ang)*spd*1.3,0.35+Math.random()*0.65,Math.sin(ang)*spd*1.3,4.5,30.0*groundRatio+10.0,58,0.85,0xcbd5e1,0.90,0.04,false);
+                    const ang=Math.random()*Math.PI*2;
+                    const spd=(3.5+Math.random()*4.5)*groundRatio;
+                    const pType=Math.random();
+                    const col=(pType<0.35)?0xf59e0b:((pType<0.65)?0xfef08a:0xe2e8f0);
+                    emitParticle(
+                        tempV.x+Math.cos(ang)*3.5,
+                        Math.max(2.5,tempV.y-16.0-Math.random()*8.0),
+                        tempV.z+Math.sin(ang)*2.5-3.0,
+                        Math.cos(ang)*spd,
+                        -1.5+Math.random()*0.8,
+                        Math.sin(ang)*spd*0.6,
+                        2.0,
+                        11.0*groundRatio+4.0,
+                        36,
+                        0.25,
+                        col,
+                        0.92,
+                        0.008,
+                        (pType<0.65)
+                    );
+                    if(bY<=1000.0&&i%2===0){
+                        emitParticle(
+                            (bX*0.1)+Math.cos(ang)*6.0,
+                            2.5+Math.random()*1.5,
+                            Math.sin(ang)*4.0-4.0,
+                            Math.cos(ang)*spd*1.5,
+                            0.1+Math.random()*0.25,
+                            Math.sin(ang)*spd*0.8,
+                            3.0,
+                            14.0*groundRatio+5.0,
+                            42,
+                            0.28,
+                            0xcbd5e1,
+                            0.90,
+                            0.005,
+                            false
+                        );
+                    }
                 }
             }
         }else{
