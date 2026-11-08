@@ -816,7 +816,7 @@ TOWER_PHYSICAL_CATCH_Y = max(0.0, (target_bottom_y_3d - 6.0) * 10.0)
 
 
 # =========================================================================
-# 💥 物理シミュレーション (ブースター連続降下プロファイル完全修正版)
+# 💥 物理シミュレーション (ブースター重力連続加速・自然落下プロファイル完全修正版)
 # =========================================================================
 def run_simulation(preview_only=False):
   if preview_only:
@@ -1005,8 +1005,9 @@ def run_simulation(preview_only=False):
           b_active = True
           b_sep_time = t
           b_x, b_y = x, y
-          b_vx = vx * 0.45
-          b_vy = -8.0 * sep_thrust_factor
+          b_vx = vx * 0.35
+          # 【改善】切り離し直後は上昇せず、わずかな負の初速からふわっと離れ始める
+          b_vy = -1.5 * sep_thrust_factor
           b_pitch = visual_pitch
       else:
         cur_mass = float(
@@ -1092,24 +1093,28 @@ def run_simulation(preview_only=False):
         )
 
     # =========================================================================
-    # 🔄 【改善適用箇所】ブースター連続降下プロファイル（チャタリング・ワープ完全排除）
+    # 🔄 【改善適用箇所】ブースター連続降下プロファイル（重力自然加速＋終端速度モデル）
     # =========================================================================
     b_rcs = 0.0
     if b_active and not b_caught:
       b_alt = b_y
       rem_h = max(0.0, b_alt - TOWER_PHYSICAL_CATCH_Y)
       sep_elapsed = t - b_sep_time
+      b_rho = (
+          1.225 * np.exp(-max(0.0, b_alt) / 7400.0) if b_alt < 100000 else 0.0
+      )
+      aero_decel = 0.5 * b_rho * (b_vy**2) * 0.0022
 
       if not spacex_return_mode:
         b_thrust = False
         b_pitch += 0.05 * dt
         b_vx *= 0.992
-        b_vy = max(-450.0, b_vy - g0 * 1.25 * dt)
+        b_vy = max(-450.0, b_vy - g0 * dt)
         b_x = max(0.0, b_x + b_vx * dt)
         b_y = max(0.0, b_y + b_vy * dt)
       else:
         if sep_elapsed <= 4.0:
-          # 【Phase 1】ホットステージング直後のフリップ反転（4秒間）
+          # 【Phase 1】ホットステージング直後：反転しつつ重力で自然に下へ加速開始
           b_thrust = False
           target_flip = -1.5708
           pitch_err = target_flip - b_pitch
@@ -1117,27 +1122,30 @@ def run_simulation(preview_only=False):
               1.0 if pitch_err < -0.05 else (-1.0 if pitch_err > 0.05 else 0.0)
           )
           b_pitch += np.clip(pitch_err * 0.45, -0.55, 0.55) * dt
-          b_vx *= 0.92
-          b_vy -= (g0 * 1.5) * dt
+          b_vx *= 0.95
+          b_vy -= g0 * 0.7 * dt
         elif sep_elapsed <= 18.0 and b_x > 1500.0:
-          # 【Phase 2】ブーストバックバーン（水平速度をキャンセルし帰還軌道へ）
+          # 【Phase 2】ブーストバックバーン：重力で落下速度を増しながら帰還コースへ誘導
           b_pitch = -1.5708
           b_thrust = True
           b_rcs = 0.0
           b_vx = -b_x / max(12.0, (rem_h / 260.0))
-          b_vy -= (g0 * 1.35) * dt
+          b_vy -= g0 * 0.95 * dt
         elif rem_h > 3600.0:
-          # 【Phase 3】大気圏グライド降下（チャタリングを完全排除し滑らかに減速）
+          # 【Phase 3】自由落下＆グライド：一定速度を廃止し、重力加速＋空気抵抗でリアルに急加速
           b_thrust = False
           target_bp = float(np.clip((b_x / 8000.0) * 0.18, -0.22, 0.22))
           b_rcs = 1.0 if abs(target_bp - b_pitch) > 0.02 else 0.0
           b_pitch += (target_bp - b_pitch) * 0.25
-          glide_target_vy = -min(340.0, 95.0 + rem_h * 0.0055)
-          b_vy += (glide_target_vy - b_vy) * 0.18
+
+          # 重力で加速し、大気抵抗によって自然な終端速度（マッハ1前後）へ収束
+          b_vy -= (g0 - aero_decel) * dt
+          b_vy = max(-380.0, b_vy)
+
           time_to_landing = max(5.0, rem_h / max(10.0, abs(b_vy)))
           b_vx = -b_x / time_to_landing
         else:
-          # 【Phase 4】ファイナル・ランディングバーン（高度3.6km以下〜キャッチまで連続比例減速）
+          # 【Phase 4】ファイナル・ランディングバーン：高度3.6kmからキャッチ直前まで減速
           b_thrust = True
           ideal_landing_vy = -max(1.8, np.sqrt(2.0 * 14.5 * rem_h))
           b_vy += (ideal_landing_vy - b_vy) * 0.45
@@ -1147,7 +1155,7 @@ def run_simulation(preview_only=False):
           b_rcs = -1.0 if abs(target_bp - b_pitch) > 0.015 else 0.0
           b_pitch += (target_bp - b_pitch) * 0.35
 
-        # 座標更新（強制ワープなし）
+        # 座標更新
         b_x = max(0.0, b_x + b_vx * dt)
         b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
 
@@ -1682,7 +1690,7 @@ const engineCvs=document.getElementById('engine-cluster-canvas'),ectx=engineCvs.
 const rudBanner=document.getElementById('rud-banner'),completeBanner=document.getElementById('complete-banner'),rudDesc=document.getElementById('rud-desc');
 const eventLog=document.getElementById('event-log'),subCallout=document.getElementById('sub-callout'),pipBox=document.getElementById('pip-box'),topBannerBar=document.getElementById('top-banner-bar');
 let isMissionEnded=false,catchPopPlayed=false,pipVisible=true,landingSonicBoomPlayed=false,hotStagingSparkTimer=0.0;
-let pipBlurTriggered12k=false,pipBlurTriggeredCatch=false,cloudWakeTriggered=false,rudSequenceStarted=false,rudStartTime=0.0,is13to3CutoffTriggered=false,jsSepTime=0.0;
+let pipBlurTriggered12k=false,pipBlurTriggeredCatch=false,cloudWakeTriggered=false,rudSequenceStarted=false,rudStartTime=0.0,is13to3CutoffTriggered=false,landingBurnVaporTriggered=false,landingBurnIgniteStartTime=0.0,jsSepTime=0.0;
 
 function updatePipPosition(){if(pipBox&&topBannerBar){const rect=topBannerBar.getBoundingClientRect();pipBox.style.top=Math.round(rect.bottom+4)+'px';}}
 updatePipPosition();
@@ -1768,20 +1776,20 @@ function playLandingDoubleSonicBoom(){
         boomOsc.connect(boomGain);boomGain.connect(actx.destination);boomOsc.start(now+offset);boomOsc.stop(now+offset+0.52);
     });
 }
+// 【改善】ぶつかるような低音過多を排除し、金属ラッチ解除＋空圧プッシャーの小音量・シャープな高精細作動音へ換装
 function playHeavySeparationSound(){
     ensureAudioActive();if(!actx)return;const now=actx.currentTime;
-    const thudOsc=actx.createOscillator(),thudGain=actx.createGain();
-    thudOsc.type='sine';thudOsc.frequency.setValueAtTime(135,now);thudOsc.frequency.exponentialRampToValueAtTime(24,now+0.26);
-    thudGain.gain.setValueAtTime(0.48,now);thudGain.gain.exponentialRampToValueAtTime(0.001,now+0.34);
-    thudOsc.connect(thudGain);thudGain.connect(actx.destination);thudOsc.start(now);thudOsc.stop(now+0.35);
-    [0.0,0.038].forEach((offset,idx)=>{
-        const clankBuf=actx.createBuffer(1,Math.floor(actx.sampleRate*0.065),actx.sampleRate),cdata=clankBuf.getChannelData(0);
-        for(let i=0;i<cdata.length;i++)cdata[i]=(Math.random()*2-1)*Math.exp(-i/(actx.sampleRate*0.008));
-        const clankSrc=actx.createBufferSource();clankSrc.buffer=clankBuf;const bp1=actx.createBiquadFilter();bp1.type='bandpass';
-        bp1.frequency.setValueAtTime(idx===0?1180:2650,now+offset);bp1.Q.value=6.5;const clankG=actx.createGain();
-        clankG.gain.setValueAtTime(0.28,now+offset);clankG.gain.exponentialRampToValueAtTime(0.01,now+offset+0.06);
-        clankSrc.connect(bp1);bp1.connect(clankG);clankG.connect(actx.destination);clankSrc.start(now+offset);
-    });
+    const clickOsc=actx.createOscillator(),clickGain=actx.createGain();
+    clickOsc.type='triangle';clickOsc.frequency.setValueAtTime(1800,now);clickOsc.frequency.exponentialRampToValueAtTime(420,now+0.045);
+    clickGain.gain.setValueAtTime(0.09,now);clickGain.gain.exponentialRampToValueAtTime(0.001,now+0.05);
+    clickOsc.connect(clickGain);clickGain.connect(actx.destination);clickOsc.start(now);clickOsc.stop(now+0.055);
+
+    const dur=0.18,pBuf=actx.createBuffer(1,Math.floor(actx.sampleRate*dur),actx.sampleRate),pData=pBuf.getChannelData(0);
+    for(let i=0;i<pData.length;i++)pData[i]=(Math.random()*2-1)*Math.exp(-i/(actx.sampleRate*0.04));
+    const pSrc=actx.createBufferSource();pSrc.buffer=pBuf;
+    const bp=actx.createBiquadFilter();bp.type='bandpass';bp.frequency.setValueAtTime(3200,now+0.01);bp.Q.value=2.2;
+    const pGain=actx.createGain();pGain.gain.setValueAtTime(0.11,now+0.01);pGain.gain.exponentialRampToValueAtTime(0.001,now+dur);
+    pSrc.connect(bp);bp.connect(pGain);pGain.connect(actx.destination);pSrc.start(now+0.01);
 }
 function playRcsPuffSound(){
     if(!actx)return;const now=actx.currentTime,dur=0.065,buf=actx.createBuffer(1,Math.floor(actx.sampleRate*dur),actx.sampleRate),data=buf.getChannelData(0);
@@ -1910,7 +1918,8 @@ function getRealisticMaterial(matId){
     if(matId==='saturn')return new THREE.MeshStandardMaterial({map:saturnRollTex,roughness:0.35,metalness:0.15,envMap:proceduralEnvMap,bumpMap:weldSeamTex,bumpScale:0.012});
     if(matId==='baguette')return new THREE.MeshStandardMaterial({map:baguetteTex,roughness:0.95,metalness:0.02});
     if(matId==='pencil')return new THREE.MeshStandardMaterial({map:pencilTex,roughness:0.45,metalness:0.25,envMap:proceduralEnvMap});
-    if(matId==='ss')return new THREE.MeshStandardMaterial({color:0xf1f5f9,roughness:0.12,metalness:0.96,envMap:proceduralEnvMap,bumpMap:weldSeamTex,bumpScale:0.018,roughnessMap:weldSeamTex});
+    // 【改善】ステンレスの反射率・envMapIntensityを大幅強化し鏡面スペキュラーを際立たせる
+    if(matId==='ss')return new THREE.MeshStandardMaterial({color:0xf8fafc,roughness:0.08,metalness:0.98,envMap:proceduralEnvMap,envMapIntensity:1.85,bumpMap:weldSeamTex,bumpScale:0.015,roughnessMap:weldSeamTex});
     if(matId==='al')return new THREE.MeshStandardMaterial({color:0xc2410c,roughness:0.70,metalness:0.15,bumpMap:weldSeamTex,bumpScale:0.010});
     if(matId==='cf')return new THREE.MeshStandardMaterial({color:0x111317,roughness:0.85,metalness:0.08,bumpMap:tileTex,bumpScale:0.025});
     if(matId==='military')return new THREE.MeshStandardMaterial({color:0x3f4f38,roughness:0.65,metalness:0.35,envMap:proceduralEnvMap,bumpMap:weldSeamTex,bumpScale:0.012});
@@ -2058,7 +2067,7 @@ if(simCfg.strapon_count>0&&simCfg.strapon_type!=='none'){
         const bBody=new THREE.Mesh(new THREE.CylinderGeometry(topR,botR,bLen,24),bMat);bBody.position.y=bLen/2;bBody.castShadow=true;bUnit.add(bBody);
         const bNose=new THREE.Mesh(new THREE.ConeGeometry(topR,2.2,24),bMat);bNose.position.y=bLen+1.1;bNose.castShadow=true;bUnit.add(bNose);
         const localTips=[];buildFullDetailedEngineCluster(bUnit,1,0,0.9,localTips,simCfg.flame_hex,s1InconelNozzleMat);localTips.forEach(t=>boosterNozzleTips.push(t));
-        s1Group.add(bUnit);boosterUnits.push({mesh:bUnit,angle:ang,distR:distR,detached:false,tips:localTips,sepAge:0.0});
+        s1Group.add(bUnit);boosterUnits.push({mesh:bUnit,angle:ang,distR:distR,detached:false,tips:localTips,sepAge:0.0,vx:0,vy:0,vz:0});
     }
 }
 
@@ -2202,6 +2211,9 @@ function animate(now){
     rocket.position.set(rx,ry+6.0,0);rocket.rotation.z=-pitch;rocket.updateMatrixWorld(true);
     oceanBumpTex.offset.x=(now*0.00004)%1.0;oceanBumpTex.offset.y=(now*0.00002)%1.0;
 
+    // 【改善】ロケット上昇・ピッチ変化に合わせ太陽光スペキュラーを追従させ、ボディのエッジを劇的に輝かせる
+    sunLight.position.set(rx+1200.0*Math.cos(pitch)+400.0,ry+1800.0,1500.0);
+
     if(umbilicalArm){
         if(simT>0.0){
             umbilicalArm.rotation.y=THREE.MathUtils.lerp(umbilicalArm.rotation.y,-1.2,0.08);
@@ -2236,16 +2248,30 @@ function animate(now){
         }
     }
 
+    // 【改善】外部ブースター（SRB/LRB）：切り離し時に親から完全独立させ、重力でリアルに自然加速落下させる
     if(!p0.strapon&&!boosterDetached&&boosterUnits.length>0&&!simCfg.is_preview){
-        boosterDetached=true;playHeavySeparationSound();camShake=0.18;
-        for(let b of boosterUnits){b.detached=true;b.sepAge=0.0;b.tips.forEach(t=>{t.glow.visible=false;t.plumeGroup.visible=false;t.diamonds.forEach(d=>d.visible=false);});}
+        boosterDetached=true;playHeavySeparationSound();camShake=0.15;
+        for(let b of boosterUnits){
+            b.detached=true;b.sepAge=0.0;
+            scene.attach(b.mesh); // ワールドシーンに付け替え、ロケット本体の上昇から切り離す
+            const outX=Math.cos(b.angle),outZ=Math.sin(b.angle);
+            b.vx=outX*0.18;b.vy=-0.08;b.vz=outZ*0.18;
+            b.tips.forEach(t=>{t.glow.visible=false;t.plumeGroup.visible=false;t.diamonds.forEach(d=>d.visible=false);});
+        }
     }
     if(boosterDetached){
         for(let b of boosterUnits){
-            b.sepAge+=0.016;const slowOut=Math.min(6.5,0.45*Math.pow(b.sepAge,1.35)),slowBack=0.35*Math.pow(b.sepAge,2.2),slowTilt=Math.min(0.65,0.08*Math.pow(b.sepAge,1.4));
-            const outX=Math.cos(b.angle),outZ=Math.sin(b.angle);
-            b.mesh.position.set(outX*(b.distR+slowOut),-slowBack,outZ*(b.distR+slowOut));b.mesh.rotation.z=-outX*slowTilt;b.mesh.rotation.x=outZ*slowTilt;
-            if(b.sepAge<2.5&&Math.random()<0.6){b.mesh.getWorldPosition(tempV);emitParticle(tempV.x,tempV.y+s1Len*0.75,tempV.z,outX*0.5,0.15,outZ*0.5,0.2,1.4,14,0.55,0xffffff,0.94,0.0);}
+            b.sepAge+=0.016;
+            b.vy-=0.018; // 毎フレーム重力を加算し、落下スピードをどんどん加速
+            b.mesh.position.x+=b.vx;
+            b.mesh.position.y=Math.max(2.0,b.mesh.position.y+b.vy);
+            b.mesh.position.z+=b.vz;
+            b.mesh.rotation.z-=Math.cos(b.angle)*0.008;
+            b.mesh.rotation.x+=Math.sin(b.angle)*0.008;
+            if(b.sepAge<2.5&&Math.random()<0.45){
+                b.mesh.getWorldPosition(tempV);
+                emitParticle(tempV.x,tempV.y+s1Len*0.75,tempV.z,Math.cos(b.angle)*0.4,0.1,Math.sin(b.angle)*0.4,0.2,1.2,14,0.45,0xffffff,0.94,0.0);
+            }
         }
     }
 
@@ -2255,7 +2281,9 @@ function animate(now){
         if(abortTowerUnit&&!abortTowerDetached){abortTowerDetached=true;scene.attach(abortTowerUnit);}
         s1Group.localToWorld(tempV.set(0,s1Len,0));
         for(let i=0;i<36;i++){const ang=(i/36)*Math.PI*2;emitParticle(tempV.x+Math.cos(ang)*1.2,tempV.y,tempV.z+Math.sin(ang)*1.2,Math.cos(ang)*3.5,(Math.random()-0.5)*0.5,Math.sin(ang)*3.5,1.2,10.5,42,0.88,simCfg.s2_flame_hex,0.92,0.0);}
+        // 【改善】ホットステージング瞬間にブースター頂部ドームを煤焦げチャコールグレーに変色
         if(s1Body&&s1Body.material){s1Body.material.roughness=0.42;s1Body.material.color.setRGB(0.72,0.74,0.78);}
+        if(domeTop&&domeTop.material){domeTop.material.color.setHex(0x27272a);domeTop.material.roughness=0.85;}
     }
     if(abortTowerDetached&&abortTowerUnit){abortTowerUnit.position.x+=perpX*0.8;abortTowerUnit.position.y+=1.8;}
 
@@ -2322,13 +2350,25 @@ function animate(now){
         }else if(p0.b_thrust){
             mainCombinedGroup.visible=false;const isThreeOnly=(bY<=1200);
             towerCatchLight.intensity=(bY<=2500)?(8.5*(1.0-bY/2500.0)):0.0;
+            if(bY<=3600&&landingBurnIgniteStartTime===0.0){
+                landingBurnIgniteStartTime=simT;
+                if(!landingBurnVaporTriggered){
+                    landingBurnVaporTriggered=true;
+                    s1NozzleTips.forEach((t,i)=>{if(i<13){t.node.getWorldPosition(tempV);for(let k=0;k<3;k++)emitParticle(tempV.x,tempV.y,tempV.z,(Math.random()-0.5)*1.8,-2.5-Math.random()*2.0,(Math.random()-0.5)*1.8,1.2,5.5,24,0.75,0xffffff,0.92,0.01,false);}});
+                }
+            }
             if(isThreeOnly&&!is13to3CutoffTriggered){
                 is13to3CutoffTriggered=true;
                 s1NozzleTips.forEach((t,i)=>{if(!t.isCenter&&i<13){t.node.getWorldPosition(tempV);for(let k=0;k<4;k++)emitParticle(tempV.x,tempV.y,tempV.z,(Math.random()-0.5)*1.2,-1.0-Math.random(),(Math.random()-0.5)*1.2,0.8,4.5,30,0.65,0xfde047,0.95,0.01,true);}});
             }
-            const isBoostback=(bY>28000);
+            const isBoostback=(bY>28000),burnAge=simT-landingBurnIgniteStartTime;
+            // 【改善】ランディングバーン点火直後（0.35秒間）は中心3基から順次点火するリップル点火演出
             s1NozzleTips.forEach((t,i)=>{
-                const active=isThreeOnly?t.isCenter:(i<13);t.glow.visible=active;t.plumeGroup.visible=active;
+                let active=false;
+                if(isBoostback){active=(i<13);}
+                else if(isThreeOnly){active=t.isCenter;}
+                else{active=(burnAge<0.35)?t.isCenter:(i<13);}
+                t.glow.visible=active;t.plumeGroup.visible=active;
                 const fLen=(isBoostback?1.4:0.68)+Math.random()*0.18;t.plumeGroup.scale.set(isBoostback?1.6:0.85,fLen,isBoostback?1.6:0.85);
                 t.diamonds.forEach((d,k)=>{d.visible=active;d.position.y=-(k+1)*2.6*fLen;d.scale.set(t.exitR*(isBoostback?2.2:1.25),1.0,t.exitR*(isBoostback?2.2:1.25));});
             });
@@ -2382,14 +2422,17 @@ function animate(now){
             spaceJellyMesh.visible=true;const jellyProgress=Math.sin(((alt-38.0)/77.0)*Math.PI);spaceJellyMat.opacity=jellyProgress*0.42;const jScale=1.0+jellyProgress*1.8;spaceJellyMesh.scale.set(jScale,1.0+jellyProgress*0.5,jScale);
         }else{spaceJellyMesh.visible=false;}
 
+        // 【改善】高高度での大気圧低下によるプルームのラッパ状膨張（Under-expansion）と半透明化
+        const vacSpread=1.0+Math.min(2.4,Math.pow(Math.max(0.0,alt-20.0)/32.0,1.35));
         const shockSpacingFactor=1.0+Math.min(1.8,alt/28.0);
         for(let tObj of activeTips){
             let isLit=true;if(simT<0.0){if(tObj.ring===1&&igniteElapsed<0.25)isLit=false;if(tObj.ring===2&&igniteElapsed<0.55)isLit=false;}
             tObj.glow.visible=isLit;tObj.plumeGroup.visible=isLit;if(tObj.outerMat)tObj.outerMat.color.copy(curDynamicFlameColor);
-            const fPulse=0.92+Math.random()*0.16;tObj.plumeGroup.scale.set(1.0,fPulse*0.85,1.0);
-            if(p0.stage===2&&alt>80.0){if(tObj.outerMat)tObj.outerMat.opacity=0.40;if(tObj.innerMat)tObj.innerMat.opacity=0.30;}
-            else{if(tObj.outerMat)tObj.outerMat.opacity=0.85;if(tObj.innerMat)tObj.innerMat.opacity=0.95;}
-            tObj.diamonds.forEach((d,k)=>{d.visible=(isLit&&alt<70.0);d.position.y=-(k+1)*2.8*fPulse*shockSpacingFactor;const diskW=tObj.exitR*(1.6-k*0.12)*Math.sqrt(shockSpacingFactor);d.scale.set(diskW,1.0,diskW);});
+            const fPulse=0.92+Math.random()*0.16;
+            tObj.plumeGroup.scale.set(vacSpread,fPulse*0.85*(1.0+vacSpread*0.15),vacSpread);
+            if(p0.stage===2&&alt>80.0){if(tObj.outerMat)tObj.outerMat.opacity=0.32;if(tObj.innerMat)tObj.innerMat.opacity=0.28;}
+            else{if(tObj.outerMat)tObj.outerMat.opacity=Math.max(0.28,0.85-(vacSpread-1.0)*0.25);if(tObj.innerMat)tObj.innerMat.opacity=0.95;}
+            tObj.diamonds.forEach((d,k)=>{d.visible=(isLit&&alt<55.0);d.position.y=-(k+1)*2.8*fPulse*shockSpacingFactor;const diskW=tObj.exitR*(1.6-k*0.12)*Math.sqrt(shockSpacingFactor);d.scale.set(diskW,1.0,diskW);});
             if(simCfg.s1_cycle_id==="gg"&&p0.stage===1&&Math.random()<0.35){tObj.node.getWorldPosition(tempV);emitParticle(tempV.x+0.8,tempV.y-0.5,tempV.z,(Math.random()-0.5)*0.3,-1.8-Math.random(),(Math.random()-0.5)*0.3,0.4,3.2,28,0.50,0x18181b,0.96,0.01,false);}
             if(Math.random()<(alt>35.0?0.28:0.05)){
                 tObj.node.getWorldPosition(tempV);const spread=(Math.random()-0.5)*2.0,isSpaceJelly=(alt>38.0),pLife=isSpaceJelly?42:22,pEndSize=isSpaceJelly?11.5:4.5,pAlpha=isSpaceJelly?0.20:0.12;
