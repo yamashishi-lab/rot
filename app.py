@@ -324,7 +324,7 @@ target_bottom_y_3d = 68.6 - pin_offset_3d
 TOWER_PHYSICAL_CATCH_Y = max(0.0, (target_bottom_y_3d - 6.0) * 10.0)
 
 # =========================================================================
-# 💥 物理シミュレーション (確実な落下・スロー分離物理演算)
+# 💥 物理シミュレーション (ブースター上昇停止＆即時放物線落下・帰還演算)
 # =========================================================================
 def run_simulation(preview_only=False):
     if preview_only:
@@ -333,7 +333,7 @@ def run_simulation(preview_only=False):
             "fairing": True, "wings": bool(wing_spec["wing_id"] != "none"), "strapon": bool(strapon_spec["count"] > 0),
             "exploded": False, "thrust": False, "pitch": 0.0, "mach": 0.0, "event": "PREVIEW", "rcs_cmd": 0.0,
             "s1_prop_pct": 100.0, "s2_prop_pct": 100.0, "pitch_deg": 90.0, "apogee_km": 0.0, "chamber_p": 0.0,
-            "b_x": 0.0, "b_y": 0.0, "b_active": False, "b_pitch": 0.0, "b_thrust": False, "b_caught": False, "b_rcs": 0.0
+            "b_x": 0.0, "b_y": 0.0, "b_active": False, "b_pitch": 0.0, "b_thrust": False, "b_caught": False, "b_rcs": 0.0, "b_vy": 0.0
         }], None
 
     dt = 0.5
@@ -373,7 +373,7 @@ def run_simulation(preview_only=False):
             "thrust": bool(t_cd >= -ignition_lead_time), "pitch": 0.0, "mach": 0.0, "event": "COUNTDOWN", "rcs_cmd": 0.0,
             "s1_prop_pct": 100.0, "s2_prop_pct": 100.0, "pitch_deg": 90.0, "apogee_km": 0.0,
             "chamber_p": float(s1_pc) if t_cd >= -ignition_lead_time else 0.0,
-            "b_x": 0.0, "b_y": 0.0, "b_active": False, "b_pitch": 0.0, "b_thrust": False, "b_caught": False, "b_rcs": 0.0
+            "b_x": 0.0, "b_y": 0.0, "b_active": False, "b_pitch": 0.0, "b_thrust": False, "b_caught": False, "b_rcs": 0.0, "b_vy": 0.0
         })
 
     maxq_passed, supersonic_called = False, False
@@ -446,9 +446,9 @@ def run_simulation(preview_only=False):
                     b_active = True
                     b_sep_time = t
                     b_x, b_y = x, y
-                    # 修正：切り離し直後は相対速度差ゼロからスタートし、じわじわ離脱
-                    b_vx = vx
-                    b_vy = vy
+                    # 修正：初速上昇をわずか+12.0m/s（即座に頂点到達）に固定し、宇宙への無限上昇を完全根絶
+                    b_vx = vx * 0.65
+                    b_vy = 12.0
                     b_pitch = visual_pitch
             else:
                 cur_mass = float((s1_spec["dry_mass"] + s2_fuel + s2_spec["dry_mass"] + payload_mass) * 1000.0 + f_mass + w_mass + strap_m + fuel_s1_rem)
@@ -486,7 +486,7 @@ def run_simulation(preview_only=False):
                 fuel_s2_rem -= (thrust / (isp * g0)) * dt
                 current_pc = 220.0 * (thrust / thrust_base if thrust_base > 0 else 0.0)
 
-        # 修正：ブースター物理演算（無限上昇の完全根絶＆確実な放物線落下・帰還）
+        # 修正：分離後の第1段ブースター物理演算（即座に重力落下・アポジー反転・降下へ移行）
         b_rcs = 0.0
         if b_active and not b_caught:
             b_alt = b_y
@@ -501,20 +501,19 @@ def run_simulation(preview_only=False):
                 b_thrust = False
                 b_pitch += 0.04 * dt
                 b_vx += (b_drag_x / (s1_spec["dry_mass"] * 1000.0)) * dt
-                b_vy += (-g0 * 1.8 + b_drag_y / (s1_spec["dry_mass"] * 1000.0)) * dt
+                b_vy += (-g0 * 2.2 + b_drag_y / (s1_spec["dry_mass"] * 1000.0)) * dt
                 b_x = max(0.0, b_x + b_vx * dt)
                 b_y = max(0.0, b_y + b_vy * dt)
             else:
                 if sep_elapsed <= 3.5:
-                    # 分離初期：相対的にじわじわ離脱しつつ緩やかにフリップ反転
                     b_thrust = False
                     target_flip = -1.5708
                     pitch_err = target_flip - b_pitch
                     b_rcs = 1.0 if pitch_err < -0.05 else (-1.0 if pitch_err > 0.05 else 0.0)
                     b_pitch += np.clip(pitch_err * 0.35, -0.45, 0.45) * dt
-                    # 第2段の排気圧と重力で下方向へ確実に引き離す
-                    b_vy -= (g0 * 3.5) * dt
-                    b_vx -= 12.0 * dt
+                    # 重力と下向き抗力により、分離後わずか1秒で下向き落下（b_vy < 0）に確実に転換
+                    b_vy -= (g0 * 3.8) * dt
+                    b_vx -= 14.0 * dt
                     b_x = max(0.0, b_x + b_vx * dt)
                     b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
                 elif b_alt > 28000 and b_fuel > s1_fuel * 1000 * 0.04 and b_vx > 0.0:
@@ -524,7 +523,7 @@ def run_simulation(preview_only=False):
                     b_force = s1_spec["thrust_vac"] * 1000.0 * 0.95
                     b_fuel -= (b_force / (s1_spec["isp_vac"] * g0)) * dt
                     b_vx -= (b_force / (s1_spec["dry_mass"] * 1000.0)) * dt * 4.2
-                    b_vy -= (g0 * 1.8 - b_drag_y / (s1_spec["dry_mass"] * 1000.0)) * dt
+                    b_vy -= (g0 * 2.0 - b_drag_y / (s1_spec["dry_mass"] * 1000.0)) * dt
                     b_x = max(0.0, b_x + b_vx * dt)
                     b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
                 elif 12000 < b_alt <= 28000 and b_vy < -280 and b_fuel > s1_fuel * 1000 * 0.015:
@@ -600,7 +599,7 @@ def run_simulation(preview_only=False):
                     "q": 0.0, "g": 0.0, "stage": int(stage), "fairing": False, "wings": False, "strapon": False,
                     "exploded": True, "thrust": False, "pitch": visual_pitch, "mach": mach, "event": "RUD", "rcs_cmd": 0.0,
                     "s1_prop_pct": 0.0, "s2_prop_pct": 0.0, "pitch_deg": pitch_deg, "apogee_km": apogee_val, "chamber_p": 0.0,
-                    "b_x": float(b_x), "b_y": float(b_y), "b_active": b_active, "b_pitch": float(b_pitch), "b_thrust": False, "b_caught": False, "b_rcs": 0.0
+                    "b_x": float(b_x), "b_y": float(b_y), "b_active": b_active, "b_pitch": float(b_pitch), "b_thrust": False, "b_caught": False, "b_rcs": 0.0, "b_vy": float(b_vy)
                 })
             break
 
@@ -615,7 +614,7 @@ def run_simulation(preview_only=False):
             "thrust": bool(thrust > 0 and not is_orbit_achieved), "pitch": visual_pitch, "mach": mach,
             "event": "ORBIT" if is_orbit_achieved else cur_event, "rcs_cmd": rcs_cmd,
             "s1_prop_pct": s1_pct, "s2_prop_pct": s2_pct, "pitch_deg": pitch_deg, "apogee_km": apogee_val, "chamber_p": current_pc,
-            "b_x": float(b_x), "b_y": float(b_y), "b_active": b_active, "b_pitch": float(b_pitch), "b_thrust": b_thrust, "b_caught": b_caught, "b_rcs": float(b_rcs)
+            "b_x": float(b_x), "b_y": float(b_y), "b_active": b_active, "b_pitch": float(b_pitch), "b_thrust": b_thrust, "b_caught": b_caught, "b_rcs": float(b_rcs), "b_vy": float(b_vy)
         })
 
         if is_orbit_achieved and (not spacex_return_mode or b_caught):
@@ -625,7 +624,7 @@ def run_simulation(preview_only=False):
                     "q": 0.0, "g": 0.0, "stage": 2, "fairing": False, "wings": wings_attached, "strapon": False, "exploded": False,
                     "thrust": False, "pitch": 1.5708, "mach": mach, "event": "ORBIT", "rcs_cmd": 0.0,
                     "s1_prop_pct": 0.0, "s2_prop_pct": s2_pct, "pitch_deg": 0.0, "apogee_km": alt_km, "chamber_p": 0.0,
-                    "b_x": float(b_x), "b_y": float(b_y), "b_active": b_active, "b_pitch": float(b_pitch), "b_thrust": False, "b_caught": True, "b_rcs": 0.0
+                    "b_x": float(b_x), "b_y": float(b_y), "b_active": b_active, "b_pitch": float(b_pitch), "b_thrust": False, "b_caught": True, "b_rcs": 0.0, "b_vy": 0.0
                 })
             break
 
@@ -870,7 +869,7 @@ html_template += """
             let rudSequenceStarted = false;
             let rudStartTime = 0.0;
             let is13to3CutoffTriggered = false;
-            let jsSepTime = 0.0; // 修正：ReferenceError完全解消
+            let jsSepTime = 0.0;
 
             function updatePipPosition() {
                 if (pipBox && topBannerBar) {
@@ -1619,7 +1618,6 @@ html_template += """
             plasmaMesh.position.y = -2.5;
             s1Group.add(plasmaMesh);
 
-            // 修正：エッジが透けない二重立体ソフトテーパー＆超高輝度コアテクスチャ
             function createPlumeCoreTex() {
                 const cvs = document.createElement('canvas'); cvs.width = 128; cvs.height = 512;
                 const ctx = cvs.getContext('2d');
@@ -1654,7 +1652,6 @@ html_template += """
                 return new THREE.CanvasTexture(cvs);
             }
 
-            // 修正：お皿に見えない本物の立体ショックセル（X字型マッハ交差ノード）
             function createMachDiamondTex() {
                 const cvs = document.createElement('canvas'); cvs.width = 64; cvs.height = 128;
                 const ctx = cvs.getContext('2d');
@@ -1687,7 +1684,6 @@ html_template += """
             const s1EngineGimbalGroup = new THREE.Group();
             s1Group.add(s1EngineGimbalGroup);
 
-            // 修正：立体的なマッハ交差コーン構造
             const machConeGeo = new THREE.ConeGeometry(0.35, 1.6, 12, 1, true);
             machConeGeo.rotateX(Math.PI);
             const machConeMat = new THREE.MeshBasicMaterial({
@@ -1695,7 +1691,6 @@ html_template += """
                 blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false
             });
 
-            // 修正：板ポリゴンの四角い輪郭を廃止し、滑らかな二重立体コーンと立体的マッハダイヤモンドで構築
             function buildFullDetailedEngineCluster(parent, count, basePosY, epsScale, tipArray, flameHex, nozzleMaterial) {
                 const group = new THREE.Group(); group.position.y = basePosY;
                 const bellH = 1.2 * epsScale;
@@ -1708,7 +1703,6 @@ html_template += """
                 const throatMat = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false });
 
                 const plumeLen = 22.0;
-                // 外側シースコーン
                 const outerConeGeo = new THREE.CylinderGeometry(exitRadius * 0.95, exitRadius * 0.18, plumeLen, 16, 1, true);
                 outerConeGeo.translate(0, -plumeLen / 2, 0);
                 const outerConeMat = new THREE.MeshBasicMaterial({
@@ -1716,7 +1710,6 @@ html_template += """
                     blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false
                 });
 
-                // 内側白熱コアコーン
                 const innerCoreGeo = new THREE.CylinderGeometry(exitRadius * 0.45, exitRadius * 0.05, plumeLen * 0.75, 12, 1, true);
                 innerCoreGeo.translate(0, -(plumeLen * 0.75) / 2, 0);
                 const innerCoreMat = new THREE.MeshBasicMaterial({
@@ -1781,7 +1774,6 @@ html_template += """
             const s1EpsScale = 0.72 + (simCfg.s1_eps / 70.0) * 0.65;
             buildFullDetailedEngineCluster(s1EngineGimbalGroup, simCfg.s1_eng, 0.0, s1EpsScale, s1NozzleTips, simCfg.flame_hex, s1InconelNozzleMat);
 
-            // 修正：のっぺり塗りつぶしていた巨大な単一円柱コーンを廃止し、自然な多層オーラのみを配置
             const mainCombinedPlumeMat = new THREE.MeshBasicMaterial({
                 map: plumeCoreTex, color: simCfg.flame_hex, transparent: true, opacity: 0.45,
                 blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false
@@ -2234,6 +2226,7 @@ html_template += """
                 const bY = p0.b_y + (p1.b_y - p0.b_y) * a;
                 const bPitch = p0.b_pitch + (p1.b_pitch - p0.b_pitch) * a;
                 const bRcsCmd = (p0.b_rcs !== undefined) ? (p0.b_rcs + ((p1.b_rcs || 0) - p0.b_rcs) * a) : 0.0;
+                const bVyVal = (p0.b_vy !== undefined) ? (p0.b_vy + ((p1.b_vy || 0) - p0.b_vy) * a) : 0.0;
 
                 rocket.position.set(rx, ry + 6.0, 0);
                 rocket.rotation.z = -pitch;
@@ -2319,7 +2312,7 @@ html_template += """
                     }
                 }
 
-                // 修正：サイドブースターの超スロー・重厚イージング剥離（Math.powによる安定した5秒並走分離）
+                // 修正：サイドブースターの超スロー・重厚イージング剥離
                 if (!p0.strapon && !boosterDetached && boosterUnits.length > 0 && !simCfg.is_preview) {
                     boosterDetached = true;
                     playHeavySeparationSound();
@@ -2333,7 +2326,6 @@ html_template += """
                 if (boosterDetached) {
                     for(let b of boosterUnits) {
                         b.sepAge += 0.016;
-                        // 毎フレーム加算を廃止し、経過秒数から直接重厚な距離と傾斜を算出
                         const slowOut = Math.min(6.5, 0.45 * Math.pow(b.sepAge, 1.35));
                         const slowBack = 0.35 * Math.pow(b.sepAge, 2.2);
                         const slowTilt = Math.min(0.65, 0.08 * Math.pow(b.sepAge, 1.4));
@@ -2359,7 +2351,7 @@ html_template += """
                     }
                 }
 
-                // ホットステージング分離
+                // 修正：ホットステージング分離（ReferenceErrorの根絶とスロー剥離ブレンド）
                 const isSeparated = (p0.stage === 2 || p0.b_active);
                 if (isSeparated && !stage1Detached && !simCfg.is_preview) {
                     stage1Detached = true;
@@ -2480,7 +2472,7 @@ html_template += """
                     gridFinMat.emissiveIntensity = 0.0;
                 }
 
-                // 修正：第1段ホットステージング直後のスロー＆重厚視覚追従
+                // 修正：フリーズの完全解消（pitch参照バグ修正）と5秒間の滑らかなスロー剥離
                 if (stage1Detached) {
                     s1Group.visible = true;
 
@@ -2499,15 +2491,18 @@ html_template += """
                         }
                     } else {
                         const postSepTime = Math.max(0.0, simT - jsSepTime);
-                        if (postSepTime < 3.5) {
-                            // 分離後3.5秒間：第2段の後方でじわじわ離れる実機通りのスロー剥離
-                            const slowSepOffset = 0.8 * Math.pow(postSepTime, 1.8);
+                        if (postSepTime < 5.0) {
+                            const blendProgress = postSepTime / 5.0;
+                            const slowSepOffset = 0.95 * Math.pow(postSepTime, 1.6);
+                            const currentTargetPitch = -bPitch;
+                            const currentRocketPitch = -pitch;
+                            
                             s1Group.position.set(
                                 rx - ux * slowSepOffset,
                                 ry + 6.0 - uy * slowSepOffset,
                                 0
                             );
-                            s1Group.rotation.set(0, 0, -pitch + (bPitch - visual_pitch) * (postSepTime / 3.5));
+                            s1Group.rotation.set(0, 0, THREE.MathUtils.lerp(currentRocketPitch, currentTargetPitch, blendProgress));
                         } else {
                             s1Group.position.set(bX * 0.1, bY_scaled, 0);
                             s1Group.rotation.set(0, 0, -bPitch);
@@ -2638,7 +2633,7 @@ html_template += """
                     }
                 }
 
-                // 修正：エンジンバーナーの立体的描画＆スタッガード点火・高速ストリーク
+                // 修正：エンジンバーナーの立体的描写＆スタッガード点火
                 const isEngineFiring = (p0.thrust && !p0.exploded && !simCfg.is_preview);
                 
                 const s1TargetEmissive = (p0.stage === 1 && isEngineFiring) ? 1.25 : (p0.b_thrust && !p0.b_caught ? 1.1 : 0.0);
@@ -2705,7 +2700,6 @@ html_template += """
 
                     const shockSpacingFactor = 1.0 + Math.min(1.8, alt / 28.0);
 
-                    // 魔改造①：時間差スタッガード点火（中央→内周→外周へ点火伝播）
                     for(let tObj of activeTips) {
                         let isLit = true;
                         if (simT < 0.0) {
@@ -3098,7 +3092,7 @@ html_template += """
                 if (p0.stage === 2) { activeFocusWorld.set(0, s2Len * 0.45, 0); s2Group.localToWorld(activeFocusWorld); }
                 else { activeFocusWorld.set(0, s1Len * 0.52, 0); rocket.localToWorld(activeFocusWorld); }
 
-                // カメラトラッキング
+                // カメラトラッキング（魔改造：ステージ分離時の自動画角ワイドニング FOV 16→21度）
                 if (simCfg.is_preview) {
                     const ang = elapsedSec * 0.22;
                     cameraMain.position.set(Math.sin(ang) * 280.0, 42.0, Math.cos(ang) * 280.0);
@@ -3118,6 +3112,14 @@ html_template += """
                         cameraMain.position.y += (Math.random() - 0.5) * camShake * 2.5;
                         camShake *= 0.94;
                     }
+
+                    // ステージ分離直後の5秒間は画角を広げて両機体を長くフレーム内に捉える
+                    if (stage1Detached && (simT - jsSepTime < 5.0)) {
+                        cameraMain.fov = THREE.MathUtils.lerp(cameraMain.fov, 21.0, 0.08);
+                    } else {
+                        cameraMain.fov = THREE.MathUtils.lerp(cameraMain.fov, 16.0, 0.05);
+                    }
+                    cameraMain.updateProjectionMatrix();
 
                     const lookAim = new THREE.Vector3().copy(activeFocusWorld);
                     lookAim.x += Math.sin(now * 0.002) * 0.25;
@@ -3154,6 +3156,11 @@ html_template += """
                             pipBlurTriggeredCatch = true;
                         }
 
+                        // 魔改造：落下速度インジケーター（▼/▲）付き高度表示
+                        const bSpdKmh = Math.round(Math.abs(bVyVal) * 3.6);
+                        const vArrow = (bVyVal < -5.0) ? "▼" : ((bVyVal > 5.0) ? "▲" : "━");
+                        const vColor = (bVyVal < -5.0) ? "#34d399" : "#38bdf8";
+
                         if (p0.b_caught || bY_scaled <= 90.0) {
                             cameraPip.fov = THREE.MathUtils.lerp(cameraPip.fov, 16.0, 0.1);
                             document.getElementById('pip-tag').innerText = "CAM 02: GROUND OPTICAL (TOWER CATCH)";
@@ -3162,7 +3169,7 @@ html_template += """
                             const targetFov = Math.max(8.0, Math.min(22.0, bY_scaled / 35.0));
                             cameraPip.fov = THREE.MathUtils.lerp(cameraPip.fov, targetFov, 0.1);
                             document.getElementById('pip-tag').innerText = "CAM 02: GROUND OPTICAL TRACKER";
-                            document.getElementById('pip-hud-alt').innerText = `BOOSTER ALT: ${(bY * 0.001).toFixed(1)} km`;
+                            document.getElementById('pip-hud-alt').innerHTML = `ALT: ${(bY * 0.001).toFixed(1)} km <span style="color:${vColor}; font-size:9.5px; margin-left:4px;">${vArrow} ${bSpdKmh.toLocaleString()} km/h</span>`;
                         }
                     } else {
                         targetPos.copy(rocket.position);
@@ -3258,12 +3265,13 @@ html_template += """
             requestAnimationFrame(animate);
 
             window.addEventListener('resize', () => {
+                updatePipPosition();
+                resizePipRenderer();
                 const rw = window.innerWidth || 1200;
                 const rh = window.innerHeight || 980;
                 cameraMain.aspect = rw / rh;
                 cameraMain.updateProjectionMatrix();
                 rendererMain.setSize(rw, rh);
-                resizePipRenderer();
             });
         } catch(err) {
             console.error("Simulation Render Error:", err);
