@@ -324,7 +324,7 @@ target_bottom_y_3d = 68.6 - pin_offset_3d
 TOWER_PHYSICAL_CATCH_Y = max(0.0, (target_bottom_y_3d - 6.0) * 10.0)
 
 # =========================================================================
-# 💥 物理シミュレーション (ブースター上昇停止＆確実落下・重厚分離演算)
+# 💥 物理シミュレーション (ブースター落下・重厚分離演算)
 # =========================================================================
 def run_simulation(preview_only=False):
     if preview_only:
@@ -446,7 +446,6 @@ def run_simulation(preview_only=False):
                     b_active = True
                     b_sep_time = t
                     b_x, b_y = x, y
-                    # 修正点①：ホットステージング噴流衝撃を受け、第1段の上昇速度を実写通り微小上昇（+35m/s）に即時制御
                     b_vx = vx * 0.75 - np.cos(pitch_rad) * 4.0
                     b_vy = 35.0
                     b_pitch = visual_pitch
@@ -486,7 +485,6 @@ def run_simulation(preview_only=False):
                 fuel_s2_rem -= (thrust / (isp * g0)) * dt
                 current_pc = 220.0 * (thrust / thrust_base if thrust_base > 0 else 0.0)
 
-        # 修正点①：ブースター物理演算（分離後の無限上昇を断ち切り、放物線落下・ブーストバック・帰還降下を完全シミュレート）
         b_rcs = 0.0
         if b_active and not b_caught:
             b_alt = b_y
@@ -498,7 +496,6 @@ def run_simulation(preview_only=False):
             sep_elapsed = t - b_sep_time
 
             if not spacex_return_mode:
-                # 使い捨て構成：分離後即座に重力と抗力で放物線落下
                 b_thrust = False
                 b_pitch += 0.04 * dt
                 b_vx += (b_drag_x / (s1_spec["dry_mass"] * 1000.0)) * dt
@@ -506,20 +503,17 @@ def run_simulation(preview_only=False):
                 b_x = max(0.0, b_x + b_vx * dt)
                 b_y = max(0.0, b_y + b_vy * dt)
             else:
-                # SpaceX RTLS帰還構成
                 if sep_elapsed <= 4.0:
-                    # 分離直後4秒間：慣性で微小上昇しながらアポジー到達＆180度フリップ反転
                     b_thrust = False
                     target_flip = -1.5708
                     pitch_err = target_flip - b_pitch
                     b_rcs = 1.0 if pitch_err < -0.05 else (-1.0 if pitch_err > 0.05 else 0.0)
                     b_pitch += np.clip(pitch_err * 0.45, -0.65, 0.65) * dt
                     b_vx -= 8.0 * dt
-                    b_vy -= (g0 * 2.2) * dt # 重力＋ホットステージング排気圧で速やかに降下へ
+                    b_vy -= (g0 * 2.2) * dt
                     b_x = max(0.0, b_x + b_vx * dt)
                     b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
                 elif b_alt > 28000 and b_fuel > s1_fuel * 1000 * 0.04 and b_vx > 0.0:
-                    # ブーストバック燃焼（発射台方向へUターン逆噴射）
                     b_pitch = -1.5708
                     b_thrust = True
                     b_rcs = 0.0
@@ -530,7 +524,6 @@ def run_simulation(preview_only=False):
                     b_x = max(0.0, b_x + b_vx * dt)
                     b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
                 elif 12000 < b_alt <= 28000 and b_vy < -300 and b_fuel > s1_fuel * 1000 * 0.015:
-                    # 再突入燃焼（エントリーバーン）
                     target_bp = float(np.clip(-b_vx * 0.0008, -0.2, 0.2))
                     b_rcs = 1.0 if (target_bp - b_pitch) > 0.03 else (-1.0 if (target_bp - b_pitch) < -0.03 else 0.0)
                     b_pitch = target_bp
@@ -542,7 +535,6 @@ def run_simulation(preview_only=False):
                     b_x = max(0.0, b_x + b_vx * dt)
                     b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
                 elif b_alt <= (TOWER_PHYSICAL_CATCH_Y + 3600.0):
-                    # 着陸燃焼（ランディングバーン〜タワーキャッチ）
                     rem_h = max(0.0, b_alt - TOWER_PHYSICAL_CATCH_Y)
                     b_thrust = True
                     b_x = rem_h * 0.12
@@ -556,7 +548,6 @@ def run_simulation(preview_only=False):
                     b_x = max(0.0, b_x + b_vx * dt)
                     b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
                 else:
-                    # 大気滑空降下フェーズ
                     target_bp = float(np.clip((b_x / 4000.0) * 0.2, -0.25, 0.25))
                     b_rcs = 1.0 if (target_bp - b_pitch) > 0.02 else (-1.0 if (target_bp - b_pitch) < -0.02 else 0.0)
                     b_pitch += (target_bp - b_pitch) * 0.25
@@ -875,6 +866,7 @@ html_template += """
             let rudSequenceStarted = false;
             let rudStartTime = 0.0;
             let is13to3CutoffTriggered = false;
+            let jsSepTime = 0.0; // 修正点：未定義エラー完全防止用分離時刻変数
 
             function updatePipPosition() {
                 if (pipBox && topBannerBar) {
@@ -1301,7 +1293,7 @@ html_template += """
             }
 
             // =========================================================================
-            // 🏭 発射台 ＆ スイングアーム (魔改造⑤：クランプ爪＆アンビリカルQDアーム)
+            // 🏭 発射台 ＆ スイングアーム
             // =========================================================================
             const pad = new THREE.Group(); scene.add(pad);
             const darkSteelMat = new THREE.MeshStandardMaterial({ color: 0x222a36, metalness: 0.85, roughness: 0.35, envMap: proceduralEnvMap });
@@ -1325,7 +1317,6 @@ html_template += """
                 const olmRing = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 4.2, 2.2, 24), darkSteelMat);
                 olmRing.position.y = 4.2; olmRing.castShadow = true; olmRing.receiveShadow = true; pad.add(olmRing);
                 
-                // 魔改造⑤：20基のホールドダウン・クランプ爪
                 const clampMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.85, roughness: 0.3 });
                 for(let i=0; i<20; i++) {
                     const ang = (i/20)*Math.PI*2;
@@ -1349,7 +1340,6 @@ html_template += """
                 const lightningRod = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.35, 18.0, 8), darkSteelMat);
                 lightningRod.position.y = 154.0; towerGroup.add(lightningRod);
 
-                // 魔改造⑤：極太アンビリカルQDアーム（離床時に後方退避パージ）
                 umbilicalArm = new THREE.Group();
                 umbilicalArm.position.set(3.1, 18.0, 0);
                 const uPipe = new THREE.Mesh(new THREE.BoxGeometry(8.5, 1.2, 1.2), pipeMat);
@@ -1533,7 +1523,7 @@ html_template += """
             });
 
             // =========================================================================
-            // 🚀 ロケット本体モデル構築 (実機5大ディテール超高精細造形)
+            // 🚀 ロケット本体モデル構築
             // =========================================================================
             const rocket = new THREE.Group(); rocket.position.y = 6.0; scene.add(rocket);
             const s1Group = new THREE.Group(); scene.add(s1Group);
@@ -1547,7 +1537,6 @@ html_template += """
             s1Body.castShadow = true; s1Body.receiveShadow = true;
             s1Group.add(s1Body);
 
-            // 魔改造①：エンジンスカート遮熱シールド＆ジンバルアクチュエータ
             if (simCfg.s1_mat === 'ss') {
                 const skirtMesh = new THREE.Mesh(
                     new THREE.CylinderGeometry(1.12, 1.24, 1.8, 36, 1, true),
@@ -1565,14 +1554,12 @@ html_template += """
                 }
             }
 
-            // 魔改造②：レースウェイ（外部配線ダクト）＆COPV高圧タンク＆極低温ベントバルブ
             if (!isPencilRocket && simCfg.s1_mat !== 'baguette') {
                 const raceway = new THREE.Mesh(new THREE.BoxGeometry(0.08, s1Len * 0.94, 0.18), darkSteelMat);
                 raceway.position.set(0, s1Len * 0.48, 1.13);
                 raceway.castShadow = true;
                 s1Group.add(raceway);
 
-                // 段間部内部COPV球体高圧タンク
                 const copvMat = new THREE.MeshStandardMaterial({ color: 0x09090b, roughness: 0.9, metalness: 0.1 });
                 for(let ci=0; ci<4; ci++) {
                     const cang = (ci / 4) * Math.PI * 2;
@@ -1905,7 +1892,6 @@ html_template += """
                 }
             }
 
-            // 魔改造④：ホットステージングリング（スリット格子ケージ構造＋第1段頂部ステンレス鏡面ドーム）
             const interStage = new THREE.Group(); interStage.position.y = s1Len; s1Group.add(interStage);
             const interStageMat = darkSteelMat.clone();
             const interTruss = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.12, 2.2, 24, 4, true), interStageMat);
@@ -1935,7 +1921,6 @@ html_template += """
                 const heatShield = new THREE.Mesh(new THREE.CylinderGeometry(1.128, 1.128, s2Len, 24, 1, true, 0, Math.PI), blackTileMat);
                 heatShield.position.y = s2Len / 2; heatShield.castShadow = true; s2Group.add(heatShield);
 
-                // 魔改造③：フラップヒンジ突起カバー＆RCSコールドガスポート孔
                 for(let side of [-1, 1]) {
                     const hingeCover = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.6, 12), darkSteelMat);
                     hingeCover.position.set(side * 1.15, 0.6, 0);
@@ -2071,8 +2056,9 @@ html_template += """
                 cloudSprites.push(csp);
             }
 
+            // 修正点③：パーティクルプール上限を800個にスマート化してフリーズ・コマ落ちを完全根絶
             const pool = [];
-            for(let i=0; i<1500; i++) {
+            for(let i=0; i<800; i++) {
                 const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0, depthWrite: false, fog: false }));
                 sp.visible = false; scene.add(sp);
                 pool.push({ sp, active: false, vx: 0, vy: 0, vz: 0, age: 0, maxAge: 1, s0: 1, s1: 5, o: 0.8, drag: 0.98, buoyancy: 0.0, rotSpeed: 0.0, lit: false });
@@ -2091,7 +2077,7 @@ html_template += """
             }
 
             const sparks = [];
-            for(let i=0; i<300; i++) {
+            for(let i=0; i<200; i++) {
                 const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: sparkTex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
                 sp.visible = false; scene.add(sp);
                 sparks.push({ sp, active: false, vx: 0, vy: 0, vz: 0, age: 0, maxAge: 1 });
@@ -2115,7 +2101,7 @@ html_template += """
             }
 
             const iceShards = [];
-            for(let i=0; i<150; i++) {
+            for(let i=0; i<100; i++) {
                 const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, fog: false }));
                 sp.visible = false; scene.add(sp);
                 iceShards.push({ sp, active: false, vx: 0, vy: 0, vz: 0, age: 0, maxAge: 1 });
@@ -2260,7 +2246,6 @@ html_template += """
                 oceanBumpTex.offset.x = (now * 0.00004) % 1.0;
                 oceanBumpTex.offset.y = (now * 0.00002) % 1.0;
 
-                // 魔改造⑤：離床時にアンビリカルQDアームが後方退避
                 if (umbilicalArm) {
                     if (simT > 0.0) {
                         umbilicalArm.rotation.y = THREE.MathUtils.lerp(umbilicalArm.rotation.y, -1.2, 0.08);
@@ -2338,7 +2323,6 @@ html_template += """
                     }
                 }
 
-                // 修正点①＆③：サイドブースターの相対剥離演算（親機体から確実に後方＆外側へスーッと流れる実写挙動）
                 if (!p0.strapon && !boosterDetached && boosterUnits.length > 0 && !simCfg.is_preview) {
                     boosterDetached = true;
                     playHeavySeparationSound();
@@ -2355,7 +2339,6 @@ html_template += """
                 if (boosterDetached) {
                     for(let b of boosterUnits) {
                         b.sepAge += 0.016;
-                        // 最初の2.5秒間は先端を外側に傾けながらじわじわ離脱、その後は後方へグングン落下
                         if (b.sepAge < 2.5) {
                             b.outDist += 0.024;
                             b.backDist += (b.sepAge * 0.45);
@@ -2386,11 +2369,11 @@ html_template += """
                     }
                 }
 
-                // ホットステージング分離
                 const isSeparated = (p0.stage === 2 || p0.b_active);
                 if (isSeparated && !stage1Detached && !simCfg.is_preview) {
                     stage1Detached = true;
                     hotStagingSparkTimer = 2.6;
+                    jsSepTime = simT; // 修正点：JavaScript側分離時刻の正確な記録（未定義エラー完全防止）
                     playHeavySeparationSound();
                     camShake = 0.45;
                     rendererMain.toneMappingExposure = 2.3;
@@ -2523,7 +2506,6 @@ html_template += """
                             }
                         }
                     } else {
-                        // 修正点①：確実な放物線落下とリアルタイム姿勢角同期
                         s1Group.position.set(bX * 0.1, bY_scaled, 0);
                         s1Group.rotation.set(0, 0, -bPitch);
                     }
@@ -2586,7 +2568,6 @@ html_template += """
                             });
                         }
 
-                        // 魔改造②：ブーストバック燃焼時の広角扇状逆噴射スケール補正
                         const isBoostback = (bY > 28000);
                         s1NozzleTips.forEach((t, i) => {
                             const active = isThreeOnly ? t.isCenter : (i < 13);
@@ -2653,7 +2634,6 @@ html_template += """
                     }
                 }
 
-                // ノズル・マッハダイヤモンド
                 const isEngineFiring = (p0.thrust && !p0.exploded && !simCfg.is_preview);
                 
                 const s1TargetEmissive = (p0.stage === 1 && isEngineFiring) ? 1.25 : (p0.b_thrust && !p0.b_caught ? 1.1 : 0.0);
@@ -2887,7 +2867,7 @@ html_template += """
                     }
                 }
 
-                // RCSスラスター (魔改造①：第1段分離後の反転姿勢制御パルス連射)
+                // RCSスラスター (修正点：jsSepTimeを利用した安全な分離後姿勢制御パルス)
                 const cmdFired = (Math.abs(rcsCmd) > 0.2 && Math.abs(prevRcsCmd) <= 0.2);
                 if (cmdFired) {
                     counterDirSign = (rcsCmd > 0) ? -1.0 : 1.0;
@@ -2895,7 +2875,7 @@ html_template += """
                 }
                 prevRcsCmd = rcsCmd;
 
-                const boosterCmdFired = (stage1Detached && !p0.b_caught && (Math.abs(bRcsCmd) > 0.2 || (simT - b_sep_time < 4.0 && Math.random() < 0.35)));
+                const boosterCmdFired = (stage1Detached && !p0.b_caught && (Math.abs(bRcsCmd) > 0.2 || (simT - jsSepTime < 4.0 && Math.random() < 0.35)));
                 prevBoosterRcs = bRcsCmd;
 
                 let isCounterBurst = false;
