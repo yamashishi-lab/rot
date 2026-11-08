@@ -816,7 +816,7 @@ TOWER_PHYSICAL_CATCH_Y = max(0.0, (target_bottom_y_3d - 6.0) * 10.0)
 
 
 # =========================================================================
-# 💥 物理シミュレーション (全修正反映：転倒激突・素材引火・分離慣性完全同期)
+# 💥 物理シミュレーション (ブースター切り離し後の上昇防止修正版)
 # =========================================================================
 def run_simulation(preview_only=False):
   if preview_only:
@@ -1005,9 +1005,9 @@ def run_simulation(preview_only=False):
           b_active = True
           b_sep_time = t
           b_x, b_y = x, y
-          # 修正：慣性速度を100%引き継ぐ（パイロ反動のみ微減算）
-          b_vx = vx - np.cos(pitch_rad) * 8.0 * sep_thrust_factor
-          b_vy = vy - np.sin(pitch_rad) * 8.0 * sep_thrust_factor
+          # 【修正箇所】ブースターの上昇を防止するため、母機の垂直上昇速度を引き継がず、即座に下向き速度(-8.0m/s)に初期化
+          b_vx = vx * 0.45
+          b_vy = -8.0 * sep_thrust_factor
           b_pitch = visual_pitch
       else:
         cur_mass = float(
@@ -1092,6 +1092,7 @@ def run_simulation(preview_only=False):
             thrust / thrust_base if thrust_base > 0 else 0.0
         )
 
+    # 【修正箇所】ブースター切り離し後の物理（上昇せず即座に制御降下へ移行）
     b_rcs = 0.0
     if b_active and not b_caught:
       b_alt = b_y
@@ -1106,9 +1107,11 @@ def run_simulation(preview_only=False):
         b_thrust = False
         b_pitch += 0.06 * dt
         b_vx += (b_drag_x / (s1_spec["dry_mass"] * 1000.0)) * dt
-        b_vy += (
-            -g0 * 1.35 + b_drag_y / (s1_spec["dry_mass"] * 1000.0)
-        ) * dt
+        b_vy = min(
+            -2.0,
+            b_vy
+            + (-g0 * 1.8 + b_drag_y / (s1_spec["dry_mass"] * 1000.0)) * dt,
+        )
         b_x = max(0.0, b_x + b_vx * dt)
         b_y = max(0.0, b_y + b_vy * dt)
       else:
@@ -1120,8 +1123,9 @@ def run_simulation(preview_only=False):
               1.0 if pitch_err < -0.05 else (-1.0 if pitch_err > 0.05 else 0.0)
           )
           b_pitch += np.clip(pitch_err * 0.45, -0.55, 0.55) * dt
-          b_vy -= (g0 * 3.2) * dt
-          b_vx -= 22.0 * dt
+          # 上昇せず下向きへ加速
+          b_vy = min(-5.0, b_vy - (g0 * 2.8) * dt)
+          b_vx -= 28.0 * dt
           b_x = max(0.0, b_x + b_vx * dt)
           b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
         elif (
@@ -1133,14 +1137,20 @@ def run_simulation(preview_only=False):
           b_force = s1_spec["thrust_vac"] * 1000.0 * 0.95
           b_fuel -= (b_force / (s1_spec["isp_vac"] * g0)) * dt
           b_vx -= (b_force / (s1_spec["dry_mass"] * 1000.0)) * dt * 4.2
-          b_vy -= (
-              g0 * 2.0 - b_drag_y / (s1_spec["dry_mass"] * 1000.0)
-          ) * dt
+          b_vy = min(
+              -8.0,
+              b_vy
+              + (
+                  -g0 * 2.0
+                  + b_drag_y / (s1_spec["dry_mass"] * 1000.0)
+              )
+              * dt,
+          )
           b_x = max(0.0, b_x + b_vx * dt)
           b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
         elif (
             12000 < b_alt <= 28000
-            and b_vy < -280
+            and b_vy < -180
             and b_fuel > s1_fuel * 1000 * 0.015
         ):
           target_bp = float(np.clip(-b_vx * 0.0008, -0.2, 0.2))
@@ -1184,9 +1194,15 @@ def run_simulation(preview_only=False):
           b_pitch += (target_bp - b_pitch) * 0.25
           b_vx += (-b_x / 25.0 - b_vx) * 0.25
           b_thrust = False
-          b_vy += (
-              -g0 * 1.5 + b_drag_y / (s1_spec["dry_mass"] * 1000.0)
-          ) * dt
+          b_vy = min(
+              -12.0,
+              b_vy
+              + (
+                  -g0 * 1.5
+                  + b_drag_y / (s1_spec["dry_mass"] * 1000.0)
+              )
+              * dt,
+          )
           b_x = max(0.0, b_x + b_vx * dt)
           b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
 
@@ -1316,7 +1332,7 @@ def run_simulation(preview_only=False):
         / (cur_mass * g0)
     )
 
-    # 💥 多項目RUD判定（素材燃焼・音響・熱衝撃含む）
+    # 💥 多項目RUD判定
     rud_triggered = False
     s1_cyc_spec = PUMP_CYCLES[s1_cycle]
     s2_cyc_spec = PUMP_CYCLES[s2_cycle]
@@ -1620,7 +1636,7 @@ cfg_json = json.dumps(rocket_visual_cfg)
 fail_msg_clean = (error_msg or "").replace('"', '\\"').replace("'", "\\'")
 
 # =========================================================================
-# 📺 HTML / JS 描画テンプレート（高密度・完全統合版）
+# 📺 HTML / JS 描画テンプレート
 # =========================================================================
 html_template = """<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
@@ -2328,7 +2344,6 @@ function animate(now){
         if(Math.random()<0.45){s1Group.localToWorld(tempV.set(0,s1Len-1.1,0));for(let gi=0;gi<2;gi++){const gfAngle=Math.random()*Math.PI*2;emitParticle(tempV.x+Math.cos(gfAngle)*1.3,tempV.y,tempV.z+Math.sin(gfAngle)*1.3,(Math.random()-0.5)*0.5,3.5+Math.random()*2.0,(Math.random()-0.5)*0.5,0.4,3.5,20,0.45,0xd946ef,0.94,0.0,false);}}
     }else{plasmaMesh.material.opacity=0.0;gridFinMat.emissiveIntensity=0.0;}
 
-    // 修正：分離後の第1段ブースターを物理座標直結で滑らかに反映（ワープ撤廃）
     if(stage1Detached){
         s1Group.visible=true;
         if(p0.b_caught){
@@ -2544,11 +2559,11 @@ function animate(now){
     if(p0.event==="ORBIT"){solarL.scale.x=THREE.MathUtils.lerp(solarL.scale.x,1.0,0.08);solarR.scale.x=THREE.MathUtils.lerp(solarR.scale.x,1.0,0.08);}
 
     // =========================================================================
-    // 📺 CAM 02 (地上望遠) ＆ CAM 01 (メイン) 完全環境分離レンダリング（修正反映）
+    // 📺 CAM 02 (地上望遠) ＆ CAM 01 (メイン) 完全環境分離レンダリング
     // =========================================================================
     if(pipVisible){
         skyDome.position.copy(cameraPip.position);skyDomeMat.color.setRGB(1.0,1.0,1.0);starPoints.visible=false;
-        atmoLimbMesh.visible=false; // 修正：CAM02への青い宇宙リム映り込みを遮断
+        atmoLimbMesh.visible=false;
         scene.fog.density=0.000028;scene.fog.color.setHex(0x4a769e);skyAmbient.intensity=1.65;sunLight.intensity=4.8;
         let targetPos=new THREE.Vector3();
         if(stage1Detached&&p0.b_active){
