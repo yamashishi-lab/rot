@@ -816,7 +816,7 @@ TOWER_PHYSICAL_CATCH_Y = max(0.0, (target_bottom_y_3d - 6.0) * 10.0)
 
 
 # =========================================================================
-# 💥 物理シミュレーション (ブースター切り離し後の上昇防止修正版)
+# 💥 物理シミュレーション (ブースター連続降下プロファイル完全修正版)
 # =========================================================================
 def run_simulation(preview_only=False):
   if preview_only:
@@ -1005,7 +1005,6 @@ def run_simulation(preview_only=False):
           b_active = True
           b_sep_time = t
           b_x, b_y = x, y
-          # 【修正箇所】ブースターの上昇を防止するため、母機の垂直上昇速度を引き継がず、即座に下向き速度(-8.0m/s)に初期化
           b_vx = vx * 0.45
           b_vy = -8.0 * sep_thrust_factor
           b_pitch = visual_pitch
@@ -1092,30 +1091,25 @@ def run_simulation(preview_only=False):
             thrust / thrust_base if thrust_base > 0 else 0.0
         )
 
-    # 【修正箇所】ブースター切り離し後の物理（上昇せず即座に制御降下へ移行）
+    # =========================================================================
+    # 🔄 【改善適用箇所】ブースター連続降下プロファイル（チャタリング・ワープ完全排除）
+    # =========================================================================
     b_rcs = 0.0
     if b_active and not b_caught:
       b_alt = b_y
-      b_rho = float(1.225 * np.exp(-b_alt / 7400.0)) if b_alt < 140000 else 0.0
-      b_v = float(np.sqrt(b_vx**2 + b_vy**2))
-      b_drag = 0.5 * b_rho * (b_v**2) * 22.0 * 0.95
-      b_drag_y = -b_drag * (b_vy / b_v) if b_v > 0 else 0.0
-      b_drag_x = -b_drag * (b_vx / b_v) if b_v > 0 else 0.0
+      rem_h = max(0.0, b_alt - TOWER_PHYSICAL_CATCH_Y)
       sep_elapsed = t - b_sep_time
 
       if not spacex_return_mode:
         b_thrust = False
-        b_pitch += 0.06 * dt
-        b_vx += (b_drag_x / (s1_spec["dry_mass"] * 1000.0)) * dt
-        b_vy = min(
-            -2.0,
-            b_vy
-            + (-g0 * 1.8 + b_drag_y / (s1_spec["dry_mass"] * 1000.0)) * dt,
-        )
+        b_pitch += 0.05 * dt
+        b_vx *= 0.992
+        b_vy = max(-450.0, b_vy - g0 * 1.25 * dt)
         b_x = max(0.0, b_x + b_vx * dt)
         b_y = max(0.0, b_y + b_vy * dt)
       else:
         if sep_elapsed <= 4.0:
+          # 【Phase 1】ホットステージング直後のフリップ反転（4秒間）
           b_thrust = False
           target_flip = -1.5708
           pitch_err = target_flip - b_pitch
@@ -1123,90 +1117,42 @@ def run_simulation(preview_only=False):
               1.0 if pitch_err < -0.05 else (-1.0 if pitch_err > 0.05 else 0.0)
           )
           b_pitch += np.clip(pitch_err * 0.45, -0.55, 0.55) * dt
-          # 上昇せず下向きへ加速
-          b_vy = min(-5.0, b_vy - (g0 * 2.8) * dt)
-          b_vx -= 28.0 * dt
-          b_x = max(0.0, b_x + b_vx * dt)
-          b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
-        elif (
-            b_alt > 28000 and b_fuel > s1_fuel * 1000 * 0.04 and b_vx > 0.0
-        ):
+          b_vx *= 0.92
+          b_vy -= (g0 * 1.5) * dt
+        elif sep_elapsed <= 18.0 and b_x > 1500.0:
+          # 【Phase 2】ブーストバックバーン（水平速度をキャンセルし帰還軌道へ）
           b_pitch = -1.5708
           b_thrust = True
           b_rcs = 0.0
-          b_force = s1_spec["thrust_vac"] * 1000.0 * 0.95
-          b_fuel -= (b_force / (s1_spec["isp_vac"] * g0)) * dt
-          b_vx -= (b_force / (s1_spec["dry_mass"] * 1000.0)) * dt * 4.2
-          b_vy = min(
-              -8.0,
-              b_vy
-              + (
-                  -g0 * 2.0
-                  + b_drag_y / (s1_spec["dry_mass"] * 1000.0)
-              )
-              * dt,
-          )
-          b_x = max(0.0, b_x + b_vx * dt)
-          b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
-        elif (
-            12000 < b_alt <= 28000
-            and b_vy < -180
-            and b_fuel > s1_fuel * 1000 * 0.015
-        ):
-          target_bp = float(np.clip(-b_vx * 0.0008, -0.2, 0.2))
-          b_rcs = (
-              1.0
-              if (target_bp - b_pitch) > 0.03
-              else (-1.0 if (target_bp - b_pitch) < -0.03 else 0.0)
-          )
-          b_pitch = target_bp
-          b_thrust = True
-          b_force = s1_spec["thrust_vac"] * 1000.0 * 0.85
-          b_fuel -= (b_force / (s1_spec["isp_vac"] * g0)) * dt
-          b_vy += (
-              b_force / (s1_spec["dry_mass"] * 1000.0)
-          ) * dt * 0.95 + (
-              -g0 + b_drag_y / (s1_spec["dry_mass"] * 1000.0)
-          ) * dt
-          b_vx += (-b_x / 20.0 - b_vx) * 0.20
-          b_x = max(0.0, b_x + b_vx * dt)
-          b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
-        elif b_alt <= (TOWER_PHYSICAL_CATCH_Y + 3600.0):
-          rem_h = max(0.0, b_alt - TOWER_PHYSICAL_CATCH_Y)
-          b_thrust = True
-          b_x = rem_h * 0.12
-          target_bp = float(np.clip((rem_h / 3600.0) * 0.20, 0.0, 0.20))
-          b_rcs = -1.0 if abs(target_bp - b_pitch) > 0.015 else 0.0
-          b_pitch = target_bp
-          desired_vy = -max(2.0, rem_h * 0.22)
-          b_vy += (desired_vy - b_vy) * 0.6
-          b_vx = -b_x * 0.7
-          b_vy += (-g0 + b_drag_y / (s1_spec["dry_mass"] * 1000.0)) * dt
-          b_x = max(0.0, b_x + b_vx * dt)
-          b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
-        else:
-          target_bp = float(np.clip((b_x / 4000.0) * 0.2, -0.25, 0.25))
-          b_rcs = (
-              1.0
-              if (target_bp - b_pitch) > 0.02
-              else (-1.0 if (target_bp - b_pitch) < -0.02 else 0.0)
-          )
-          b_pitch += (target_bp - b_pitch) * 0.25
-          b_vx += (-b_x / 25.0 - b_vx) * 0.25
+          b_vx = -b_x / max(12.0, (rem_h / 260.0))
+          b_vy -= (g0 * 1.35) * dt
+        elif rem_h > 3600.0:
+          # 【Phase 3】大気圏グライド降下（チャタリングを完全排除し滑らかに減速）
           b_thrust = False
-          b_vy = min(
-              -12.0,
-              b_vy
-              + (
-                  -g0 * 1.5
-                  + b_drag_y / (s1_spec["dry_mass"] * 1000.0)
-              )
-              * dt,
-          )
-          b_x = max(0.0, b_x + b_vx * dt)
-          b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
+          target_bp = float(np.clip((b_x / 8000.0) * 0.18, -0.22, 0.22))
+          b_rcs = 1.0 if abs(target_bp - b_pitch) > 0.02 else 0.0
+          b_pitch += (target_bp - b_pitch) * 0.25
+          glide_target_vy = -min(340.0, 95.0 + rem_h * 0.0055)
+          b_vy += (glide_target_vy - b_vy) * 0.18
+          time_to_landing = max(5.0, rem_h / max(10.0, abs(b_vy)))
+          b_vx = -b_x / time_to_landing
+        else:
+          # 【Phase 4】ファイナル・ランディングバーン（高度3.6km以下〜キャッチまで連続比例減速）
+          b_thrust = True
+          ideal_landing_vy = -max(1.8, np.sqrt(2.0 * 14.5 * rem_h))
+          b_vy += (ideal_landing_vy - b_vy) * 0.45
+          time_to_catch = max(1.2, rem_h / max(2.0, abs(b_vy)))
+          b_vx = -b_x / time_to_catch
+          target_bp = float(np.clip((rem_h / 3600.0) * 0.16, 0.0, 0.16))
+          b_rcs = -1.0 if abs(target_bp - b_pitch) > 0.015 else 0.0
+          b_pitch += (target_bp - b_pitch) * 0.35
 
-        if b_y <= (TOWER_PHYSICAL_CATCH_Y + 12.0) and abs(b_x) < 40.0:
+        # 座標更新（強制ワープなし）
+        b_x = max(0.0, b_x + b_vx * dt)
+        b_y = max(TOWER_PHYSICAL_CATCH_Y, b_y + b_vy * dt)
+
+        # タワーキャッチ判定
+        if rem_h <= 12.0 and abs(b_x) < 40.0:
           (
               b_caught,
               b_y,
