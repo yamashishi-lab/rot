@@ -1005,9 +1005,9 @@ def run_simulation(preview_only=False):
           b_active = True
           b_sep_time = t
           b_x, b_y = x, y
-          b_vx = vx * 0.35
-          # 【改善】切り離し直後は上昇せず、わずかな負の初速からふわっと離れ始める
-          b_vy = -1.5 * sep_thrust_factor
+          # 【改善】第2段と水平並走しつつ画面内にとどまる。急な下落や上昇を完全排除
+          b_vx = vx * 0.98
+          b_vy = -0.5 * sep_thrust_factor
           b_pitch = visual_pitch
       else:
         cur_mass = float(
@@ -1093,17 +1093,13 @@ def run_simulation(preview_only=False):
         )
 
     # =========================================================================
-    # 🔄 【改善適用箇所】ブースター連続降下プロファイル（重力自然加速＋終端速度モデル）
+    # 🔄 【改善適用箇所】ブースター連続降下プロファイル（1300km/h頭打ち排除・着火前ノンストップ加速）
     # =========================================================================
     b_rcs = 0.0
     if b_active and not b_caught:
       b_alt = b_y
       rem_h = max(0.0, b_alt - TOWER_PHYSICAL_CATCH_Y)
       sep_elapsed = t - b_sep_time
-      b_rho = (
-          1.225 * np.exp(-max(0.0, b_alt) / 7400.0) if b_alt < 100000 else 0.0
-      )
-      aero_decel = 0.5 * b_rho * (b_vy**2) * 0.0022
 
       if not spacex_return_mode:
         b_thrust = False
@@ -1114,7 +1110,7 @@ def run_simulation(preview_only=False):
         b_y = max(0.0, b_y + b_vy * dt)
       else:
         if sep_elapsed <= 4.0:
-          # 【Phase 1】ホットステージング直後：反転しつつ重力で自然に下へ加速開始
+          # 【Phase 1】ホットステージング直後：反転しつつ重力で下へ加速
           b_thrust = False
           target_flip = -1.5708
           pitch_err = target_flip - b_pitch
@@ -1122,34 +1118,34 @@ def run_simulation(preview_only=False):
               1.0 if pitch_err < -0.05 else (-1.0 if pitch_err > 0.05 else 0.0)
           )
           b_pitch += np.clip(pitch_err * 0.45, -0.55, 0.55) * dt
-          b_vx *= 0.95
+          b_vx *= 0.96
           b_vy -= g0 * 0.7 * dt
         elif sep_elapsed <= 18.0 and b_x > 1500.0:
-          # 【Phase 2】ブーストバックバーン：重力で落下速度を増しながら帰還コースへ誘導
+          # 【Phase 2】ブーストバックバーン：帰還軌道へ戻しつつ重力加速を継続
           b_pitch = -1.5708
           b_thrust = True
           b_rcs = 0.0
           b_vx = -b_x / max(12.0, (rem_h / 260.0))
           b_vy -= g0 * 0.95 * dt
         elif rem_h > 3600.0:
-          # 【Phase 3】自由落下＆グライド：一定速度を廃止し、重力加速＋空気抵抗でリアルに急加速
+          # 【Phase 3】自由落下：上限リミッターや抵抗減速を完全排除し、着火直前まで重力でノンストップ加速！
           b_thrust = False
           target_bp = float(np.clip((b_x / 8000.0) * 0.18, -0.22, 0.22))
           b_rcs = 1.0 if abs(target_bp - b_pitch) > 0.02 else 0.0
           b_pitch += (target_bp - b_pitch) * 0.25
 
-          # 重力で加速し、大気抵抗によって自然な終端速度（マッハ1前後）へ収束
-          b_vy -= (g0 - aero_decel) * dt
-          b_vy = max(-380.0, b_vy)
+          # 重力により高速（マッハ2以上）へ連続加速し続ける
+          b_vy -= g0 * 1.15 * dt
 
-          time_to_landing = max(5.0, rem_h / max(10.0, abs(b_vy)))
+          time_to_landing = max(4.0, rem_h / max(10.0, abs(b_vy)))
           b_vx = -b_x / time_to_landing
         else:
-          # 【Phase 4】ファイナル・ランディングバーン：高度3.6kmからキャッチ直前まで減速
+          # 【Phase 4】ファイナル・ランディングバーン：エンジン点火によって初めて急減速！
           b_thrust = True
-          ideal_landing_vy = -max(1.8, np.sqrt(2.0 * 14.5 * rem_h))
-          b_vy += (ideal_landing_vy - b_vy) * 0.45
-          time_to_catch = max(1.2, rem_h / max(2.0, abs(b_vy)))
+          req_decel = (b_vy**2) / max(1.0, 2.0 * rem_h)
+          b_vy = min(-1.5, b_vy + req_decel * dt)
+
+          time_to_catch = max(1.0, rem_h / max(2.0, abs(b_vy)))
           b_vx = -b_x / time_to_catch
           target_bp = float(np.clip((rem_h / 3600.0) * 0.16, 0.0, 0.16))
           b_rcs = -1.0 if abs(target_bp - b_pitch) > 0.015 else 0.0
@@ -1776,7 +1772,6 @@ function playLandingDoubleSonicBoom(){
         boomOsc.connect(boomGain);boomGain.connect(actx.destination);boomOsc.start(now+offset);boomOsc.stop(now+offset+0.52);
     });
 }
-// 【改善】ぶつかるような低音過多を排除し、金属ラッチ解除＋空圧プッシャーの小音量・シャープな高精細作動音へ換装
 function playHeavySeparationSound(){
     ensureAudioActive();if(!actx)return;const now=actx.currentTime;
     const clickOsc=actx.createOscillator(),clickGain=actx.createGain();
@@ -1918,7 +1913,6 @@ function getRealisticMaterial(matId){
     if(matId==='saturn')return new THREE.MeshStandardMaterial({map:saturnRollTex,roughness:0.35,metalness:0.15,envMap:proceduralEnvMap,bumpMap:weldSeamTex,bumpScale:0.012});
     if(matId==='baguette')return new THREE.MeshStandardMaterial({map:baguetteTex,roughness:0.95,metalness:0.02});
     if(matId==='pencil')return new THREE.MeshStandardMaterial({map:pencilTex,roughness:0.45,metalness:0.25,envMap:proceduralEnvMap});
-    // 【改善】ステンレスの反射率・envMapIntensityを大幅強化し鏡面スペキュラーを際立たせる
     if(matId==='ss')return new THREE.MeshStandardMaterial({color:0xf8fafc,roughness:0.08,metalness:0.98,envMap:proceduralEnvMap,envMapIntensity:1.85,bumpMap:weldSeamTex,bumpScale:0.015,roughnessMap:weldSeamTex});
     if(matId==='al')return new THREE.MeshStandardMaterial({color:0xc2410c,roughness:0.70,metalness:0.15,bumpMap:weldSeamTex,bumpScale:0.010});
     if(matId==='cf')return new THREE.MeshStandardMaterial({color:0x111317,roughness:0.85,metalness:0.08,bumpMap:tileTex,bumpScale:0.025});
@@ -2067,7 +2061,7 @@ if(simCfg.strapon_count>0&&simCfg.strapon_type!=='none'){
         const bBody=new THREE.Mesh(new THREE.CylinderGeometry(topR,botR,bLen,24),bMat);bBody.position.y=bLen/2;bBody.castShadow=true;bUnit.add(bBody);
         const bNose=new THREE.Mesh(new THREE.ConeGeometry(topR,2.2,24),bMat);bNose.position.y=bLen+1.1;bNose.castShadow=true;bUnit.add(bNose);
         const localTips=[];buildFullDetailedEngineCluster(bUnit,1,0,0.9,localTips,simCfg.flame_hex,s1InconelNozzleMat);localTips.forEach(t=>boosterNozzleTips.push(t));
-        s1Group.add(bUnit);boosterUnits.push({mesh:bUnit,angle:ang,distR:distR,detached:false,tips:localTips,sepAge:0.0,vx:0,vy:0,vz:0});
+        s1Group.add(bUnit);boosterUnits.push({mesh:bUnit,angle:ang,distR:distR,detached:false,tips:localTips,sepAge:0.0,fallOffset:0.0,fallVel:0.05,sepBaseY:0.0});
     }
 }
 
@@ -2211,7 +2205,6 @@ function animate(now){
     rocket.position.set(rx,ry+6.0,0);rocket.rotation.z=-pitch;rocket.updateMatrixWorld(true);
     oceanBumpTex.offset.x=(now*0.00004)%1.0;oceanBumpTex.offset.y=(now*0.00002)%1.0;
 
-    // 【改善】ロケット上昇・ピッチ変化に合わせ太陽光スペキュラーを追従させ、ボディのエッジを劇的に輝かせる
     sunLight.position.set(rx+1200.0*Math.cos(pitch)+400.0,ry+1800.0,1500.0);
 
     if(umbilicalArm){
@@ -2248,29 +2241,32 @@ function animate(now){
         }
     }
 
-    // 【改善】外部ブースター（SRB/LRB）：切り離し時に親から完全独立させ、重力でリアルに自然加速落下させる
+    // 【改善】外部ブースター：画面から消える不具合を修正。親の相対座標を維持しつつ上昇分を相殺して重力加速で自然落下
     if(!p0.strapon&&!boosterDetached&&boosterUnits.length>0&&!simCfg.is_preview){
         boosterDetached=true;playHeavySeparationSound();camShake=0.15;
         for(let b of boosterUnits){
-            b.detached=true;b.sepAge=0.0;
-            scene.attach(b.mesh); // ワールドシーンに付け替え、ロケット本体の上昇から切り離す
-            const outX=Math.cos(b.angle),outZ=Math.sin(b.angle);
-            b.vx=outX*0.18;b.vy=-0.08;b.vz=outZ*0.18;
+            b.detached=true;b.sepAge=0.0;b.fallOffset=0.0;b.fallVel=0.05;b.sepBaseY=ry;
             b.tips.forEach(t=>{t.glow.visible=false;t.plumeGroup.visible=false;t.diamonds.forEach(d=>d.visible=false);});
         }
     }
     if(boosterDetached){
         for(let b of boosterUnits){
             b.sepAge+=0.016;
-            b.vy-=0.018; // 毎フレーム重力を加算し、落下スピードをどんどん加速
-            b.mesh.position.x+=b.vx;
-            b.mesh.position.y=Math.max(2.0,b.mesh.position.y+b.vy);
-            b.mesh.position.z+=b.vz;
-            b.mesh.rotation.z-=Math.cos(b.angle)*0.008;
-            b.mesh.rotation.x+=Math.sin(b.angle)*0.008;
+            b.fallVel+=0.025;
+            b.fallOffset+=b.fallVel;
+            const outX=Math.cos(b.angle),outZ=Math.sin(b.angle);
+            const spread=Math.min(12.0,b.sepAge*1.8);
+            const cancelRocketClimb=Math.max(0.0,ry-b.sepBaseY);
+            b.mesh.position.set(
+                outX*(b.distR+spread),
+                -cancelRocketClimb-b.fallOffset,
+                outZ*(b.distR+spread)
+            );
+            b.mesh.rotation.z=-outX*Math.min(1.2,b.sepAge*0.25);
+            b.mesh.rotation.x=outZ*Math.min(1.2,b.sepAge*0.25);
             if(b.sepAge<2.5&&Math.random()<0.45){
                 b.mesh.getWorldPosition(tempV);
-                emitParticle(tempV.x,tempV.y+s1Len*0.75,tempV.z,Math.cos(b.angle)*0.4,0.1,Math.sin(b.angle)*0.4,0.2,1.2,14,0.45,0xffffff,0.94,0.0);
+                emitParticle(tempV.x,tempV.y+s1Len*0.75,tempV.z,outX*0.4,0.1,outZ*0.4,0.2,1.2,14,0.45,0xffffff,0.94,0.0);
             }
         }
     }
@@ -2281,7 +2277,6 @@ function animate(now){
         if(abortTowerUnit&&!abortTowerDetached){abortTowerDetached=true;scene.attach(abortTowerUnit);}
         s1Group.localToWorld(tempV.set(0,s1Len,0));
         for(let i=0;i<36;i++){const ang=(i/36)*Math.PI*2;emitParticle(tempV.x+Math.cos(ang)*1.2,tempV.y,tempV.z+Math.sin(ang)*1.2,Math.cos(ang)*3.5,(Math.random()-0.5)*0.5,Math.sin(ang)*3.5,1.2,10.5,42,0.88,simCfg.s2_flame_hex,0.92,0.0);}
-        // 【改善】ホットステージング瞬間にブースター頂部ドームを煤焦げチャコールグレーに変色
         if(s1Body&&s1Body.material){s1Body.material.roughness=0.42;s1Body.material.color.setRGB(0.72,0.74,0.78);}
         if(domeTop&&domeTop.material){domeTop.material.color.setHex(0x27272a);domeTop.material.roughness=0.85;}
     }
@@ -2328,7 +2323,15 @@ function animate(now){
                 for(let k=0;k<4;k++){emitSpark(tempV.x+(Math.random()-0.5)*1.8,tempV.y,tempV.z+(Math.random()-0.5)*1.8,(Math.random()-0.5)*3.5,1.2+Math.random()*2.0,(Math.random()-0.5)*3.5,0xf59e0b);emitParticle(tempV.x,tempV.y,tempV.z,(Math.random()-0.5)*0.8,0.4+Math.random()*0.5,(Math.random()-0.5)*0.8,0.4,2.5,25,0.4,0xffffff,0.94,0.02,false);}
             }
         }else{
-            s1Group.position.set(bX*0.1,bY_scaled,0);s1Group.rotation.set(0,0,-bPitch);
+            s1Group.position.set(bX*0.1,bY_scaled,0);
+            // 【改善】降下・着陸バーン時の微細な姿勢揺らぎと補正制御
+            let swayZ=0.0,swayX=0.0;
+            if(bY<15000&&!p0.b_caught){
+                const turb=p0.b_thrust?0.045:0.025;
+                swayZ=Math.sin(now*0.008)*Math.cos(now*0.013)*turb;
+                swayX=Math.sin(now*0.011)*turb*0.7;
+            }
+            s1Group.rotation.set(swayX,0,-bPitch+swayZ);
         }
         s1Group.updateMatrixWorld(true);
 
@@ -2362,7 +2365,6 @@ function animate(now){
                 s1NozzleTips.forEach((t,i)=>{if(!t.isCenter&&i<13){t.node.getWorldPosition(tempV);for(let k=0;k<4;k++)emitParticle(tempV.x,tempV.y,tempV.z,(Math.random()-0.5)*1.2,-1.0-Math.random(),(Math.random()-0.5)*1.2,0.8,4.5,30,0.65,0xfde047,0.95,0.01,true);}});
             }
             const isBoostback=(bY>28000),burnAge=simT-landingBurnIgniteStartTime;
-            // 【改善】ランディングバーン点火直後（0.35秒間）は中心3基から順次点火するリップル点火演出
             s1NozzleTips.forEach((t,i)=>{
                 let active=false;
                 if(isBoostback){active=(i<13);}
@@ -2422,7 +2424,6 @@ function animate(now){
             spaceJellyMesh.visible=true;const jellyProgress=Math.sin(((alt-38.0)/77.0)*Math.PI);spaceJellyMat.opacity=jellyProgress*0.42;const jScale=1.0+jellyProgress*1.8;spaceJellyMesh.scale.set(jScale,1.0+jellyProgress*0.5,jScale);
         }else{spaceJellyMesh.visible=false;}
 
-        // 【改善】高高度での大気圧低下によるプルームのラッパ状膨張（Under-expansion）と半透明化
         const vacSpread=1.0+Math.min(2.4,Math.pow(Math.max(0.0,alt-20.0)/32.0,1.35));
         const shockSpacingFactor=1.0+Math.min(1.8,alt/28.0);
         for(let tObj of activeTips){
@@ -2473,17 +2474,39 @@ function animate(now){
     }
 
     const cmdFired=(Math.abs(rcsCmd)>0.2&&Math.abs(prevRcsCmd)<=0.2);if(cmdFired){counterDirSign=(rcsCmd>0)?-1.0:1.0;counterPulseTimer=0.26;}
-    prevRcsCmd=rcsCmd;const boosterCmdFired=(stage1Detached&&!p0.b_caught&&(Math.abs(bRcsCmd)>0.2||(simT-jsSepTime<4.0&&Math.random()<0.35)));prevBoosterRcs=bRcsCmd;
+    prevRcsCmd=rcsCmd;
     let isCounterBurst=false;if(counterPulseTimer>0){counterPulseTimer-=0.016;if(counterPulseTimer<=0)isCounterBurst=true;}
     let soundTriggeredThisFrame=false;
+
+    // 【改善】全方向一斉噴射を完全排除。傾きと角速度に応じた独立ノズル非対称修正噴射
+    const isLandingCorrection=(stage1Detached&&!p0.b_caught&&(p0.b_thrust||bY<25000));
     for(let rcs of rcsNozzles){
         let triggerPulse=false;
         if(!simCfg.is_preview&&simT>0&&!p0.exploded){
-            if(!rcs.isS1&&stage1Detached){if(cmdFired&&((rcs.dir.dx<-0.5&&rcsCmd>0)||(rcs.dir.dx>0.5&&rcsCmd<0)))triggerPulse=true;if(isCounterBurst&&((rcs.dir.dx<-0.5&&counterDirSign>0)||(rcs.dir.dx>0.5&&counterDirSign<0)))triggerPulse=true;}
-            else if(rcs.isS1){if(!stage1Detached){if(cmdFired&&((rcs.dir.dx<-0.5&&rcsCmd>0)||(rcs.dir.dx>0.5&&rcsCmd<0)))triggerPulse=true;}else if(!p0.b_caught){if(boosterCmdFired)triggerPulse=true;}}
+            if(!rcs.isS1&&stage1Detached){
+                if(cmdFired&&((rcs.dir.dx<-0.5&&rcsCmd>0)||(rcs.dir.dx>0.5&&rcsCmd<0)))triggerPulse=true;
+                if(isCounterBurst&&((rcs.dir.dx<-0.5&&counterDirSign>0)||(rcs.dir.dx>0.5&&counterDirSign<0)))triggerPulse=true;
+            }else if(rcs.isS1){
+                if(!stage1Detached){
+                    if(cmdFired&&((rcs.dir.dx<-0.5&&rcsCmd>0)||(rcs.dir.dx>0.5&&rcsCmd<0)))triggerPulse=true;
+                }else if(!p0.b_caught){
+                    if(simT-jsSepTime<4.0){
+                        if(rcs.dir.id==="-X"&&Math.random()<0.45)triggerPulse=true;
+                    }else if(isLandingCorrection){
+                        const swayPhaseX=Math.sin(now*0.008);
+                        const swayPhaseZ=Math.cos(now*0.011);
+                        const fireProb=p0.b_thrust?0.16:0.06;
+                        if(rcs.dir.id==="+X"&&swayPhaseX>0.2&&Math.random()<fireProb)triggerPulse=true;
+                        if(rcs.dir.id==="-X"&&swayPhaseX<-0.2&&Math.random()<fireProb)triggerPulse=true;
+                        if(rcs.dir.id==="+Z"&&swayPhaseZ>0.2&&Math.random()<fireProb)triggerPulse=true;
+                        if(rcs.dir.id==="-Z"&&swayPhaseZ<-0.2&&Math.random()<fireProb)triggerPulse=true;
+                    }
+                }
+            }
         }
         if(triggerPulse){
-            rcs.timer=0.11;if(!soundTriggeredThisFrame){playRcsPuffSound();soundTriggeredThisFrame=true;}
+            rcs.timer=0.05+Math.random()*0.09;
+            if(!soundTriggeredThisFrame){playRcsPuffSound();soundTriggeredThisFrame=true;}
             rcs.mount.getWorldPosition(tempV);const localJetDir=new THREE.Vector3(rcs.dir.dx,0,rcs.dir.dz).normalize(),parentQuat=new THREE.Quaternion();
             rcs.mount.parent.getWorldQuaternion(parentQuat);localJetDir.applyQuaternion(parentQuat);
             for(let k=0;k<2;k++){const spd=2.8+k*1.1;emitParticle(tempV.x+localJetDir.x*0.5,tempV.y+localJetDir.y*0.5,tempV.z+localJetDir.z*0.5,localJetDir.x*spd,localJetDir.y*spd,localJetDir.z*spd,0.18,0.95,6,0.55,0xe0f2fe,0.88,0.0,false);}
