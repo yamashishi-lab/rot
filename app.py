@@ -1005,9 +1005,8 @@ def run_simulation(preview_only=False):
           b_active = True
           b_sep_time = t
           b_x, b_y = x, y
-          # 【改善】第2段と水平並走しつつ画面内にとどまる。急な下落や上昇を完全排除
           b_vx = vx * 0.98
-          b_vy = -0.5 * sep_thrust_factor
+          b_vy = -2.0 * sep_thrust_factor
           b_pitch = visual_pitch
       else:
         cur_mass = float(
@@ -1117,9 +1116,9 @@ def run_simulation(preview_only=False):
           b_rcs = (
               1.0 if pitch_err < -0.05 else (-1.0 if pitch_err > 0.05 else 0.0)
           )
-          b_pitch += np.clip(pitch_err * 0.45, -0.55, 0.55) * dt
-          b_vx *= 0.96
-          b_vy -= g0 * 0.7 * dt
+          b_pitch += np.clip(pitch_err * 0.35, -0.45, 0.45) * dt
+          b_vx *= 0.985
+          b_vy -= g0 * 0.25 * dt
         elif sep_elapsed <= 18.0 and b_x > 1500.0:
           # 【Phase 2】ブーストバックバーン：帰還軌道へ戻しつつ重力加速を継続
           b_pitch = -1.5708
@@ -1127,29 +1126,45 @@ def run_simulation(preview_only=False):
           b_rcs = 0.0
           b_vx = -b_x / max(12.0, (rem_h / 260.0))
           b_vy -= g0 * 0.95 * dt
-        elif rem_h > 3600.0:
-          # 【Phase 3】自由落下：上限リミッターや抵抗減速を完全排除し、着火直前まで重力でノンストップ加速！
+        elif rem_h > 4800.0:
+          # 【Phase 3】自由落下：高度4.8kmまで重力でノンストップ加速
           b_thrust = False
           target_bp = float(np.clip((b_x / 8000.0) * 0.18, -0.22, 0.22))
           b_rcs = 1.0 if abs(target_bp - b_pitch) > 0.02 else 0.0
           b_pitch += (target_bp - b_pitch) * 0.25
 
-          # 重力により高速（マッハ2以上）へ連続加速し続ける
           b_vy -= g0 * 1.15 * dt
 
-          time_to_landing = max(4.0, rem_h / max(10.0, abs(b_vy)))
+          time_to_landing = max(6.0, rem_h / max(10.0, abs(b_vy)))
           b_vx = -b_x / time_to_landing
-        else:
-          # 【Phase 4】ファイナル・ランディングバーン：エンジン点火によって初めて急減速！
+        elif rem_h > 750.0:
+          # 【Phase 4A】初期ランディングバーン（13基点火：高度750mで -38m/s になるよう力強く減速）
           b_thrust = True
-          req_decel = (b_vy**2) / max(1.0, 2.0 * rem_h)
-          b_vy = min(-1.5, b_vy + req_decel * dt)
+          target_v_at_750 = -38.0
+          rem_dist_to_gate = max(10.0, rem_h - 750.0)
+          req_decel = max(
+              0.0, (b_vy**2 - target_v_at_750**2) / (2.0 * rem_dist_to_gate)
+          )
+          b_vy = min(target_v_at_750, b_vy + req_decel * dt)
 
-          time_to_catch = max(1.0, rem_h / max(2.0, abs(b_vy)))
-          b_vx = -b_x / time_to_catch
-          target_bp = float(np.clip((rem_h / 3600.0) * 0.16, 0.0, 0.16))
+          time_to_gate = max(4.0, rem_dist_to_gate / max(10.0, abs(b_vy)))
+          b_vx = -b_x / (time_to_gate + 10.0)
+          target_bp = float(np.clip((rem_h / 4800.0) * 0.16, 0.02, 0.16))
           b_rcs = -1.0 if abs(target_bp - b_pitch) > 0.015 else 0.0
-          b_pitch += (target_bp - b_pitch) * 0.35
+          b_pitch += (target_bp - b_pitch) * 0.3
+        else:
+          # 【Phase 4B】ファイナル・スローアプローチ（中央3基：約12秒かけてゆっくりアームへ降りて引っ掛ける）
+          b_thrust = True
+          approach_ratio = np.clip(rem_h / 750.0, 0.0, 1.0)
+          ideal_slow_vy = -(2.5 + 35.5 * (approach_ratio**0.85))
+          b_vy += (ideal_slow_vy - b_vy) * 0.35
+
+          time_to_catch = max(2.5, rem_h / max(2.5, abs(b_vy)))
+          b_vx = -b_x / time_to_catch
+
+          target_bp = float(approach_ratio * 0.03)
+          b_rcs = -1.0 if abs(target_bp - b_pitch) > 0.005 else 0.0
+          b_pitch += (target_bp - b_pitch) * 0.4
 
         # 座標更新
         b_x = max(0.0, b_x + b_vx * dt)
@@ -1900,7 +1915,7 @@ if(isStarshipPad){
     const jokePlate=new THREE.Mesh(new THREE.BoxGeometry(32,4.0,32),new THREE.MeshStandardMaterial({color:boardColor,roughness:0.7}));jokePlate.position.y=0.5;jokePlate.receiveShadow=true;pad.add(jokePlate);
 }
 
-function createSaturnRollPattern(){const cvs=document.createElement('canvas');cvs.width=512;cvs.height=512;const ctx=cvs.getContext('2d');ctx.fillStyle='#f8fafc';ctx.fillRect(0,0,512,512);ctx.fillStyle='#0f172a';ctx.fillRect(0,0,256,128);ctx.fillRect(256,128,256,128);ctx.fillRect(0,256,256,128);ctx.fillRect(256,384,256,128);ctx.fillStyle='#b91c1c';ctx.font='bold 36px sans-serif';ctx.fillText('USA',190,480);const tex=new THREE.CanvasTexture(cvs);tex.wrapS=THREE.RepeatWrapping;tex.wrapT=THREE.RepeatWrapping;return tex;}
+function createSaturnRollPattern(){const cvs=document.createElement('canvas');cvs.width=512;cvs.height=512;const ctx=cvs.getContext('2d');ctx.fillStyle='#f8fafc';ctx.fillRect(0,0,512,512);ctx.fillStyle='#0f172a';ctx.fillRect(0,0,256,128);ctx.fillRect(256,128,256,128);ctx.fillRect(0,256,256,128);ctx.fillRect(256,384,256,128);ctx.fillStyle='#b91c1c';ctx.font='bold 32px sans-serif';ctx.fillText('USA',190,480);const tex=new THREE.CanvasTexture(cvs);tex.wrapS=THREE.RepeatWrapping;tex.wrapT=THREE.RepeatWrapping;return tex;}
 function createBaguetteTexture(){const cvs=document.createElement('canvas');cvs.width=512;cvs.height=512;const ctx=cvs.getContext('2d');ctx.fillStyle='#c68a4c';ctx.fillRect(0,0,512,512);ctx.fillStyle='#e8b87d';for(let i=0;i<8;i++){ctx.save();ctx.translate(120+(i%3)*120,40+i*60);ctx.rotate(-0.35);ctx.beginPath();ctx.ellipse(0,0,75,14,0,0,Math.PI*2);ctx.fill();ctx.restore();}const imgData=ctx.getImageData(0,0,512,512);for(let k=0;k<imgData.data.length;k+=4){const noise=(Math.random()-0.5)*22;imgData.data[k]+=noise;imgData.data[k+1]+=noise;imgData.data[k+2]+=noise;}ctx.putImageData(imgData,0,0);return new THREE.CanvasTexture(cvs);}
 function createPencilTexture(){const cvs=document.createElement('canvas');cvs.width=512;cvs.height=512;const ctx=cvs.getContext('2d');ctx.fillStyle='#155e3b';ctx.fillRect(0,0,512,512);ctx.fillStyle='#d97706';ctx.font='bold 32px serif';ctx.fillText('★ MITSUBISHI Hi-uni HB ★',60,260);ctx.fillStyle='#ca8a04';ctx.fillRect(0,470,512,42);return new THREE.CanvasTexture(cvs);}
 function createHexTileTexture(){const cvs=document.createElement('canvas');cvs.width=256;cvs.height=256;const ctx=cvs.getContext('2d');ctx.fillStyle='#0f1216';ctx.fillRect(0,0,256,256);ctx.strokeStyle='#1e242d';ctx.lineWidth=1.5;for(let x=0;x<256;x+=16){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,256);ctx.stroke();}for(let y=0;y<256;y+=16){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(256,y);ctx.stroke();}return new THREE.CanvasTexture(cvs);}
@@ -2061,7 +2076,7 @@ if(simCfg.strapon_count>0&&simCfg.strapon_type!=='none'){
         const bBody=new THREE.Mesh(new THREE.CylinderGeometry(topR,botR,bLen,24),bMat);bBody.position.y=bLen/2;bBody.castShadow=true;bUnit.add(bBody);
         const bNose=new THREE.Mesh(new THREE.ConeGeometry(topR,2.2,24),bMat);bNose.position.y=bLen+1.1;bNose.castShadow=true;bUnit.add(bNose);
         const localTips=[];buildFullDetailedEngineCluster(bUnit,1,0,0.9,localTips,simCfg.flame_hex,s1InconelNozzleMat);localTips.forEach(t=>boosterNozzleTips.push(t));
-        s1Group.add(bUnit);boosterUnits.push({mesh:bUnit,angle:ang,distR:distR,detached:false,tips:localTips,sepAge:0.0,fallOffset:0.0,fallVel:0.05,sepBaseY:0.0});
+        s1Group.add(bUnit);boosterUnits.push({mesh:bUnit,angle:ang,distR:distR,detached:false,tips:localTips,sepAge:0.0,fallOffset:0.0,fallVel:0.004});
     }
 }
 
@@ -2241,32 +2256,30 @@ function animate(now){
         }
     }
 
-    // 【改善】外部ブースター：画面から消える不具合を修正。親の相対座標を維持しつつ上昇分を相殺して重力加速で自然落下
     if(!p0.strapon&&!boosterDetached&&boosterUnits.length>0&&!simCfg.is_preview){
         boosterDetached=true;playHeavySeparationSound();camShake=0.15;
         for(let b of boosterUnits){
-            b.detached=true;b.sepAge=0.0;b.fallOffset=0.0;b.fallVel=0.05;b.sepBaseY=ry;
+            b.detached=true;b.sepAge=0.0;b.fallOffset=0.0;b.fallVel=0.004;
             b.tips.forEach(t=>{t.glow.visible=false;t.plumeGroup.visible=false;t.diamonds.forEach(d=>d.visible=false);});
         }
     }
     if(boosterDetached){
         for(let b of boosterUnits){
             b.sepAge+=0.016;
-            b.fallVel+=0.025;
+            b.fallVel+=0.0012;
             b.fallOffset+=b.fallVel;
             const outX=Math.cos(b.angle),outZ=Math.sin(b.angle);
-            const spread=Math.min(12.0,b.sepAge*1.8);
-            const cancelRocketClimb=Math.max(0.0,ry-b.sepBaseY);
+            const spread=Math.min(8.0,b.sepAge*0.55);
             b.mesh.position.set(
                 outX*(b.distR+spread),
-                -cancelRocketClimb-b.fallOffset,
+                -b.fallOffset,
                 outZ*(b.distR+spread)
             );
-            b.mesh.rotation.z=-outX*Math.min(1.2,b.sepAge*0.25);
-            b.mesh.rotation.x=outZ*Math.min(1.2,b.sepAge*0.25);
-            if(b.sepAge<2.5&&Math.random()<0.45){
+            b.mesh.rotation.z=-outX*Math.min(0.85,b.sepAge*0.12);
+            b.mesh.rotation.x=outZ*Math.min(0.85,b.sepAge*0.12);
+            if(b.sepAge<3.5&&Math.random()<0.45){
                 b.mesh.getWorldPosition(tempV);
-                emitParticle(tempV.x,tempV.y+s1Len*0.75,tempV.z,outX*0.4,0.1,outZ*0.4,0.2,1.2,14,0.45,0xffffff,0.94,0.0);
+                emitParticle(tempV.x,tempV.y+s1Len*0.75,tempV.z,outX*0.25,0.05,outZ*0.25,0.2,1.2,18,0.45,0xffffff,0.94,0.0);
             }
         }
     }
@@ -2324,20 +2337,20 @@ function animate(now){
             }
         }else{
             s1Group.position.set(bX*0.1,bY_scaled,0);
-            // 【改善】降下・着陸バーン時の微細な姿勢揺らぎと補正制御
             let swayZ=0.0,swayX=0.0;
             if(bY<15000&&!p0.b_caught){
-                const turb=p0.b_thrust?0.045:0.025;
-                swayZ=Math.sin(now*0.008)*Math.cos(now*0.013)*turb;
-                swayX=Math.sin(now*0.011)*turb*0.7;
+                const stabilizeFactor=Math.min(1.0,Math.max(0.15,(bY-350.0)/2000.0));
+                const turb=(p0.b_thrust?0.018:0.012)*stabilizeFactor;
+                swayZ=Math.sin(now*0.0014)*turb;
+                swayX=Math.cos(now*0.0011)*turb*0.6;
             }
             s1Group.rotation.set(swayX,0,-bPitch+swayZ);
         }
         s1Group.updateMatrixWorld(true);
 
-        if(p0.b_thrust&&!landingSonicBoomPlayed&&bY<=3600){playLandingDoubleSonicBoom();landingSonicBoomPlayed=true;camShake=0.55;}
+        if(p0.b_thrust&&!landingSonicBoomPlayed&&bY<=4800){playLandingDoubleSonicBoom();landingSonicBoomPlayed=true;camShake=0.55;}
         if(actx&&boosterRumble&&boosterCrackle){
-            if(p0.b_thrust&&!p0.b_caught&&bY<=3600){const is13Engines=(bY>1200);boosterRumble.gain.setTargetAtTime(is13Engines?1.4:0.95,actx.currentTime,0.08);boosterCrackle.gain.setTargetAtTime(is13Engines?1.1:0.65,actx.currentTime,0.08);}
+            if(p0.b_thrust&&!p0.b_caught&&bY<=4800){const is13Engines=(bY>900);boosterRumble.gain.setTargetAtTime(is13Engines?1.4:0.95,actx.currentTime,0.08);boosterCrackle.gain.setTargetAtTime(is13Engines?1.1:0.65,actx.currentTime,0.08);}
             else{boosterRumble.gain.setTargetAtTime(0.0001,actx.currentTime,0.12);boosterCrackle.gain.setTargetAtTime(0.0001,actx.currentTime,0.12);}
         }
 
@@ -2351,9 +2364,9 @@ function animate(now){
             document.getElementById('tv-stage-badge').innerText="TOWER CATCH SUCCESS";document.getElementById('tv-stage-badge').style.color="#38bdf8";
             if(simT-catchStartTime<4.5&&Math.random()<0.75){s1Group.localToWorld(tempV.set(0,0,0));emitParticle(tempV.x+(Math.random()-0.5)*2.0,tempV.y-0.5,tempV.z+(Math.random()-0.5)*2.0,(Math.random()-0.5)*0.8,0.6+Math.random()*0.8,(Math.random()-0.5)*0.8,1.2,8.5,45,0.50,0xe2e8f0,0.96,0.025,true);}
         }else if(p0.b_thrust){
-            mainCombinedGroup.visible=false;const isThreeOnly=(bY<=1200);
+            mainCombinedGroup.visible=false;const isThreeOnly=(bY<=900);
             towerCatchLight.intensity=(bY<=2500)?(8.5*(1.0-bY/2500.0)):0.0;
-            if(bY<=3600&&landingBurnIgniteStartTime===0.0){
+            if(bY<=4800&&landingBurnIgniteStartTime===0.0){
                 landingBurnIgniteStartTime=simT;
                 if(!landingBurnVaporTriggered){
                     landingBurnVaporTriggered=true;
@@ -2478,7 +2491,6 @@ function animate(now){
     let isCounterBurst=false;if(counterPulseTimer>0){counterPulseTimer-=0.016;if(counterPulseTimer<=0)isCounterBurst=true;}
     let soundTriggeredThisFrame=false;
 
-    // 【改善】全方向一斉噴射を完全排除。傾きと角速度に応じた独立ノズル非対称修正噴射
     const isLandingCorrection=(stage1Detached&&!p0.b_caught&&(p0.b_thrust||bY<25000));
     for(let rcs of rcsNozzles){
         let triggerPulse=false;
@@ -2493,8 +2505,8 @@ function animate(now){
                     if(simT-jsSepTime<4.0){
                         if(rcs.dir.id==="-X"&&Math.random()<0.45)triggerPulse=true;
                     }else if(isLandingCorrection){
-                        const swayPhaseX=Math.sin(now*0.008);
-                        const swayPhaseZ=Math.cos(now*0.011);
+                        const swayPhaseX=Math.sin(now*0.0014);
+                        const swayPhaseZ=Math.cos(now*0.0011);
                         const fireProb=p0.b_thrust?0.16:0.06;
                         if(rcs.dir.id==="+X"&&swayPhaseX>0.2&&Math.random()<fireProb)triggerPulse=true;
                         if(rcs.dir.id==="-X"&&swayPhaseX<-0.2&&Math.random()<fireProb)triggerPulse=true;
@@ -2581,7 +2593,7 @@ function animate(now){
         if(stage1Detached&&p0.b_active){
             targetPos.set(bX*0.1,bY_scaled+s1Len*0.55,0);cameraPip.position.set(240.0,22.0,260.0);
             if(bY<=14000&&bY>=10000&&!pipBlurTriggered12k){triggerPipAutoFocus();pipBlurTriggered12k=true;}
-            if(bY<=3600&&!pipBlurTriggeredCatch){triggerPipAutoFocus();pipBlurTriggeredCatch=true;}
+            if(bY<=4800&&!pipBlurTriggeredCatch){triggerPipAutoFocus();pipBlurTriggeredCatch=true;}
             const bSpdKmh=Math.round(Math.abs(bVyVal)*3.6),vArrow=(bVyVal<-5.0)?"▼":((bVyVal>5.0)?"▲":"━"),vColor=(bVyVal<-5.0)?"#34d399":"#38bdf8";
             if(p0.b_caught||bY_scaled<=90.0){
                 cameraPip.fov=THREE.MathUtils.lerp(cameraPip.fov,16.0,0.1);document.getElementById('pip-tag').innerText="CAM 02: GROUND OPTICAL (TOWER CATCH)";document.getElementById('pip-hud-alt').innerText=p0.b_caught?"SUSPENDED (SECURED)":"FINAL TOUCHDOWN";
