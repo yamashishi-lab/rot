@@ -54,14 +54,14 @@ PUMP_CYCLES = {
 }
 
 MATERIALS = {
-    "Austenitic 304L 冷間圧延鏡面ステンレス [Starship仕様]": {"base_dry_ratio": 0.065, "max_q_base": 130.0, "max_g_base": 12.5, "mat_id": "ss"},
-    "航空宇宙用 Al-Li-2195 アルミリチウム合金 [SLSオレンジ塗装]": {"base_dry_ratio": 0.050, "max_q_base": 82.0, "max_g_base": 9.0, "mat_id": "al"},
-    "Saturn V 伝統 ホワイト＆ブラック・ロールチェック塗工": {"base_dry_ratio": 0.054, "max_q_base": 88.0, "max_g_base": 9.5, "mat_id": "saturn"},
-    "高弾性トレカ炭素繊維複合材 (CFRP) [マットブラック]": {"base_dry_ratio": 0.036, "max_q_base": 65.0, "max_g_base": 7.5, "mat_id": "cf"},
-    "軍用オリーブドラブ重装甲鋼板 [ICBM サルマト仕様]": {"base_dry_ratio": 0.088, "max_q_base": 180.0, "max_g_base": 18.0, "mat_id": "military"},
-    "焼きたて小麦粉クラスト [超軽量パリパリ仕様]": {"base_dry_ratio": 0.040, "max_q_base": 70.0, "max_g_base": 8.0, "mat_id": "baguette"},
-    "天然ヒノキ材＆消しゴムラバー [HB鉛筆仕様]": {"base_dry_ratio": 0.048, "max_q_base": 85.0, "max_g_base": 10.0, "mat_id": "pencil"},
-    "超耐熱インコネル718 モノコック [重装甲チタン調]": {"base_dry_ratio": 0.092, "max_q_base": 195.0, "max_g_base": 16.5, "mat_id": "inconel"}
+    "Austenitic 304L 冷間圧延鏡面ステンレス [Starship仕様]": {"base_dry_ratio": 0.065, "max_q_base": 58.0, "max_g_base": 8.5, "mat_id": "ss"},
+    "航空宇宙用 Al-Li-2195 アルミリチウム合金 [SLSオレンジ塗装]": {"base_dry_ratio": 0.050, "max_q_base": 42.0, "max_g_base": 6.0, "mat_id": "al"},
+    "Saturn V 伝統 ホワイト＆ブラック・ロールチェック塗工": {"base_dry_ratio": 0.054, "max_q_base": 45.0, "max_g_base": 6.5, "mat_id": "saturn"},
+    "高弾性トレカ炭素繊維複合材 (CFRP) [マットブラック]": {"base_dry_ratio": 0.036, "max_q_base": 36.0, "max_g_base": 5.5, "mat_id": "cf"},
+    "軍用オリーブドラブ重装甲鋼板 [ICBM サルマト仕様]": {"base_dry_ratio": 0.088, "max_q_base": 95.0, "max_g_base": 14.0, "mat_id": "military"},
+    "焼きたて小麦粉クラスト [超軽量パリパリ仕様]": {"base_dry_ratio": 0.040, "max_q_base": 24.0, "max_g_base": 4.2, "mat_id": "baguette"},
+    "天然ヒノキ材＆消しゴムラバー [HB鉛筆仕様]": {"base_dry_ratio": 0.048, "max_q_base": 32.0, "max_g_base": 5.0, "mat_id": "pencil"},
+    "超耐熱インコネル718 モノコック [重装甲チタン調]": {"base_dry_ratio": 0.092, "max_q_base": 110.0, "max_g_base": 12.0, "mat_id": "inconel"}
 }
 
 STRAPON_BOOSTERS = {
@@ -446,7 +446,6 @@ def run_simulation(preview_only=False):
                     b_active = True
                     b_sep_time = t
                     b_x, b_y = x, y
-                    # 修正：初速上昇をわずか+12.0m/s（即座に頂点到達）に固定し、宇宙への無限上昇を完全根絶
                     b_vx = vx * 0.65
                     b_vy = 12.0
                     b_pitch = visual_pitch
@@ -486,7 +485,6 @@ def run_simulation(preview_only=False):
                 fuel_s2_rem -= (thrust / (isp * g0)) * dt
                 current_pc = 220.0 * (thrust / thrust_base if thrust_base > 0 else 0.0)
 
-        # 修正：分離後の第1段ブースター物理演算（即座に重力落下・アポジー反転・降下へ移行）
         b_rcs = 0.0
         if b_active and not b_caught:
             b_alt = b_y
@@ -511,7 +509,6 @@ def run_simulation(preview_only=False):
                     pitch_err = target_flip - b_pitch
                     b_rcs = 1.0 if pitch_err < -0.05 else (-1.0 if pitch_err > 0.05 else 0.0)
                     b_pitch += np.clip(pitch_err * 0.35, -0.45, 0.45) * dt
-                    # 重力と下向き抗力により、分離後わずか1秒で下向き落下（b_vy < 0）に確実に転換
                     b_vy -= (g0 * 3.8) * dt
                     b_vx -= 14.0 * dt
                     b_x = max(0.0, b_x + b_vx * dt)
@@ -586,8 +583,64 @@ def run_simulation(preview_only=False):
         s2_pct = max(0.0, (fuel_s2_rem / fuel_s2_init) * 100.0)
         apogee_val = alt_km + (max(0.0, vy)**2 / (2.0 * g0 * 1000.0))
 
+        # =====================================================================
+        # 💥 リアル＆シビアな多項目RUD（構造破壊・エンジン爆発）判定
+        # =====================================================================
+        rud_triggered = False
+        s1_cyc_spec = PUMP_CYCLES[s1_cycle]
+        s2_cyc_spec = PUMP_CYCLES[s2_cycle]
+        cur_prop_spec = PROPELLANTS[s1_prop if stage == 1 else s2_prop]
+
+        # 1. 動圧 (Max-Q) 限界超過
         if q > cur_spec["max_q"]:
-            fail_reason = f"Max-Q 構造圧壊: 動圧 {q:.1f} kPa が強度限界を超過。"
+            fail_reason = f"【Max-Q 構造圧壊】動圧 {q:.1f} kPa が機体強度限界 ({cur_spec['max_q']:.1f} kPa) を超過。外殻板厚を上げるか推力抑制を強めてください。"
+            rud_triggered = True
+
+        # 2. 過大迎角 (AoA) による空力曲げモーメント座屈
+        elif q > 10.0 and (q * abs(angle_of_attack)) > (cur_spec["max_q"] * 1.35):
+            fail_reason = f"【空力横曲げ座屈】高動圧領域 ({q:.1f} kPa) での迎角 ({angle_of_attack}°) が過大なため、機体が横風圧で折損しました。"
+            rud_triggered = True
+
+        # 3. 軸方向G過負荷 (タンク隔壁座屈)
+        elif acc_g > cur_spec["max_g"]:
+            fail_reason = f"【過G 構造座屈】加速度 {acc_g:.1f} G が機体耐G限界 ({cur_spec['max_g']:.1f} G) を超過。最大加速度リミッターを下げてください。"
+            rud_triggered = True
+
+        # 4. ターボポンプ耐圧限界突破 (燃焼室破裂)
+        elif stage == 1 and thrust > 0 and s1_pc > s1_cyc_spec["max_pressure_limit"]:
+            if t > 1.5:
+                fail_reason = f"【ターボポンプ爆裂】燃焼室圧力 ({s1_pc} bar) が {s1_cycle} の設計耐圧限界 ({s1_cyc_spec['max_pressure_limit']} bar) を突破しエンジンが爆発しました。"
+                rud_triggered = True
+
+        # 5. 海面ノズル過膨張によるフローセパレーション（低空でのノズル横振動破壊）
+        elif stage == 1 and thrust > 0 and alt_km < 8.0 and s1_eps > 46:
+            if t > 4.0:
+                fail_reason = f"【ノズル過膨張・剥離破壊】海面膨張比 (ε={s1_eps}) が大きすぎるため低空大気圧で排気剥離(Flow Separation)が発生、激しい横振動でノズルが爆散しました。"
+                rud_triggered = True
+
+        # 6. 空力パーツの超音速フラッター破壊
+        elif wings_attached and alt_km < 55.0 and mach > wing_spec["flutter_mach"]:
+            fail_reason = f"【超音速フラッター分解】速度 Mach {mach:.2f} が空力翼の限界速度 (Mach {wing_spec['flutter_mach']}) を超過し、主翼の共振剥離から機体が空中分解しました。"
+            rud_triggered = True
+
+        # 7. 先端部の空力加熱 (熱構造崩壊) またはフェアリング早期分離による衛星焼損
+        elif alt_km < 65.0 and mach > 4.0:
+            stag_temp = 260.0 * (1.0 + 0.2 * (mach ** 2)) * np.exp(-alt_km / 42.0)
+            if not fairing_attached and alt_km < 52.0 and q > 1.2:
+                fail_reason = f"【ペイロード空力焼損】高度 {alt_km:.1f} km でフェアリングを早期分離したため、むき出しの衛星が超音速気流と空力加熱に耐えきれず大破しました。"
+                rud_triggered = True
+            elif stag_temp > fair_spec["heat_limit"]:
+                fail_reason = f"【ノーズコーン熱融解】空力加熱温度 ({stag_temp:.0f} K) が先端カウルの耐熱限界 ({fair_spec['heat_limit']} K) を超え、先端部から融解・爆散しました。"
+                rud_triggered = True
+
+        # 8. 推進剤固有の燃焼不安定・ハードスタートリスク (猛毒/核熱など)
+        elif thrust > 0 and cur_prop_spec["risk"] > 0.0:
+            step_fail_prob = cur_prop_spec["risk"] * 0.012 * ((s1_pc / 200.0) ** 1.5)
+            if np.random.rand() < step_fail_prob:
+                fail_reason = f"【推進剤・燃焼不安定爆発】高リスク推進剤の燃焼振動および配管腐食リークが発生し、推進系が連鎖爆発しました。"
+                rud_triggered = True
+
+        if rud_triggered:
             for rud_step in range(9):
                 t_rud = t + rud_step * dt
                 vx *= 0.94
@@ -596,7 +649,7 @@ def run_simulation(preview_only=False):
                 y = max(0.0, y + vy * dt)
                 history.append({
                     "t": float(t_rud), "x": float(x), "y": float(y), "alt": float(y / 1000.0), "v": float(np.sqrt(vx**2 + vy**2)),
-                    "q": 0.0, "g": 0.0, "stage": int(stage), "fairing": False, "wings": False, "strapon": False,
+                    "q": float(q), "g": float(acc_g), "stage": int(stage), "fairing": False, "wings": False, "strapon": False,
                     "exploded": True, "thrust": False, "pitch": visual_pitch, "mach": mach, "event": "RUD", "rcs_cmd": 0.0,
                     "s1_prop_pct": 0.0, "s2_prop_pct": 0.0, "pitch_deg": pitch_deg, "apogee_km": apogee_val, "chamber_p": 0.0,
                     "b_x": float(b_x), "b_y": float(b_y), "b_active": b_active, "b_pitch": float(b_pitch), "b_thrust": False, "b_caught": False, "b_rcs": 0.0, "b_vy": float(b_vy)
@@ -2312,7 +2365,6 @@ html_template += """
                     }
                 }
 
-                // 修正：サイドブースターの超スロー・重厚イージング剥離
                 if (!p0.strapon && !boosterDetached && boosterUnits.length > 0 && !simCfg.is_preview) {
                     boosterDetached = true;
                     playHeavySeparationSound();
@@ -2351,7 +2403,6 @@ html_template += """
                     }
                 }
 
-                // 修正：ホットステージング分離（ReferenceErrorの根絶とスロー剥離ブレンド）
                 const isSeparated = (p0.stage === 2 || p0.b_active);
                 if (isSeparated && !stage1Detached && !simCfg.is_preview) {
                     stage1Detached = true;
@@ -2472,7 +2523,6 @@ html_template += """
                     gridFinMat.emissiveIntensity = 0.0;
                 }
 
-                // 修正：フリーズの完全解消（pitch参照バグ修正）と5秒間の滑らかなスロー剥離
                 if (stage1Detached) {
                     s1Group.visible = true;
 
@@ -2530,7 +2580,21 @@ html_template += """
                     }
 
                     if (p0.b_caught) {
-                        if (!catchPopPlayed) { playFirecrackerSnapSound(); catchPopPlayed = true; camShake = 0.45; }
+                        if (!catchPopPlayed) { 
+                            playFirecrackerSnapSound(); 
+                            catchPopPlayed = true; 
+                            camShake = 0.45; 
+                            s1Group.localToWorld(tempV.set(0, 0, 0));
+                            for (let i = 0; i < 28; i++) {
+                                const ang = Math.random() * Math.PI * 2;
+                                const spd = 1.2 + Math.random() * 2.8;
+                                emitParticle(
+                                    tempV.x + Math.cos(ang) * 1.5, tempV.y - 1.0, tempV.z + Math.sin(ang) * 1.5,
+                                    Math.cos(ang) * spd, -0.5 + Math.random() * 1.8, Math.sin(ang) * spd,
+                                    2.5, 16.0, 55, 0.75, 0xf8fafc, 0.94, 0.03, false
+                                );
+                            }
+                        }
                         s1NozzleTips.forEach(t => {
                             t.glow.visible = false;
                             t.plumeGroup.visible = false;
@@ -2541,9 +2605,13 @@ html_template += """
                         document.getElementById('tv-stage-badge').innerText = "TOWER CATCH SUCCESS";
                         document.getElementById('tv-stage-badge').style.color = "#38bdf8";
 
-                        if (simT - catchStartTime < 1.2 && Math.random() < 0.6) {
+                        if (simT - catchStartTime < 4.5 && Math.random() < 0.75) {
                             s1Group.localToWorld(tempV.set(0, 0, 0));
-                            emitParticle(tempV.x, tempV.y - 0.5, tempV.z, (Math.random()-0.5)*0.6, -0.4, (Math.random()-0.5)*0.6, 0.6, 3.8, 30, 0.35, 0xd97706, 0.96, 0.01, true);
+                            emitParticle(
+                                tempV.x + (Math.random()-0.5)*2.0, tempV.y - 0.5, tempV.z + (Math.random()-0.5)*2.0,
+                                (Math.random()-0.5)*0.8, 0.6 + Math.random()*0.8, (Math.random()-0.5)*0.8,
+                                1.2, 8.5, 45, 0.50, 0xe2e8f0, 0.96, 0.025, true
+                            );
                         }
                     } else if (p0.b_thrust) {
                         mainCombinedGroup.visible = false;
@@ -2581,19 +2649,38 @@ html_template += """
                             });
                         });
 
-                        if (bY <= 350.0) {
-                            const groundRatio = Math.max(0.2, 1.0 - (bY / 350.0));
-                            const blastCount = Math.ceil(14 * groundRatio);
+                        if (bY <= 2200.0) {
+                            const groundRatio = Math.max(0.25, 1.0 - Math.max(0.0, bY - 400.0) / 1800.0);
+                            const blastCount = Math.ceil(12 * groundRatio);
+                            s1Group.localToWorld(tempV.set(0, 0, 0));
+
                             for (let i = 0; i < blastCount; i++) {
                                 const ang = Math.random() * Math.PI * 2;
-                                const spd = (4.0 + Math.random() * 5.5) * groundRatio;
+                                const spd = (2.5 + Math.random() * 4.5) * groundRatio;
                                 const pType = Math.random();
-                                const col = (pType < 0.4) ? 0xf59e0b : ((pType < 0.75) ? 0xfef08a : 0x52525b);
+                                const col = (pType < 0.35) ? 0xf59e0b : ((pType < 0.65) ? 0xfef08a : 0xe2e8f0);
+
                                 emitParticle(
-                                    (bX * 0.1) + Math.cos(ang) * 2.0, 3.8 + Math.random() * 1.2, Math.sin(ang) * 2.0,
-                                    Math.cos(ang) * spd, 0.15 + Math.random() * 0.35, Math.sin(ang) * spd,
-                                    3.8, 26.0 * groundRatio + 8.0, 52, 0.85, col, 0.88, 0.025, (pType < 0.75)
+                                    tempV.x + Math.cos(ang) * 1.8,
+                                    Math.max(3.0, tempV.y - 4.0 - Math.random() * 10.0),
+                                    tempV.z + Math.sin(ang) * 1.8,
+                                    Math.cos(ang) * spd * 0.7,
+                                    -1.2 + Math.random() * 2.2,
+                                    Math.sin(ang) * spd * 0.7,
+                                    3.2, 22.0 * groundRatio + 6.0, 48, 0.82, col, 0.92, 0.035, (pType < 0.65)
                                 );
+
+                                if (bY <= 1400.0 && i % 2 === 0) {
+                                    emitParticle(
+                                        (bX * 0.1) + Math.cos(ang) * 3.5,
+                                        3.5 + Math.random() * 2.5,
+                                        Math.sin(ang) * 3.5,
+                                        Math.cos(ang) * spd * 1.3,
+                                        0.35 + Math.random() * 0.65,
+                                        Math.sin(ang) * spd * 1.3,
+                                        4.5, 30.0 * groundRatio + 10.0, 58, 0.85, 0xcbd5e1, 0.90, 0.04, false
+                                    );
+                                }
                             }
                         }
                     } else {
@@ -2633,7 +2720,6 @@ html_template += """
                     }
                 }
 
-                // 修正：エンジンバーナーの立体的描写＆スタッガード点火
                 const isEngineFiring = (p0.thrust && !p0.exploded && !simCfg.is_preview);
                 
                 const s1TargetEmissive = (p0.stage === 1 && isEngineFiring) ? 1.25 : (p0.b_thrust && !p0.b_caught ? 1.1 : 0.0);
@@ -3092,7 +3178,6 @@ html_template += """
                 if (p0.stage === 2) { activeFocusWorld.set(0, s2Len * 0.45, 0); s2Group.localToWorld(activeFocusWorld); }
                 else { activeFocusWorld.set(0, s1Len * 0.52, 0); rocket.localToWorld(activeFocusWorld); }
 
-                // カメラトラッキング（魔改造：ステージ分離時の自動画角ワイドニング FOV 16→21度）
                 if (simCfg.is_preview) {
                     const ang = elapsedSec * 0.22;
                     cameraMain.position.set(Math.sin(ang) * 280.0, 42.0, Math.cos(ang) * 280.0);
@@ -3113,7 +3198,6 @@ html_template += """
                         camShake *= 0.94;
                     }
 
-                    // ステージ分離直後の5秒間は画角を広げて両機体を長くフレーム内に捉える
                     if (stage1Detached && (simT - jsSepTime < 5.0)) {
                         cameraMain.fov = THREE.MathUtils.lerp(cameraMain.fov, 21.0, 0.08);
                     } else {
@@ -3156,7 +3240,6 @@ html_template += """
                             pipBlurTriggeredCatch = true;
                         }
 
-                        // 魔改造：落下速度インジケーター（▼/▲）付き高度表示
                         const bSpdKmh = Math.round(Math.abs(bVyVal) * 3.6);
                         const vArrow = (bVyVal < -5.0) ? "▼" : ((bVyVal > 5.0) ? "▲" : "━");
                         const vColor = (bVyVal < -5.0) ? "#34d399" : "#38bdf8";
