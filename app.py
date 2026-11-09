@@ -519,16 +519,65 @@ def on_preset_change():
     st.session_state["k_turn_exp"] = float(cfg["turn_exp"])
 
 
+def on_manual_change():
+  st.session_state["preset_selector"] = list(PRESETS.keys())[0]
+
+
+if "orbit_achieved" not in st.session_state:
+  st.session_state["orbit_achieved"] = False
+
 if "initialized_preset" not in st.session_state:
-  st.session_state["preset_selector"] = list(PRESETS.keys())[1]
-  on_preset_change()
+  st.session_state["preset_selector"] = list(PRESETS.keys())[0]
+
+  st.session_state["k_s1_prop"] = prop_keys[0]
+  st.session_state["k_s1_cycle"] = cyc_keys[2]
+  st.session_state["k_s1_eng"] = 1
+  st.session_state["k_s1_pc"] = 180
+  st.session_state["k_s1_eps"] = 52
+  st.session_state["k_s1_fuel"] = 280.0
+  st.session_state["k_s1_mat"] = mat_keys[0]
+  st.session_state["k_s1_thick"] = 1.0
+
+  st.session_state["k_strapon"] = strap_keys[0]
+  st.session_state["k_sep_thrust"] = 1.2
+  st.session_state["k_spacex_rtls"] = False
+
+  st.session_state["k_wings"] = wing_keys[2]
+  st.session_state["k_aoa"] = 0.0
+  st.session_state["k_rcs"] = 0.8
+
+  st.session_state["k_s2_prop"] = prop_keys[0]
+  st.session_state["k_s2_cycle"] = cyc_keys[2]
+  st.session_state["k_s2_eng"] = 1
+  st.session_state["k_s2_eps"] = 40
+  st.session_state["k_s2_fuel"] = 15.0
+  st.session_state["k_s2_mat"] = mat_keys[0]
+  st.session_state["k_s2_thick"] = 1.0
+
+  st.session_state["k_fairing"] = fair_keys[0]
+  st.session_state["k_fairing_sep"] = 75.0
+  st.session_state["k_payload"] = 5.0
+  st.session_state["k_water"] = 50
+  st.session_state["k_ign_lead"] = 3.8
+  st.session_state["k_turn_start"] = 1.8
+  st.session_state["k_turn_end"] = 120.0
+  st.session_state["k_turn_exp"] = 1.45
+  st.session_state["k_maxq_thr"] = 100
+  st.session_state["k_max_g"] = 15.0
+
   st.session_state["initialized_preset"] = True
+
+if not st.session_state["orbit_achieved"]:
+  st.info("🔒 **機体プリセットはロックされています**：カスタム構成で試行錯誤し、自力で一度でも軌道投入（LEO投入）を達成すると完成機体プリセットがアンロックされます。")
+else:
+  st.success("🔓 **完成機体プリセットがアンロックされました！**：実機プリセットを自由にお試しいただけます。")
 
 preset_choice = st.selectbox(
     "🎯 機体プリセット / 特殊兵器セレクター",
     list(PRESETS.keys()),
     key="preset_selector",
     on_change=on_preset_change,
+    disabled=not st.session_state["orbit_achieved"],
 )
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -542,13 +591,13 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
   c1, c2, c3 = st.columns(3)
   with c1:
-    s1_prop = st.selectbox("第1段 推進剤", prop_keys, key="k_s1_prop")
-    s1_cycle = st.selectbox("ターボポンプ駆動サイクル", cyc_keys, key="k_s1_cycle")
-    s1_eng_count = st.slider("メインエンジン群 基数", 1, 33, key="k_s1_eng")
+    s1_prop = st.selectbox("第1段 推進剤", prop_keys, key="k_s1_prop", on_change=on_manual_change)
+    s1_cycle = st.selectbox("ターボポンプ駆動サイクル", cyc_keys, key="k_s1_cycle", on_change=on_manual_change)
+    s1_eng_count = st.slider("メインエンジン群 基数", 1, 33, key="k_s1_eng", on_change=on_manual_change)
   with c2:
-    s1_pc = st.slider("燃焼室圧力 Pc (bar)", 30, 420, step=10, key="k_s1_pc")
+    s1_pc = st.slider("燃焼室圧力 Pc (bar)", 30, 420, step=10, key="k_s1_pc", on_change=on_manual_change)
     s1_eps = st.slider(
-        "海面膨張比 (ε: ノズル径連動)", 8, 70, step=1, key="k_s1_eps"
+        "海面膨張比 (ε: ノズル径連動)", 8, 70, step=1, key="k_s1_eps", on_change=on_manual_change
     )
   with c3:
     s1_fuel = st.slider(
@@ -557,29 +606,31 @@ with tab1:
         4500.0,
         step=25.0,
         key="k_s1_fuel",
+        on_change=on_manual_change,
     )
-    s1_mat = st.selectbox("第1段 構造素材", mat_keys, key="k_s1_mat")
+    s1_mat = st.selectbox("第1段 構造素材", mat_keys, key="k_s1_mat", on_change=on_manual_change)
     s1_thick = st.slider(
-        "外殻等価板厚 (mm)", 1.0, 12.0, step=0.1, key="k_s1_thick"
+        "外殻等価板厚 (mm)", 1.0, 12.0, step=0.1, key="k_s1_thick", on_change=on_manual_change
     )
 
 with tab2:
   c1, c2 = st.columns(2)
   with c1:
-    strapon_opt = st.selectbox("ブースター種別クラスタ", strap_keys, key="k_strapon")
+    strapon_opt = st.selectbox("ブースター種別クラスタ", strap_keys, key="k_strapon", on_change=on_manual_change)
     sep_thrust_factor = st.slider(
         "分離パイロモーター推力倍率",
         0.5,
         3.0,
-        1.2,
         step=0.1,
         key="k_sep_thrust",
+        on_change=on_manual_change,
     )
   with c2:
     spacex_return_mode = st.checkbox(
         "🔄 SpaceX型 ブースターRTLS帰還 ＆ チョップスティック・タワーキャッチ"
         " (IFT-5再現)",
         key="k_spacex_rtls",
+        on_change=on_manual_change,
     )
     st.caption(
         "※ ONの場合：第2段軌道投入＆第1段タワーキャッチの両方成功でミッション完了。OFFの場合：軌道投入のみでミッション完了。"
@@ -588,13 +639,13 @@ with tab2:
 with tab3:
   c1, c2 = st.columns(2)
   with c1:
-    wing_type = st.selectbox("機体外部 空力パーツ", wing_keys, key="k_wings")
+    wing_type = st.selectbox("機体外部 空力パーツ", wing_keys, key="k_wings", on_change=on_manual_change)
     angle_of_attack = st.slider(
-        "固定取り付け迎角 AoA (deg)", -3.0, 12.0, step=0.5, key="k_aoa"
+        "固定取り付け迎角 AoA (deg)", -3.0, 12.0, step=0.5, key="k_aoa", on_change=on_manual_change
     )
   with c2:
     rcs_deadband = st.slider(
-        "4象限RCS デッドバンド感度 (deg)", 0.2, 5.0, step=0.1, key="k_rcs"
+        "4象限RCS デッドバンド感度 (deg)", 0.2, 5.0, step=0.1, key="k_rcs", on_change=on_manual_change
     )
     st.caption(
         "※ 姿勢制御要求が発生した瞬間だけ冷ガス窒素(GN2)が一瞬パルス噴射されます。"
@@ -603,70 +654,70 @@ with tab3:
 with tab4:
   c1, c2, c3 = st.columns(3)
   with c1:
-    s2_prop = st.selectbox("第2段 推進剤", prop_keys, key="k_s2_prop")
-    s2_cycle = st.selectbox("第2段 ポンプ方式", cyc_keys, key="k_s2_cycle")
-    s2_eng_count = st.slider("真空ノズル基数", 1, 9, key="k_s2_eng")
+    s2_prop = st.selectbox("第2段 推進剤", prop_keys, key="k_s2_prop", on_change=on_manual_change)
+    s2_cycle = st.selectbox("第2段 ポンプ方式", cyc_keys, key="k_s2_cycle", on_change=on_manual_change)
+    s2_eng_count = st.slider("真空ノズル基数", 1, 9, key="k_s2_eng", on_change=on_manual_change)
     s2_eps = st.slider(
-        "第2段 真空膨張比 (ε)", 30, 280, step=5, key="k_s2_eps"
+        "第2段 真空膨張比 (ε)", 30, 280, step=5, key="k_s2_eps", on_change=on_manual_change
     )
   with c2:
     s2_fuel = st.slider(
-        "第2段 推進剤充填量 (トン)", 10.0, 1500.0, step=10.0, key="k_s2_fuel"
+        "第2段 推進剤充填量 (トン)", 10.0, 1500.0, step=10.0, key="k_s2_fuel", on_change=on_manual_change
     )
-    s2_mat = st.selectbox("第2段 構造素材", mat_keys, key="k_s2_mat")
+    s2_mat = st.selectbox("第2段 構造素材", mat_keys, key="k_s2_mat", on_change=on_manual_change)
     s2_thick = st.slider(
-        "第2段 壁厚 (mm)", 0.8, 8.0, step=0.1, key="k_s2_thick"
+        "第2段 壁厚 (mm)", 0.8, 8.0, step=0.1, key="k_s2_thick", on_change=on_manual_change
     )
   with c3:
     fairing_type = st.selectbox(
-        "先端空力カウル / 弾頭 / ペイロード", fair_keys, key="k_fairing"
+        "先端空力カウル / 弾頭 / ペイロード", fair_keys, key="k_fairing", on_change=on_manual_change
     )
     fairing_sep_alt = st.slider(
         "フェアリング分離高度 (km)",
         30.0,
         180.0,
-        75.0,
         step=5.0,
         key="k_fairing_sep",
+        on_change=on_manual_change,
     )
     payload_mass = st.slider(
-        "投入衛星 / 弾頭質量 (トン)", 0.2, 120.0, step=0.5, key="k_payload"
+        "投入衛星 / 弾頭質量 (トン)", 0.2, 120.0, step=0.5, key="k_payload", on_change=on_manual_change
     )
 
 with tab5:
   c1, c2 = st.columns(2)
   with c1:
     water_flow_rate = st.slider(
-        "消音注水デリュージ流量 (トン/秒)", 50, 450, step=25, key="k_water"
+        "消音注水デリュージ流量 (トン/秒)", 50, 450, step=25, key="k_water", on_change=on_manual_change
     )
     ignition_lead_time = st.slider(
         "エンジン先行点火開始 (T-マイナス秒)",
         2.5,
         6.0,
-        3.8,
         step=0.1,
         key="k_ign_lead",
+        on_change=on_manual_change,
     )
   with c2:
     turn_start_alt = st.slider(
-        "ピッチオーバー開始高度 (km)", 0.3, 15.0, 1.8, step=0.1, key="k_turn_start"
+        "ピッチオーバー開始高度 (km)", 0.3, 15.0, step=0.1, key="k_turn_start", on_change=on_manual_change
     )
     turn_end_alt = st.slider(
         "水平重力ターン完了高度 (km)",
         50.0,
         250.0,
-        120.0,
         step=5.0,
         key="k_turn_end",
+        on_change=on_manual_change,
     )
     turn_exponent = st.slider(
-        "ターン曲率指数", 0.3, 2.0, step=0.02, key="k_turn_exp"
+        "ターン曲率指数", 0.3, 2.0, step=0.02, key="k_turn_exp", on_change=on_manual_change
     )
     throttle_maxq = st.slider(
-        "Max-Q 領域 推力抑制 (%)", 30, 100, 75, key="k_maxq_thr"
+        "Max-Q 領域 推力抑制 (%)", 30, 100, key="k_maxq_thr", on_change=on_manual_change
     )
     max_g_limit_cut = st.slider(
-        "最大加速度リミッター (G)", 2.5, 18.0, 5.0, step=0.2, key="k_max_g"
+        "最大加速度リミッター (G)", 2.5, 18.0, step=0.2, key="k_max_g", on_change=on_manual_change
     )
 
 
@@ -782,15 +833,20 @@ total_dv = dv_s1 + dv_s2
 
 st.markdown("---")
 m1, m2, m3, m4 = st.columns(4)
+twr_delta_str = f"TWR: {twr_init:.2f} ({'離床可能' if twr_init >= 1.05 else '推力不足！'})"
 m1.metric(
     "総離床重量 / 離床TWR",
     f"{total_s1_wet:.1f} t",
-    f"TWR: {twr_init:.2f} ({'離床可能' if twr_init >= 1.05 else '推力不足！'})",
+    twr_delta_str,
+    delta_color="normal" if twr_init >= 1.05 else "inverse",
 )
+dv_diff = total_dv - 9200.0
+dv_delta_str = f"LEO基準(9200m/s)差: {dv_diff:+.0f} m/s"
 m2.metric(
     "総計算速度増分 (ΔV)",
     f"{total_dv:.0f} m/s",
-    "LEO投入基準: 9,200 m/s",
+    dv_delta_str,
+    delta_color="normal" if dv_diff >= 0 else "inverse",
 )
 m3.metric(
     "構造限界動圧 / 耐G",
@@ -1559,6 +1615,12 @@ with cb2:
   st.caption("※ 設定変更すると発射台上の3Dモデルが即座に反映されます。")
 
 traj_data, error_msg = run_simulation(preview_only=(not launch_clicked))
+
+if launch_clicked:
+  has_orbit = any(pt.get("event") == "ORBIT" for pt in traj_data)
+  if has_orbit and not st.session_state["orbit_achieved"]:
+    st.session_state["orbit_achieved"] = True
+    st.rerun()
 
 rocket_visual_cfg = {
     "is_preview": bool(not launch_clicked),
@@ -2357,7 +2419,6 @@ function animate(now){
         if(p0.b_caught){
             if(!catchPopPlayed){
                 playFirecrackerSnapSound();catchPopPlayed=true;camShake=0.45;s1Group.localToWorld(tempV.set(0,0,0));
-                // 【改善】キャッチ瞬間の白煙発生位置を下げ、不透明度を抑えてロック機構をクリアに魅せる
                 for(let i=0;i<10;i++){const ang=Math.random()*Math.PI*2,spd=1.2+Math.random()*2.8;emitParticle(tempV.x+Math.cos(ang)*1.5,tempV.y-8.0,tempV.z+Math.sin(ang)*1.5,Math.cos(ang)*spd,-0.5+Math.random()*1.8,Math.sin(ang)*spd,2.0,12.0,45,0.28,0xf8fafc,0.94,0.02,false);}
             }
             s1NozzleTips.forEach(t=>{t.glow.visible=false;t.plumeGroup.visible=false;t.diamonds.forEach(d=>d.visible=false);});
@@ -2389,7 +2450,6 @@ function animate(now){
                 t.diamonds.forEach((d,k)=>{d.visible=active;d.position.y=-(k+1)*2.6*fLen;d.scale.set(t.exitR*(isBoostback?2.2:1.25),1.0,t.exitR*(isBoostback?2.2:1.25));});
             });
 
-            // 【改善】着陸煙の発生位置をノズル先端のはるか下へ下げ、不透明度を大幅に薄くしてブースターをクリアに可視化
             if(bY<=1800.0){
                 const groundRatio=Math.max(0.15,1.0-Math.max(0.0,bY-400.0)/1400.0);
                 const blastCount=Math.ceil(4*groundRatio);
